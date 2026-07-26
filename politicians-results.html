@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Your representatives · Congress Bills</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav id="app-nav" class="app-nav" aria-label="Main">
+      <div class="app-nav__inner">
+        <a class="app-nav__brand" href="index.html">Congress Bills</a>
+        <div class="app-nav__links">
+          <a class="app-nav__link" href="index.html">Bills</a>
+          <a class="app-nav__link" href="feed.html">Feed</a>
+          <a class="app-nav__link" href="topics.html">Topics</a>
+          <a class="app-nav__link is-active" href="politicians.html"
+            >Politicians</a
+          >
+        </div>
+        <div class="app-nav__actions" id="app-nav-actions">
+          <a class="app-nav__button app-nav__button--ghost" href="auth.html"
+            >Sign in</a
+          >
+          <a
+            class="app-nav__button app-nav__button--primary"
+            href="auth.html?mode=signup"
+            >Sign up</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <main class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">
+            <a class="text-link" href="politicians.html">← New search</a>
+          </p>
+          <h1>Your representatives</h1>
+          <p class="subtitle">
+            Results for <strong id="results-query">your address</strong>
+          </p>
+        </div>
+      </header>
+
+      <section
+        class="lookup-results-panel"
+        aria-labelledby="results-heading"
+      >
+        <h2 id="results-heading" class="visually-hidden">Search results</h2>
+        <p id="address-status" class="status lookup-panel__status" hidden></p>
+        <div id="address-results" class="politician-results"></div>
+      </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js"></script>
+    <script src="politicians-shared.js"></script>
+    <script src="politicians-results.js" defer></script>
+  </body>
+</html>

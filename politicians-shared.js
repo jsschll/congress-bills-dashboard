@@ -713,12 +713,109 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   applySectionVisibility();
 }
 
-function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
+function dedupeLookupPoliticians(politicians) {
+  const map = new Map();
+  for (const politician of politicians) {
+    const key =
+      (politician.bioguide_id &&
+        `bioguide:${String(politician.bioguide_id).toLowerCase()}`) ||
+      `name:${String(politician.state || "").toUpperCase()}:${String(
+        politician.name || ""
+      )
+        .toLowerCase()
+        .replace(/[^a-z\s]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .split(" ")
+        .filter((part) => part.length > 1)
+        .join(" ")}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, {
+        ...politician,
+        levels: politicianLevels(politician),
+        offices: politicianOffices(politician),
+      });
+      continue;
+    }
+    const levels = [
+      ...new Set([
+        ...politicianLevels(existing),
+        ...politicianLevels(politician),
+      ]),
+    ].sort(
+      (a, b) => DISPLAY_LEVEL_ORDER.indexOf(a) - DISPLAY_LEVEL_ORDER.indexOf(b)
+    );
+    const offices = [...politicianOffices(existing)];
+    for (const office of politicianOffices(politician)) {
+      const signature = `${office.level}|${office.office_title}|${office.district}`;
+      if (
+        !offices.some(
+          (item) =>
+            `${item.level}|${item.office_title}|${item.district}` === signature
+        )
+      ) {
+        offices.push(office);
+      }
+    }
+    map.set(key, {
+      ...existing,
+      ...politician,
+      photo_url: existing.photo_url || politician.photo_url,
+      website_url: existing.website_url || politician.website_url,
+      phone: existing.phone || politician.phone,
+      bioguide_id: existing.bioguide_id || politician.bioguide_id,
+      levels,
+      offices,
+      metadata: {
+        ...(existing.metadata || {}),
+        ...(politician.metadata || {}),
+        levels,
+        offices,
+      },
+    });
+  }
+  return [...map.values()];
+}
+
+function politiciansResultsUrl(address) {
+  return `politicians-results.html?address=${encodeURIComponent(address.trim())}`;
+}
+
+/** Search forms navigate to the results page; they do not render inline. */
+function mountAddressLookup({ formId, inputId }) {
   const form = document.getElementById(formId);
   const input = document.getElementById(inputId);
+  if (!form || !input) return;
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const address = input.value.trim();
+    if (!address) return;
+    window.location.href = politiciansResultsUrl(address);
+  });
+}
+
+function mountAddressResultsPage({
+  statusId = "address-status",
+  resultsId = "address-results",
+  queryLabelId = "results-query",
+} = {}) {
   const status = document.getElementById(statusId);
   const results = document.getElementById(resultsId);
-  if (!form || !input || !status || !results) return;
+  const queryLabel = document.getElementById(queryLabelId);
+  if (!status || !results) return;
+
+  const address = new URLSearchParams(window.location.search)
+    .get("address")
+    ?.trim();
+
+  if (!address) {
+    window.location.replace("politicians.html");
+    return;
+  }
+
+  if (queryLabel) queryLabel.textContent = address;
 
   function setStatus(message, type = "loading") {
     status.hidden = !message;
@@ -726,8 +823,7 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
     status.dataset.type = type;
   }
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  (async () => {
     results.replaceChildren();
     setStatus("Looking up officials at every level of government…", "loading");
 
@@ -738,75 +834,8 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
         ? await loadFollowedPoliticianIds(user.id)
         : new Set();
 
-      const data = await lookupRepresentatives(input.value);
-      const politicians = data.politicians || [];
-
-      const uniquePeople = (() => {
-        // Client-side guard if an older API build still returns source duplicates.
-        const map = new Map();
-        for (const politician of politicians) {
-          const key =
-            (politician.bioguide_id &&
-              `bioguide:${String(politician.bioguide_id).toLowerCase()}`) ||
-            `name:${String(politician.state || "").toUpperCase()}:${String(
-              politician.name || ""
-            )
-              .toLowerCase()
-              .replace(/[^a-z\s]/g, " ")
-              .replace(/\s+/g, " ")
-              .trim()
-              .split(" ")
-              .filter((part) => part.length > 1)
-              .join(" ")}`;
-          const existing = map.get(key);
-          if (!existing) {
-            map.set(key, {
-              ...politician,
-              levels: politicianLevels(politician),
-              offices: politicianOffices(politician),
-            });
-            continue;
-          }
-          const levels = [
-            ...new Set([
-              ...politicianLevels(existing),
-              ...politicianLevels(politician),
-            ]),
-          ].sort(
-            (a, b) => DISPLAY_LEVEL_ORDER.indexOf(a) - DISPLAY_LEVEL_ORDER.indexOf(b)
-          );
-          const offices = [...politicianOffices(existing)];
-          for (const office of politicianOffices(politician)) {
-            const signature = `${office.level}|${office.office_title}|${office.district}`;
-            if (
-              !offices.some(
-                (item) =>
-                  `${item.level}|${item.office_title}|${item.district}` ===
-                  signature
-              )
-            ) {
-              offices.push(office);
-            }
-          }
-          map.set(key, {
-            ...existing,
-            ...politician,
-            photo_url: existing.photo_url || politician.photo_url,
-            website_url: existing.website_url || politician.website_url,
-            phone: existing.phone || politician.phone,
-            bioguide_id: existing.bioguide_id || politician.bioguide_id,
-            levels,
-            offices,
-            metadata: {
-              ...(existing.metadata || {}),
-              ...(politician.metadata || {}),
-              levels,
-              offices,
-            },
-          });
-        }
-        return [...map.values()];
-      })();
+      const data = await lookupRepresentatives(address);
+      const uniquePeople = dedupeLookupPoliticians(data.politicians || []);
 
       if (!uniquePeople.length) {
         setStatus(
@@ -823,16 +852,28 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
         return count ? `${levelLabel(level)} ${count}` : null;
       }).filter(Boolean);
 
+      const resolvedAddress = data.address || address;
+      if (queryLabel) queryLabel.textContent = resolvedAddress;
+
       setStatus(
-        `Representatives for ${data.address || input.value} · ${uniquePeople.length} people · ${levelCounts.join(" · ")}`,
+        `${uniquePeople.length} people · ${levelCounts.join(" · ")}`,
         "success"
       );
-      // Show results immediately; persist in the background for Follow/browse.
       renderPoliticianGroups(results, uniquePeople, { followedIds, user });
+
+      // SORT BY stays first; summary line sits directly under it.
+      const toolbar = results.querySelector(".politician-results-toolbar");
+      if (toolbar) {
+        toolbar.after(status);
+      } else {
+        results.prepend(status);
+      }
 
       Promise.all(
         uniquePeople.map(async (politician) => {
-          if (politician.metadata?.district_only || politician.id) return politician;
+          if (politician.metadata?.district_only || politician.id) {
+            return politician;
+          }
           const row = await upsertPoliticianRecord(politician);
           if (row?.id) politician.id = row.id;
           return politician;
@@ -842,5 +883,5 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
       console.error(error);
       setStatus(error.message || "Address lookup failed.", "error");
     }
-  });
+  })();
 }

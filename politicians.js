@@ -198,8 +198,6 @@ filterSearch.addEventListener("input", applyFilters);
   mountAddressLookup({
     formId: "address-form",
     inputId: "address-input",
-    statusId: "address-status",
-    resultsId: "address-results",
   });
 
   currentUser = (await getUser().catch(() => null)) || null;
