@@ -5,8 +5,11 @@ create table if not exists public.politicians (
   id uuid primary key default gen_random_uuid(),
   external_key text not null unique,
   bioguide_id text,
-  level text not null check (level in ('federal', 'state')),
+  level text not null check (
+    level in ('federal', 'state', 'county', 'city', 'school', 'local')
+  ),
   chamber text,
+  office_title text,
   name text not null,
   party text,
   state text,
@@ -84,7 +87,8 @@ create or replace function public.upsert_politician(
   p_website_url text,
   p_phone text,
   p_source text,
-  p_metadata jsonb default '{}'::jsonb
+  p_metadata jsonb default '{}'::jsonb,
+  p_office_title text default null
 )
 returns public.politicians
 language plpgsql
@@ -93,19 +97,27 @@ set search_path = public
 as $$
 declare
   row public.politicians;
+  resolved_title text;
 begin
+  resolved_title := coalesce(
+    nullif(trim(p_office_title), ''),
+    nullif(trim(p_metadata ->> 'office_title'), ''),
+    nullif(trim(p_chamber), '')
+  );
+
   insert into public.politicians as pol (
-    external_key, bioguide_id, level, chamber, name, party, state, district,
+    external_key, bioguide_id, level, chamber, office_title, name, party, state, district,
     photo_url, website_url, phone, source, metadata, updated_at
   )
   values (
-    p_external_key, p_bioguide_id, p_level, p_chamber, p_name, p_party, p_state, p_district,
+    p_external_key, p_bioguide_id, p_level, p_chamber, resolved_title, p_name, p_party, p_state, p_district,
     p_photo_url, p_website_url, p_phone, p_source, coalesce(p_metadata, '{}'::jsonb), now()
   )
   on conflict (external_key) do update set
     bioguide_id = coalesce(excluded.bioguide_id, pol.bioguide_id),
     level = excluded.level,
     chamber = coalesce(excluded.chamber, pol.chamber),
+    office_title = coalesce(excluded.office_title, pol.office_title),
     name = excluded.name,
     party = coalesce(excluded.party, pol.party),
     state = coalesce(excluded.state, pol.state),
@@ -123,5 +135,5 @@ end;
 $$;
 
 grant execute on function public.upsert_politician(
-  text, text, text, text, text, text, text, text, text, text, text, text, jsonb
+  text, text, text, text, text, text, text, text, text, text, text, text, jsonb, text
 ) to anon, authenticated;

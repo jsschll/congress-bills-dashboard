@@ -25,15 +25,22 @@ Set these for Production/Preview:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY` (also bake into deployed `config.js`, or replace config at build time)
 - `SUPABASE_SERVICE_ROLE_KEY` (server only — never expose to the browser)
-- `GEOCODIO_API_KEY` — used by `/api/lookup-representatives` for address → representatives
+- `GEOCODIO_API_KEY` — federal + state legislators (+ school **district names**)
+- `CICERO_API_KEY` — recommended for city, county, and school **board members** ([Cicero free trial](https://www.cicerodata.com/api/))
+- `GOOGLE_CIVIC_API_KEY` — optional; Google’s Representatives API was turned down in April 2025, but still tried when set
+- `OPENSTATES_API_KEY` — optional enrichment for state / some municipal officials ([Open States](https://openstates.org/accounts/login/))
 
 Cron runs `/api/watch-bills` once daily at midnight UTC (`vercel.json`).
 
 ## 4. Politicians feature
 1. Run [`supabase/migration-politicians.sql`](supabase/migration-politicians.sql)
-2. Open **Politicians** in the nav, or use the address lookup on the homepage
-3. Federal browse uses Congress.gov current members; state officials appear from address lookups (and are saved for browsing)
-4. Signed-in users can Follow / Unfollow politicians (stored in `followed_politicians`)
+2. If you already ran an older politicians migration, also run [`supabase/migration-politicians-levels.sql`](supabase/migration-politicians-levels.sql)
+3. Open **Politicians** in the nav, or use the address lookup on the homepage
+4. Address lookup merges Geocodio (+ optional Cicero / Google Civic / Open States) and groups results by Federal, State, County, City, School, and Local
+5. Federal browse uses Congress.gov current members; other levels appear from address lookups (and are saved for browsing/follow)
+6. Signed-in users can Follow / Unfollow individual officeholders (stored in `followed_politicians`)
+
+**Coverage note:** Geocodio alone covers federal and state legislators. City, county, and school board members need a Cicero key (or a still-working Google Civic key). Without those, lookups still return federal/state officials and school **district** names.
 
 ## 5. Auth flow
 1. Sign up with username, email, and password

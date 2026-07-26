@@ -122,7 +122,10 @@ function applyFilters() {
         politician.name,
         politician.district,
         politician.chamber,
+        politician.office_title,
+        politician.metadata?.office_title,
         politician.state,
+        politician.level,
       ]
         .join(" ")
         .toLowerCase();
@@ -131,20 +134,17 @@ function applyFilters() {
     return true;
   });
 
-  politiciansGrid.replaceChildren(
-    ...filtered.map((politician) =>
-      renderPoliticianCard(politician, {
-        followedIds,
-        user: currentUser,
-      })
-    )
-  );
-
+  politiciansGrid.replaceChildren();
   if (!filtered.length) {
     setBrowseStatus("No politicians match these filters.", "error");
-  } else {
-    setBrowseStatus(`Showing ${filtered.length} politicians.`, "success");
+    return;
   }
+
+  renderPoliticianGroups(politiciansGrid, filtered, {
+    followedIds,
+    user: currentUser,
+  });
+  setBrowseStatus(`Showing ${filtered.length} politicians.`, "success");
 }
 
 async function loadBrowseList() {

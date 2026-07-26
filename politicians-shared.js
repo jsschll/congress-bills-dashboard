@@ -5,6 +5,17 @@ const US_STATES = [
   "WI","WY","DC",
 ];
 
+const LEVEL_ORDER = ["federal", "state", "county", "city", "school", "local"];
+
+const LEVEL_LABELS = {
+  federal: "Federal",
+  state: "State",
+  county: "County",
+  city: "City",
+  school: "School board / district",
+  local: "Local / other",
+};
+
 function escapePoliticianHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -13,18 +24,42 @@ function escapePoliticianHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function chamberLabel(chamber) {
+function levelLabel(level) {
+  return LEVEL_LABELS[level] || "Other";
+}
+
+function chamberLabel(chamber, politician = {}) {
+  const officeTitle =
+    politician.office_title || politician.metadata?.office_title || "";
+  if (officeTitle) return officeTitle;
+
   switch (chamber) {
     case "house":
       return "U.S. House";
     case "senate":
       return "U.S. Senate";
+    case "executive":
+      return "Executive";
+    case "governor":
+      return "Governor";
     case "state_house":
       return "State House";
     case "state_senate":
       return "State Senate";
+    case "mayor":
+      return "Mayor";
+    case "city_council":
+      return "City Council";
+    case "county":
+      return "County office";
+    case "school_board":
+      return "School Board";
+    case "school_district":
+      return "School District";
     default:
-      return chamber || "Office";
+      return chamber
+        ? String(chamber).replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : "Office";
   }
 }
 
@@ -67,80 +102,22 @@ async function lookupRepresentatives(query) {
   }
 
   if (!response.ok) {
-    // Optional local fallback when GEOCODIO_API_KEY is present in config.js.
-    if (typeof GEOCODIO_API_KEY === "string" && GEOCODIO_API_KEY && !GEOCODIO_API_KEY.includes("YOUR_")) {
-      return lookupRepresentativesDirect(q);
-    }
     throw new Error(data.error || `Lookup failed (${response.status})`);
   }
   return data;
-}
-
-async function lookupRepresentativesDirect(query) {
-  const url = `https://api.geocod.io/v1.7/geocode?q=${encodeURIComponent(
-    query
-  )}&fields=cd,stateleg&limit=1&api_key=${encodeURIComponent(GEOCODIO_API_KEY)}`;
-  const response = await fetch(url);
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || "Geocodio lookup failed");
-  }
-
-  // Reuse server mapper logic lightly on the client for fallback.
-  const result = payload.results?.[0];
-  if (!result) return { address: null, politicians: [] };
-
-  const state = (result.address_components?.state || "").toUpperCase();
-  const politicians = [];
-  const seen = new Set();
-
-  for (const district of result.fields?.congressional_districts || []) {
-    for (const legislator of district.current_legislators || []) {
-      const bio = legislator.bio || {};
-      const contact = legislator.contact || {};
-      const references = legislator.references || {};
-      const type = String(legislator.type || "").toLowerCase();
-      const chamber = type === "senator" ? "senate" : "house";
-      const name = [bio.first_name, bio.last_name].filter(Boolean).join(" ");
-      const bioguide = references.bioguide_id || null;
-      const external_key = bioguide
-        ? `federal:${bioguide}`
-        : `federal:${state}:${chamber}:${name}`.toLowerCase();
-      if (seen.has(external_key)) continue;
-      seen.add(external_key);
-      politicians.push({
-        external_key,
-        bioguide_id: bioguide,
-        level: "federal",
-        chamber,
-        name,
-        party: bio.party || "",
-        state,
-        district:
-          chamber === "senate"
-            ? "Statewide"
-            : String(district.district_number || ""),
-        photo_url: bio.photo_url || "",
-        website_url: contact.url || "",
-        phone: contact.phone || "",
-        source: "geocodio",
-        metadata: { references },
-      });
-    }
-  }
-
-  return {
-    address: result.formatted_address || null,
-    state,
-    politicians,
-  };
 }
 
 async function upsertPoliticianRecord(politician) {
   const client = getSupabase();
   if (!client) return null;
 
-  const { data, error } = await client.rpc("upsert_politician", {
+  const officeTitle =
+    politician.office_title ||
+    politician.metadata?.office_title ||
+    politician.chamber ||
+    null;
+
+  const payload = {
     p_external_key: politician.external_key,
     p_bioguide_id: politician.bioguide_id || null,
     p_level: politician.level,
@@ -153,8 +130,18 @@ async function upsertPoliticianRecord(politician) {
     p_website_url: politician.website_url || null,
     p_phone: politician.phone || null,
     p_source: politician.source || "app",
-    p_metadata: politician.metadata || {},
-  });
+    p_metadata: {
+      ...(politician.metadata || {}),
+      office_title: officeTitle,
+    },
+    p_office_title: officeTitle,
+  };
+
+  let { data, error } = await client.rpc("upsert_politician", payload);
+  if (error && /p_office_title|function.*upsert_politician/i.test(error.message || "")) {
+    delete payload.p_office_title;
+    ({ data, error } = await client.rpc("upsert_politician", payload));
+  }
 
   if (error) {
     console.error(error);
@@ -199,6 +186,7 @@ async function unfollowPolitician(userId, politicianId) {
 function renderPoliticianCard(politician, { followedIds, user, onFollowChange }) {
   const card = document.createElement("article");
   card.className = "politician-card";
+  card.dataset.level = politician.level || "local";
 
   const media = document.createElement("div");
   media.className = "politician-card__media";
@@ -217,14 +205,15 @@ function renderPoliticianCard(politician, { followedIds, user, onFollowChange })
   const body = document.createElement("div");
   body.className = "politician-card__body";
 
-  const name = document.createElement("h2");
+  const name = document.createElement("h3");
   name.className = "politician-card__name";
   name.textContent = politician.name;
 
   const meta = document.createElement("p");
   meta.className = "politician-card__meta";
   meta.textContent = [
-    chamberLabel(politician.chamber),
+    levelLabel(politician.level),
+    chamberLabel(politician.chamber, politician),
     politician.state,
     politician.district ? `Dist. ${politician.district}` : "",
   ]
@@ -252,11 +241,23 @@ function renderPoliticianCard(politician, { followedIds, user, onFollowChange })
   followBtn.type = "button";
   followBtn.className = "refresh-btn politician-card__follow";
 
+  const isDistrictOnly = Boolean(politician.metadata?.district_only);
   const isFollowed = politician.id && followedIds?.has(politician.id);
-  followBtn.textContent = isFollowed ? "Following" : "Follow";
+  followBtn.textContent = isDistrictOnly
+    ? "District only"
+    : isFollowed
+      ? "Following"
+      : "Follow";
   if (isFollowed) followBtn.classList.add("is-following");
+  if (isDistrictOnly) {
+    followBtn.disabled = true;
+    followBtn.title =
+      politician.metadata?.note ||
+      "This is a district match, not an individual officeholder.";
+  }
 
   followBtn.addEventListener("click", async () => {
+    if (isDistrictOnly) return;
     if (!user) {
       window.location.href = `auth.html?next=${encodeURIComponent(
         window.location.pathname.split("/").pop() || "politicians.html"
@@ -299,6 +300,40 @@ function renderPoliticianCard(politician, { followedIds, user, onFollowChange })
   return card;
 }
 
+function renderPoliticianGroups(container, politicians, cardOptions) {
+  container.replaceChildren();
+  const byLevel = new Map();
+  for (const politician of politicians) {
+    const level = LEVEL_ORDER.includes(politician.level)
+      ? politician.level
+      : "local";
+    if (!byLevel.has(level)) byLevel.set(level, []);
+    byLevel.get(level).push(politician);
+  }
+
+  for (const level of LEVEL_ORDER) {
+    const group = byLevel.get(level);
+    if (!group?.length) continue;
+
+    const section = document.createElement("section");
+    section.className = "politician-level-group";
+    section.setAttribute("aria-label", levelLabel(level));
+
+    const heading = document.createElement("h3");
+    heading.className = "politician-level-group__title";
+    heading.textContent = `${levelLabel(level)} (${group.length})`;
+    section.append(heading);
+
+    const grid = document.createElement("div");
+    grid.className = "politician-grid";
+    grid.append(
+      ...group.map((politician) => renderPoliticianCard(politician, cardOptions))
+    );
+    section.append(grid);
+    container.append(section);
+  }
+}
+
 function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
   const form = document.getElementById(formId);
   const input = document.getElementById(inputId);
@@ -315,7 +350,7 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     results.replaceChildren();
-    setStatus("Looking up your representatives…", "loading");
+    setStatus("Looking up officials at every level of government…", "loading");
 
     try {
       await injectSupabaseScript().catch(() => {});
@@ -327,7 +362,6 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
       const data = await lookupRepresentatives(input.value);
       const politicians = data.politicians || [];
 
-      // Persist discovered politicians for browse/follow.
       const saved = [];
       for (const politician of politicians) {
         if (politician.metadata?.district_only) {
@@ -346,15 +380,16 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
         return;
       }
 
+      const levelCounts = LEVEL_ORDER.map((level) => {
+        const count = saved.filter((p) => p.level === level).length;
+        return count ? `${levelLabel(level)} ${count}` : null;
+      }).filter(Boolean);
+
       setStatus(
-        `Representatives for ${data.address || input.value}`,
+        `Representatives for ${data.address || input.value} · ${levelCounts.join(" · ")}`,
         "success"
       );
-      results.replaceChildren(
-        ...saved.map((politician) =>
-          renderPoliticianCard(politician, { followedIds, user })
-        )
-      );
+      renderPoliticianGroups(results, saved, { followedIds, user });
     } catch (error) {
       console.error(error);
       setStatus(error.message || "Address lookup failed.", "error");
