@@ -35,16 +35,39 @@ function partyClass(party) {
   return "party--other";
 }
 
+const LOOKUP_API_PATH = "/api/lookup-representatives";
+const LOOKUP_API_FALLBACK =
+  "https://congress-bills-dashboard.vercel.app/api/lookup-representatives";
+
+async function fetchLookupRepresentatives(endpoint, query) {
+  const response = await fetch(
+    `${endpoint}?q=${encodeURIComponent(query)}`
+  );
+  const data = await response.json().catch(() => ({}));
+  return { response, data };
+}
+
 async function lookupRepresentatives(query) {
   const q = query.trim();
   if (!q) throw new Error("Enter an address or ZIP code.");
 
-  const response = await fetch(
-    `/api/lookup-representatives?q=${encodeURIComponent(q)}`
-  );
-  const data = await response.json().catch(() => ({}));
+  let { response, data } = await fetchLookupRepresentatives(LOOKUP_API_PATH, q);
+
+  // GitHub Pages / static hosts have no Vercel serverless routes — retry production API.
+  if (!response.ok && !LOOKUP_API_PATH.startsWith("http")) {
+    const absoluteOrigin =
+      typeof location !== "undefined" &&
+      location.origin &&
+      !location.origin.includes("vercel.app")
+        ? LOOKUP_API_FALLBACK
+        : null;
+    if (absoluteOrigin) {
+      ({ response, data } = await fetchLookupRepresentatives(absoluteOrigin, q));
+    }
+  }
+
   if (!response.ok) {
-    // Fallback for local/static hosts without the Vercel API route.
+    // Optional local fallback when GEOCODIO_API_KEY is present in config.js.
     if (typeof GEOCODIO_API_KEY === "string" && GEOCODIO_API_KEY && !GEOCODIO_API_KEY.includes("YOUR_")) {
       return lookupRepresentativesDirect(q);
     }
