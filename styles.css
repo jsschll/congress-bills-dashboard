@@ -780,10 +780,18 @@ body {
 }
 
 .politician-level-nav {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
   margin: 0 0 1rem;
+  padding: 0.55rem;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
 }
 
 .politician-level-nav__link {

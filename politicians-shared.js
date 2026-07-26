@@ -7,25 +7,23 @@ const US_STATES = [
 
 const LEVEL_ORDER = ["federal", "state", "county", "city", "school", "local"];
 
-// User-facing buckets: Federal → State → County → Municipal/Local
-const DISPLAY_LEVEL_ORDER = ["federal", "state", "county", "municipal"];
+// User-facing buckets from highest to lowest authority.
+const DISPLAY_LEVEL_ORDER = ["federal", "state", "county", "city", "school"];
 
 const LEVEL_LABELS = {
   federal: "Federal",
   state: "State",
   county: "County",
-  city: "Municipal / Local",
-  school: "Municipal / Local",
-  local: "Municipal / Local",
-  municipal: "Municipal / Local",
+  city: "City / Municipal",
+  school: "School Board / District",
+  local: "City / Municipal",
+  municipal: "City / Municipal",
 };
 
 function toDisplayLevel(level) {
-  if (level === "city" || level === "school" || level === "local") {
-    return "municipal";
-  }
+  if (level === "local" || level === "municipal") return "city";
   if (DISPLAY_LEVEL_ORDER.includes(level)) return level;
-  return "municipal";
+  return "city";
 }
 
 function escapePoliticianHtml(value) {
@@ -95,6 +93,10 @@ function chamberLabel(chamber, politician = {}) {
       return "State Executive";
     case "judicial":
       return "Judge";
+    case "sheriff":
+      return "Sheriff";
+    case "trustee":
+      return "Trustee";
     case "county_commissioner":
       return "County Commissioner";
     case "state_house":
@@ -250,7 +252,7 @@ function politicianLevels(politician) {
   unique.sort(
     (a, b) => DISPLAY_LEVEL_ORDER.indexOf(a) - DISPLAY_LEVEL_ORDER.indexOf(b)
   );
-  return unique.length ? unique : ["municipal"];
+  return unique.length ? unique : ["city"];
 }
 
 function politicianOffices(politician) {
@@ -520,11 +522,11 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
     const blurb = document.createElement("p");
     blurb.className = "politician-level-group__blurb";
     const blurbs = {
-      federal: "Members of Congress and federal executives for this address.",
-      state: "Governor, statewide executives, legislators, and state courts.",
-      county: "County commissioners, county executives, and county courts.",
-      municipal:
-        "Mayors, city council, school board members, and other local officials.",
+      federal: "U.S. Senators, Representative, and President for this address.",
+      state: "Governor, statewide executives, legislators, and state officials.",
+      county: "County supervisors/commissioners, sheriff, and county judges.",
+      city: "Mayor, city council, and other municipal officials.",
+      school: "School districts and school board members / trustees.",
     };
     blurb.textContent =
       blurbs[level] ||
@@ -576,28 +578,10 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
       const data = await lookupRepresentatives(input.value);
       const politicians = data.politicians || [];
 
-      const saved = [];
-      for (const politician of politicians) {
-        if (politician.metadata?.district_only) {
-          saved.push(politician);
-          continue;
-        }
-        const row = await upsertPoliticianRecord(politician);
-        saved.push(row ? { ...politician, ...row } : politician);
-      }
-
-      if (!saved.length) {
-        setStatus(
-          "No representatives found for that address. Try a fuller street address.",
-          "error"
-        );
-        return;
-      }
-
       const uniquePeople = (() => {
         // Client-side guard if an older API build still returns source duplicates.
         const map = new Map();
-        for (const politician of saved) {
+        for (const politician of politicians) {
           const key =
             (politician.bioguide_id &&
               `bioguide:${String(politician.bioguide_id).toLowerCase()}`) ||
@@ -626,7 +610,7 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
               ...politicianLevels(politician),
             ]),
           ].sort(
-            (a, b) => LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b)
+            (a, b) => DISPLAY_LEVEL_ORDER.indexOf(a) - DISPLAY_LEVEL_ORDER.indexOf(b)
           );
           const offices = [...politicianOffices(existing)];
           for (const office of politicianOffices(politician)) {
@@ -661,6 +645,14 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
         return [...map.values()];
       })();
 
+      if (!uniquePeople.length) {
+        setStatus(
+          "No representatives found for that address. Try a fuller street address.",
+          "error"
+        );
+        return;
+      }
+
       const levelCounts = DISPLAY_LEVEL_ORDER.map((level) => {
         const count = uniquePeople.filter((p) =>
           politicianLevels(p).includes(level)
@@ -672,7 +664,17 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
         `Representatives for ${data.address || input.value} · ${uniquePeople.length} people · ${levelCounts.join(" · ")}`,
         "success"
       );
+      // Show results immediately; persist in the background for Follow/browse.
       renderPoliticianGroups(results, uniquePeople, { followedIds, user });
+
+      Promise.all(
+        uniquePeople.map(async (politician) => {
+          if (politician.metadata?.district_only || politician.id) return politician;
+          const row = await upsertPoliticianRecord(politician);
+          if (row?.id) politician.id = row.id;
+          return politician;
+        })
+      ).catch((error) => console.error(error));
     } catch (error) {
       console.error(error);
       setStatus(error.message || "Address lookup failed.", "error");

@@ -501,8 +501,11 @@ function mapCiceroDistrictType(districtType = "", officeTitle = "") {
   const title = String(officeTitle || "").toLowerCase();
 
   // Title-based refinements first (Governors, AGs, Mayors, Judges, school boards).
-  if (title.includes("school board") || title.includes("board of education")) {
-    return { level: "school", chamber: "school_board" };
+  if (title.includes("school board") || title.includes("board of education") || title.includes("trustee")) {
+    return { level: "school", chamber: title.includes("trustee") ? "trustee" : "school_board" };
+  }
+  if (title.includes("sheriff") || title.includes("constable") || title.includes("marshal")) {
+    return { level: "county", chamber: "sheriff" };
   }
   if (title.includes("mayor")) {
     return { level: "city", chamber: "mayor" };
@@ -887,6 +890,25 @@ async function fetchCicero(query, apiKey, lat, lng) {
     }
   });
 
+  // Non-legislative districts (school / county / judicial) often need a district
+  // lookup first, then an officials query by district_id to return board members,
+  // sheriffs, and judges.
+  try {
+    const nonleg = await fetchCiceroNonlegislativeOfficials(
+      apiKey,
+      lat,
+      lng,
+      query
+    );
+    politicians.push(...nonleg.politicians);
+    typeErrors.push(...nonleg.typeErrors);
+  } catch (error) {
+    typeErrors.push({
+      district_type: "nonlegislative",
+      error: error.message || String(error),
+    });
+  }
+
   if (!politicians.length) {
     const fallback = await fetchCiceroPage({
       apiKey,
@@ -899,7 +921,165 @@ async function fetchCicero(query, apiKey, lat, lng) {
     politicians.push(...fallback.politicians);
   }
 
+  return {
+    politicians: politicians.filter(isRelevantOfficeholder),
+    typeErrors,
+  };
+}
+
+async function fetchCiceroNonlegislativeOfficials(apiKey, lat, lng, query) {
+  const types = ["SCHOOL", "COUNTY", "JUDICIAL"];
+  const politicians = [];
+  const typeErrors = [];
+
+  for (const districtType of types) {
+    try {
+      const params = new URLSearchParams({
+        format: "json",
+        key: apiKey,
+        max: "50",
+        district_type: districtType,
+      });
+      if (lat != null && lng != null) {
+        params.set("lat", String(lat));
+        params.set("lon", String(lng));
+      } else {
+        params.set("search_loc", query);
+      }
+
+      const response = await fetch(
+        `${CICERO_BASE}/nonlegislative_district?${params.toString()}`
+      );
+      const payload = await response.json();
+      const errors = payload?.response?.errors || [];
+      if (!response.ok || (Array.isArray(errors) && errors.length)) {
+        throw new Error(
+          errors?.[0]?.message ||
+            errors?.[0] ||
+            `Cicero ${districtType} districts failed`
+        );
+      }
+
+      const districts =
+        payload?.response?.results?.districts ||
+        payload?.response?.results?.district ||
+        [];
+      const list = Array.isArray(districts) ? districts : [];
+
+      for (const district of list.slice(0, 8)) {
+        const districtId = district.district_id || district.id;
+        const districtName =
+          district.label ||
+          district.city ||
+          district.district_id ||
+          `${districtType} district`;
+
+        // Always surface the district itself so school districts appear even when
+        // Cicero has no individual board-member records for that area.
+        if (districtType === "SCHOOL" && districtName) {
+          politicians.push({
+            external_key: `cicero-district:school:${districtId || districtName}`
+              .toLowerCase(),
+            bioguide_id: null,
+            level: "school",
+            chamber: "school_district",
+            name: String(districtName),
+            party: "Nonpartisan",
+            state: String(district.state || "").toUpperCase(),
+            district: district.subtype ? String(district.subtype) : "",
+            photo_url: "",
+            website_url: "",
+            phone: "",
+            source: "cicero-school-district",
+            metadata: {
+              office_title: "School District",
+              district_only: true,
+              district_type: "SCHOOL",
+              note: "School district for this address. Individual board members appear when Cicero has them.",
+            },
+          });
+        }
+
+        if (!districtId) continue;
+
+        try {
+          const officials = await fetchCiceroPage({
+            apiKey,
+            lat,
+            lng,
+            query,
+            districtType,
+            offset: 0,
+          });
+          // Prefer exact district_id match when present on returned officials.
+          const matched = officials.politicians.filter((person) => {
+            const personDistrict = String(person.district || "").toLowerCase();
+            const id = String(districtId).toLowerCase();
+            return (
+              personDistrict === id ||
+              person.metadata?.district_type === districtType ||
+              person.level ===
+                (districtType === "SCHOOL"
+                  ? "school"
+                  : districtType === "JUDICIAL"
+                    ? "county"
+                    : "county")
+            );
+          });
+
+          // Also do a targeted call with district_id when supported.
+          const targetedParams = new URLSearchParams({
+            format: "json",
+            key: apiKey,
+            max: "200",
+            district_type: districtType,
+            district_id: String(districtId),
+          });
+          if (lat != null && lng != null) {
+            targetedParams.set("lat", String(lat));
+            targetedParams.set("lon", String(lng));
+          } else {
+            targetedParams.set("search_loc", query);
+          }
+          const targetedResponse = await fetch(
+            `${CICERO_BASE}/official?${targetedParams.toString()}`
+          );
+          const targetedPayload = await targetedResponse.json();
+          const targetedOfficials = extractCiceroPoliticians(targetedPayload);
+          politicians.push(...matched, ...targetedOfficials);
+        } catch (error) {
+          typeErrors.push({
+            district_type: `${districtType}:${districtId}`,
+            error: error.message || String(error),
+          });
+        }
+      }
+    } catch (error) {
+      typeErrors.push({
+        district_type: districtType,
+        error: error.message || String(error),
+      });
+    }
+  }
+
   return { politicians, typeErrors };
+}
+
+function isRelevantOfficeholder(politician) {
+  if (!politician?.name) return false;
+  if (politician.level !== "federal") return true;
+
+  // Keep elected federal offices; drop appointed cabinet / agency heads that
+  // drown out local results without representing the address's district.
+  if (politician.chamber === "senate" || politician.chamber === "house") {
+    return true;
+  }
+  const title = String(
+    politician.metadata?.office_title || politician.chamber || ""
+  ).toLowerCase();
+  if (title.includes("vice president")) return true;
+  if (/\bpresident\b/.test(title) && !title.includes("pro tempore")) return true;
+  return false;
 }
 
 async function fetchOpenStates(lat, lng, apiKey, stateHint) {
@@ -1015,7 +1195,9 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const politicians = mergePoliticians(politicianLists);
+    const politicians = mergePoliticians(politicianLists).filter(
+      isRelevantOfficeholder
+    );
     if (!politicians.length) {
       return json(res, 404, {
         error:

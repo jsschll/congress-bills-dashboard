@@ -96,6 +96,8 @@ async function fetchStoredPoliticians(level) {
   if (level && level !== "all") {
     if (level === "municipal") {
       query = query.in("level", ["city", "school", "local"]);
+    } else if (level === "city") {
+      query = query.in("level", ["city", "local"]);
     } else {
       query = query.eq("level", level);
     }
