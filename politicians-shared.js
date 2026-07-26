@@ -28,9 +28,42 @@ function levelLabel(level) {
   return LEVEL_LABELS[level] || "Other";
 }
 
+function readableOfficeTitle(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "object") {
+    return readableOfficeTitle(
+      value.name_formal || value.name || value.title || value.role || ""
+    );
+  }
+  const text = String(value).trim();
+  if (!text || text.startsWith("{") || text.startsWith("[")) return "";
+  if (text === "[object Object]") return "";
+  if (/^ocd-/i.test(text)) return "";
+  return text;
+}
+
+function formatDistrictMeta(district, politician = {}) {
+  const raw = String(district || "").trim();
+  if (!raw) return "";
+  if (/^ocd-/i.test(raw)) return "";
+  if (/^united states$/i.test(raw)) return "";
+  if (/^\d{5,}$/.test(raw)) return "";
+  if (/^statewide$/i.test(raw)) return "Statewide";
+  if (/^lea\s+/i.test(raw)) return raw;
+  if (
+    politician.chamber === "senate" &&
+    politician.level === "federal" &&
+    /^[A-Z]{2}$/.test(raw)
+  ) {
+    return "Statewide";
+  }
+  return `Dist. ${raw}`;
+}
+
 function chamberLabel(chamber, politician = {}) {
-  const officeTitle =
-    politician.office_title || politician.metadata?.office_title || "";
+  const officeTitle = readableOfficeTitle(
+    politician.office_title || politician.metadata?.office_title
+  );
   if (officeTitle) return officeTitle;
 
   switch (chamber) {
@@ -215,7 +248,7 @@ function renderPoliticianCard(politician, { followedIds, user, onFollowChange })
     levelLabel(politician.level),
     chamberLabel(politician.chamber, politician),
     politician.state,
-    politician.district ? `Dist. ${politician.district}` : "",
+    formatDistrictMeta(politician.district, politician),
   ]
     .filter(Boolean)
     .join(" · ");

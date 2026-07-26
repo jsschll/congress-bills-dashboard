@@ -351,6 +351,52 @@ function mapCiceroDistrictType(districtType = "") {
   return { level: "local", chamber: slugKey(type) || "local" };
 }
 
+function pickReadableTitle(...candidates) {
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    if (typeof value === "object") {
+      const nested =
+        value.name_formal ||
+        value.name ||
+        value.title ||
+        value.role ||
+        value.label ||
+        "";
+      if (nested && typeof nested === "string") return nested.trim();
+      continue;
+    }
+    const text = String(value).trim();
+    // Skip JSON blobs / internal ids accidentally stringified into titles.
+    if (!text || text.startsWith("{") || text.startsWith("[")) continue;
+    if (/^ocd-/i.test(text)) continue;
+    return text;
+  }
+  return "";
+}
+
+function cleanDistrictValue(value, { level, chamber } = {}) {
+  if (value == null || value === "") return "";
+  if (typeof value === "object") {
+    return cleanDistrictValue(
+      value.district_id || value.id || value.city || value.name || "",
+      { level, chamber }
+    );
+  }
+  const text = String(value).trim();
+  if (!text) return "";
+  if (/^ocd-/i.test(text)) return "";
+  if (/^united states$/i.test(text)) return "";
+  if (/^\d{5,}$/.test(text)) return ""; // Cicero surrogate / DB ids
+  if (
+    (chamber === "senate" || chamber === "executive") &&
+    level === "federal" &&
+    /^[A-Z]{2}$/.test(text)
+  ) {
+    return chamber === "senate" ? "Statewide" : "";
+  }
+  return text;
+}
+
 function mapCiceroOfficial(official) {
   const office = official.office || {};
   const district = office.district || {};
@@ -369,44 +415,42 @@ function mapCiceroOfficial(official) {
     [official.preferred_name, official.last_name].filter(Boolean).join(" ");
   const addresses = official.addresses || [];
   const primaryAddress = addresses[0] || {};
-  const state = (
-    district.state ||
-    office.state ||
-    primaryAddress.state ||
-    ""
+  const state = String(
+    district.state || office.state || primaryAddress.state || ""
   ).toUpperCase();
   const sk = official.sk || official.id;
-  const chamberName =
-    office.chamber ||
-    office.title ||
-    (Array.isArray(official.titles) ? official.titles[0] : "") ||
-    mapped.chamber;
+  const officeTitle =
+    pickReadableTitle(
+      office.chamber,
+      office.title,
+      Array.isArray(official.titles) ? official.titles[0] : "",
+      office.role,
+      mapped.chamber
+    ) || mapped.chamber;
+  const districtValue = cleanDistrictValue(
+    district.district_id || district.city || office.district_id || "",
+    { level: mapped.level, chamber: mapped.chamber }
+  );
 
   return {
-    external_key: sk ? `cicero:${sk}` : `cicero:${mapped.level}:${slugKey(name)}:${slugKey(chamberName)}`,
+    external_key: sk
+      ? `cicero:${sk}`
+      : `cicero:${mapped.level}:${slugKey(name)}:${slugKey(officeTitle)}`,
     bioguide_id: null,
     level: mapped.level,
     chamber: mapped.chamber,
     name: name || "Official",
     party: normalizeParty(official.party),
     state,
-    district: String(
-      district.district_id ||
-        district.id ||
-        district.city ||
-        office.district_id ||
-        ""
-    ),
+    district: districtValue,
     photo_url: official.photo_origin_url || "",
     website_url: (official.urls && official.urls[0]) || official.web_form_url || "",
     phone: primaryAddress.phone_1 || primaryAddress.phone || "",
     source: "cicero",
     metadata: {
-      office_title: chamberName || office.role || mapped.chamber,
+      office_title: officeTitle,
       cicero_sk: sk,
       emails: official.email_addresses || [],
-      office,
-      district,
     },
   };
 }
