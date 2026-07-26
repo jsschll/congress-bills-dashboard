@@ -520,7 +520,8 @@ function mapCiceroDistrictType(districtType = "", officeTitle = "") {
     title.includes("county commissioner") ||
     title.includes("county supervisor") ||
     title.includes("board of supervisors") ||
-    (title.includes("commissioner") && title.includes("county"))
+    (title.includes("commissioner") && title.includes("county")) ||
+    (title.includes("supervisor") && !title.includes("city"))
   ) {
     return { level: "county", chamber: "county_commissioner" };
   }
