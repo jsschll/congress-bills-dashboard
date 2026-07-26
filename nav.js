@@ -1,4 +1,20 @@
-async function renderAppNav(activePage = "home") {
+function buildLoggedOutActions(actions) {
+  actions.replaceChildren();
+
+  const signIn = document.createElement("a");
+  signIn.className = "app-nav__button app-nav__button--ghost";
+  signIn.href = "auth.html";
+  signIn.textContent = "Sign in";
+
+  const signUp = document.createElement("a");
+  signUp.className = "app-nav__button app-nav__button--primary";
+  signUp.href = "auth.html?mode=signup";
+  signUp.textContent = "Sign up";
+
+  actions.append(signIn, signUp);
+}
+
+function createNavShell(activePage = "home") {
   const existing = document.getElementById("app-nav");
   if (existing) existing.remove();
 
@@ -6,16 +22,6 @@ async function renderAppNav(activePage = "home") {
   nav.id = "app-nav";
   nav.className = "app-nav";
   nav.setAttribute("aria-label", "Main");
-
-  const user = await getUser();
-  const configured = isSupabaseConfigured();
-
-  let unreadCount = 0;
-  let notifications = [];
-  if (user) {
-    notifications = await fetchNotifications({ limit: 8 });
-    unreadCount = notifications.filter((item) => !item.read_at).length;
-  }
 
   nav.innerHTML = `
     <div class="app-nav__inner">
@@ -31,22 +37,40 @@ async function renderAppNav(activePage = "home") {
 
   document.body.prepend(nav);
   const actions = nav.querySelector("#app-nav-actions");
+  buildLoggedOutActions(actions);
+  return { nav, actions };
+}
 
-  if (!configured) {
-    const hint = document.createElement("span");
-    hint.className = "app-nav__hint";
-    hint.textContent = "Connect Supabase in config.js";
-    actions.append(hint);
-    return;
+async function renderAppNav(activePage = "home") {
+  const { actions } = createNavShell(activePage);
+
+  let user = null;
+  try {
+    user = await getUser();
+  } catch (error) {
+    console.error(error);
   }
 
   if (!user) {
-    const signIn = document.createElement("a");
-    signIn.className = "app-nav__button";
-    signIn.href = "auth.html";
-    signIn.textContent = "Sign in";
-    actions.append(signIn);
+    buildLoggedOutActions(actions);
+    if (!isSupabaseConfigured()) {
+      const hint = document.createElement("span");
+      hint.className = "app-nav__hint";
+      hint.textContent = "Add SUPABASE_ANON_KEY in config.js";
+      actions.prepend(hint);
+    }
     return;
+  }
+
+  actions.replaceChildren();
+
+  let unreadCount = 0;
+  let notifications = [];
+  try {
+    notifications = await fetchNotifications({ limit: 8 });
+    unreadCount = notifications.filter((item) => !item.read_at).length;
+  } catch (error) {
+    console.error(error);
   }
 
   const bellWrap = document.createElement("div");
@@ -158,10 +182,19 @@ function injectSupabaseScript() {
 }
 
 async function bootNav(activePage) {
+  // Show Sign in / Sign up immediately so the top-right actions never depend on network.
+  createNavShell(activePage);
+
   try {
     await injectSupabaseScript();
   } catch (error) {
     console.error(error);
   }
-  await renderAppNav(activePage);
+
+  try {
+    await renderAppNav(activePage);
+  } catch (error) {
+    console.error(error);
+    createNavShell(activePage);
+  }
 }

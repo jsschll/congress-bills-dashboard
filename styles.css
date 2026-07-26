@@ -339,6 +339,16 @@ body {
   background: transparent;
 }
 
+.app-nav__button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.app-nav__button--primary:hover {
+  filter: brightness(1.05);
+}
+
 .app-nav__hint,
 .app-nav__email {
   color: var(--muted);

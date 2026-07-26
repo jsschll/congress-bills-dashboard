@@ -96,6 +96,16 @@ otpForm.addEventListener("submit", async (event) => {
 
 (async function initAuthPage() {
   await bootNav("auth");
+
+  const params = new URLSearchParams(window.location.search);
+  const isSignup = params.get("mode") === "signup";
+  if (isSignup) {
+    document.title = "Create account · Congress Bills";
+    document.getElementById("auth-title").textContent = "Create account";
+    document.getElementById("auth-subtitle").textContent =
+      "Enter your email to create an account. We’ll send a one-time code to verify it.";
+  }
+
   const existing = await getUser();
   if (existing) {
     await finishLogin(existing);
