@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Topics · Congress Bills</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Follow</p>
+          <h1>Topics & keywords</h1>
+          <p class="subtitle">
+            Follow official policy areas and add custom keywords. When Congress
+            updates a matching bill, you’ll get an in-app notification.
+          </p>
+        </div>
+      </header>
+
+      <p id="topics-status" class="status" hidden></p>
+
+      <section class="topics-panel" aria-labelledby="following-heading">
+        <h2 id="following-heading">Following</h2>
+        <div id="following-list" class="chip-row"></div>
+      </section>
+
+      <section class="topics-panel" aria-labelledby="keyword-heading">
+        <h2 id="keyword-heading">Add a keyword</h2>
+        <form id="keyword-form" class="keyword-form">
+          <input
+            id="keyword-input"
+            class="search-bar__input"
+            type="text"
+            maxlength="80"
+            placeholder="e.g. veterans, tariffs, AI safety"
+            required
+          />
+          <button class="refresh-btn" type="submit">Follow keyword</button>
+        </form>
+      </section>
+
+      <section class="topics-panel" aria-labelledby="policy-heading">
+        <div class="topics-panel__header">
+          <h2 id="policy-heading">Policy areas</h2>
+          <input
+            id="policy-filter"
+            class="search-bar__input topics-filter"
+            type="search"
+            placeholder="Filter policy areas…"
+          />
+        </div>
+        <div id="policy-grid" class="policy-grid"></div>
+      </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="policy-areas.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js"></script>
+    <script src="topics.js" defer></script>
+  </body>
+</html>

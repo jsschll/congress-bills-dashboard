@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in · Congress Bills</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page page--narrow">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Account</p>
+          <h1>Sign in</h1>
+          <p class="subtitle">
+            Use your email to receive a one-time code. Phone signup is coming
+            soon.
+          </p>
+        </div>
+      </header>
+
+      <p id="auth-status" class="status" hidden></p>
+
+      <form id="email-form" class="auth-card">
+        <label class="search-bar__label" for="email-input">Email</label>
+        <input
+          id="email-input"
+          class="search-bar__input"
+          type="email"
+          required
+          autocomplete="email"
+          placeholder="you@example.com"
+        />
+        <button class="refresh-btn auth-card__submit" type="submit">
+          Send code
+        </button>
+      </form>
+
+      <form id="otp-form" class="auth-card" hidden>
+        <label class="search-bar__label" for="otp-input">One-time code</label>
+        <input
+          id="otp-input"
+          class="search-bar__input"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          placeholder="123456"
+          required
+        />
+        <button class="refresh-btn auth-card__submit" type="submit">
+          Verify and continue
+        </button>
+      </form>
+
+      <div class="auth-card auth-card--muted">
+        <label class="search-bar__label" for="phone-input">Phone</label>
+        <input
+          id="phone-input"
+          class="search-bar__input"
+          type="tel"
+          disabled
+          placeholder="Coming soon"
+        />
+        <p class="auth-card__note">SMS signup via Twilio will be added later.</p>
+      </div>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js"></script>
+    <script src="auth.js" defer></script>
+  </body>
+</html>

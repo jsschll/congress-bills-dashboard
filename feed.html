@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Feed · Congress Bills</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page page--feed">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Updates</p>
+          <h1>Your feed</h1>
+          <p class="subtitle">
+            Newest bill updates for topics you follow, with related suggestions
+            below.
+          </p>
+        </div>
+        <a class="refresh-btn" href="topics.html">Manage topics</a>
+      </header>
+
+      <p id="feed-status" class="status" hidden></p>
+      <section id="feed-stream" class="feed-stream" aria-label="Update feed"></section>
+      <section
+        id="suggestions"
+        class="feed-suggestions"
+        aria-label="Suggested bills"
+        hidden
+      >
+        <h2>You might also care about</h2>
+        <div id="suggestions-list" class="feed-stream"></div>
+      </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js"></script>
+    <script src="feed.js" defer></script>
+  </body>
+</html>

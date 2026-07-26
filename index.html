@@ -14,7 +14,7 @@
           <h1>Recent Bills</h1>
           <p class="subtitle">
             Latest legislation from the 119th Congress with official CRS
-            summaries.
+            summaries. Sign in to follow topics and get a personalized feed.
           </p>
         </div>
         <button id="refresh-btn" class="refresh-btn" type="button">
@@ -49,6 +49,11 @@
     </main>
 
     <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js"></script>
     <script src="app.js" defer></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => bootNav("home"));
+    </script>
   </body>
 </html>
