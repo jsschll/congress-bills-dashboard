@@ -468,9 +468,9 @@ function groupPoliticiansByLevel(politicians) {
   return byLevel;
 }
 
-function selectedLevelsLabel(selected, availableLevels) {
-  if (!selected.size || selected.size === availableLevels.length) {
-    return "All levels";
+function selectedLevelsLabel(selected, availableLevels, showAll = false) {
+  if (showAll || !selected.size || selected.size === availableLevels.length) {
+    return "Show all";
   }
   return availableLevels
     .filter((level) => selected.has(level))
@@ -489,7 +489,8 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     return;
   }
 
-  // Fresh lookup always starts with every category checked/visible.
+  // Fresh lookup always starts in "Show all" mode (individuals unchecked).
+  let showAll = true;
   const selected = new Set(availableLevels);
   const collapsed = container._collapsedLevels instanceof Set
     ? new Set(
@@ -501,6 +502,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
 
   container._politicianData = { politicians, cardOptions };
   container._selectedLevels = selected;
+  container._showAllLevels = showAll;
   container._collapsedLevels = collapsed;
   container.replaceChildren();
 
@@ -538,7 +540,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   function refreshToggleLabel() {
     toggle.innerHTML = "";
     const text = document.createElement("span");
-    text.textContent = selectedLevelsLabel(selected, availableLevels);
+    text.textContent = selectedLevelsLabel(selected, availableLevels, showAll);
     const caret = document.createElement("span");
     caret.className = "level-filter__caret";
     caret.setAttribute("aria-hidden", "true");
@@ -549,9 +551,10 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   function syncCheckboxUi() {
     menu.querySelectorAll('input[type="checkbox"]').forEach((box) => {
       if (box.value === "all") {
-        box.checked = selected.size === availableLevels.length;
+        box.checked = showAll;
       } else {
-        box.checked = selected.has(box.value);
+        // In Show all mode, leave category boxes unmarked.
+        box.checked = !showAll && selected.has(box.value);
       }
     });
   }
@@ -559,7 +562,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   function applySectionVisibility() {
     sectionsWrap.querySelectorAll(".politician-level-group").forEach((section) => {
       const level = section.dataset.level;
-      const visible = selected.has(level);
+      const visible = showAll || selected.has(level);
       section.hidden = !visible;
       section.classList.toggle("is-hidden", !visible);
       section.classList.toggle("is-collapsed", collapsed.has(level));
@@ -636,7 +639,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   allInput.type = "checkbox";
   allInput.value = "all";
   allInput.checked = true;
-  allLabel.append(allInput, document.createTextNode(" All levels"));
+  allLabel.append(allInput, document.createTextNode(" Show all"));
   menu.append(allLabel);
 
   for (const level of availableLevels) {
@@ -645,7 +648,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.value = level;
-    input.checked = true;
+    input.checked = false;
     label.append(input, document.createTextNode(` ${levelLabel(level)}`));
     menu.append(label);
   }
@@ -655,24 +658,31 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     if (!(input instanceof HTMLInputElement)) return;
 
     if (input.value === "all") {
-      selected.clear();
       if (input.checked) {
+        showAll = true;
+        selected.clear();
         availableLevels.forEach((level) => selected.add(level));
+      } else {
+        // Unchecking Show all with no categories picked keeps Show all on.
+        showAll = true;
       }
     } else if (input.checked) {
+      if (showAll) {
+        showAll = false;
+        selected.clear();
+      }
       selected.add(input.value);
-      // Re-checking a category unfolds it.
       collapsed.delete(input.value);
     } else {
       selected.delete(input.value);
-    }
-
-    // Keep at least one category visible.
-    if (!selected.size) {
-      availableLevels.forEach((level) => selected.add(level));
+      if (!selected.size) {
+        showAll = true;
+        availableLevels.forEach((level) => selected.add(level));
+      }
     }
 
     container._selectedLevels = selected;
+    container._showAllLevels = showAll;
     container._collapsedLevels = collapsed;
     syncCheckboxUi();
     applySectionVisibility();
@@ -710,6 +720,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   toolbar.append(sortLabel, filter);
   container.append(toolbar, sectionsWrap);
   setMenuOpen(false);
+  syncCheckboxUi();
   applySectionVisibility();
 }
 
