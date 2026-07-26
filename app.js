@@ -458,6 +458,10 @@ function renderBillCard(bill, highlightTerms = []) {
 }
 
 async function fetchJson(url) {
+  if (!API_KEY || API_KEY === "YOUR_CONGRESS_GOV_API_KEY") {
+    throw new Error("Missing Congress.gov API key");
+  }
+
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Request failed (${response.status})`);
