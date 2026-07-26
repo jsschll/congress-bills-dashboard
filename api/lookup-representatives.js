@@ -466,8 +466,95 @@ function extractGoogleCivicPoliticians(payload) {
   return { address: address || null, state, politicians };
 }
 
-function mapCiceroDistrictType(districtType = "") {
+const CICERO_DISTRICT_TYPES = [
+  // Legislative + executive (national / state / local)
+  "NATIONAL_EXEC",
+  "NATIONAL_UPPER",
+  "NATIONAL_LOWER",
+  "STATE_EXEC",
+  "STATE_UPPER",
+  "STATE_LOWER",
+  "LOCAL_EXEC",
+  "LOCAL",
+  // Non-legislative
+  "COUNTY",
+  "SCHOOL",
+  "JUDICIAL",
+];
+
+function ciceroDistrictTypeName(district = {}, office = {}) {
+  const raw =
+    district.district_type__name_short ||
+    district.district_type ||
+    district.subtype ||
+    office.district_type__name_short ||
+    office.district_type ||
+    "";
+  if (typeof raw === "object" && raw) {
+    return String(raw.name_short || raw.name || raw.label || "").toUpperCase();
+  }
+  return String(raw || "").toUpperCase();
+}
+
+function mapCiceroDistrictType(districtType = "", officeTitle = "") {
   const type = String(districtType || "").toUpperCase();
+  const title = String(officeTitle || "").toLowerCase();
+
+  // Title-based refinements first (Governors, AGs, Mayors, Judges, school boards).
+  if (title.includes("school board") || title.includes("board of education")) {
+    return { level: "school", chamber: "school_board" };
+  }
+  if (title.includes("mayor")) {
+    return { level: "city", chamber: "mayor" };
+  }
+  if (
+    title.includes("city council") ||
+    title.includes("council member") ||
+    title.includes("councilor") ||
+    title.includes("councillor") ||
+    title.includes("alderman")
+  ) {
+    return { level: "city", chamber: "city_council" };
+  }
+  if (
+    title.includes("county commissioner") ||
+    title.includes("county supervisor") ||
+    title.includes("board of supervisors") ||
+    (title.includes("commissioner") && title.includes("county"))
+  ) {
+    return { level: "county", chamber: "county_commissioner" };
+  }
+  if (title.includes("governor") && !title.includes("lieutenant")) {
+    return { level: "state", chamber: "governor" };
+  }
+  if (title.includes("lieutenant governor")) {
+    return { level: "state", chamber: "lieutenant_governor" };
+  }
+  if (title.includes("attorney general")) {
+    return { level: "state", chamber: "attorney_general" };
+  }
+  if (
+    title.includes("secretary of state") ||
+    title.includes("state treasurer") ||
+    title.includes("state auditor") ||
+    title.includes("comptroller")
+  ) {
+    return { level: "state", chamber: "state_executive" };
+  }
+  if (title.includes("judge") || title.includes("justice")) {
+    if (
+      title.includes("supreme") ||
+      title.includes("appeals") ||
+      title.includes("appellate")
+    ) {
+      return { level: "state", chamber: "judicial" };
+    }
+    if (title.includes("county") || title.includes("circuit") || title.includes("superior")) {
+      return { level: "county", chamber: "judicial" };
+    }
+    return { level: "local", chamber: "judicial" };
+  }
+
   if (type.startsWith("NATIONAL")) {
     if (type.includes("UPPER")) return { level: "federal", chamber: "senate" };
     if (type.includes("LOWER")) return { level: "federal", chamber: "house" };
@@ -484,8 +571,14 @@ function mapCiceroDistrictType(districtType = "") {
   if (type === "SCHOOL" || type.includes("SCHOOL")) {
     return { level: "school", chamber: "school_board" };
   }
-  if (type.startsWith("LOCAL")) {
-    return { level: "city", chamber: type.includes("EXEC") ? "mayor" : "city_council" };
+  if (type === "JUDICIAL" || type.includes("JUDICIAL")) {
+    return { level: "county", chamber: "judicial" };
+  }
+  if (type.startsWith("LOCAL") || type === "LOCAL") {
+    return {
+      level: "city",
+      chamber: type.includes("EXEC") ? "mayor" : "city_council",
+    };
   }
   return { level: "local", chamber: slugKey(type) || "local" };
 }
@@ -538,36 +631,39 @@ function cleanDistrictValue(value, { level, chamber } = {}) {
 
 function mapCiceroOfficial(official) {
   const office = official.office || {};
-  const district = office.district || {};
-  const districtType =
-    district.district_type ||
-    district.subtype ||
-    office.representing_city ||
-    "";
-  const mapped = mapCiceroDistrictType(
-    typeof districtType === "object"
-      ? districtType.name_short || districtType.name || ""
-      : districtType
+  const district = office.district || official.district || {};
+  const districtTypeName = ciceroDistrictTypeName(district, office);
+  const officeTitleHint = pickReadableTitle(
+    official.title,
+    office.title,
+    office.chamber,
+    Array.isArray(official.titles) ? official.titles[0] : "",
+    official.chamber__name_formal,
+    districtTypeName
   );
+  const mapped = mapCiceroDistrictType(districtTypeName, officeTitleHint);
   const name =
     fullName(official) ||
     [official.preferred_name, official.last_name].filter(Boolean).join(" ");
   const addresses = official.addresses || [];
   const primaryAddress = addresses[0] || {};
   const state = String(
-    district.state || office.state || primaryAddress.state || ""
+    official.state ||
+      district.state ||
+      office.representing_state ||
+      office.state ||
+      primaryAddress.state ||
+      ""
   ).toUpperCase();
   const sk = official.sk || official.id;
-  const officeTitle =
-    pickReadableTitle(
-      office.chamber,
-      office.title,
-      Array.isArray(official.titles) ? official.titles[0] : "",
-      office.role,
-      mapped.chamber
-    ) || mapped.chamber;
+  const officeTitle = officeTitleHint || mapped.chamber;
   const districtValue = cleanDistrictValue(
-    district.district_id || district.city || office.district_id || "",
+    district.district_id ||
+      district.label ||
+      district.city ||
+      office.representing_city ||
+      office.district_id ||
+      "",
     { level: mapped.level, chamber: mapped.chamber }
   );
 
@@ -584,11 +680,16 @@ function mapCiceroOfficial(official) {
     district: districtValue,
     photo_url: official.photo_origin_url || "",
     website_url: (official.urls && official.urls[0]) || official.web_form_url || "",
-    phone: primaryAddress.phone_1 || primaryAddress.phone || "",
+    phone:
+      official.phone_1 ||
+      primaryAddress.phone_1 ||
+      primaryAddress.phone ||
+      "",
     source: "cicero",
     metadata: {
       office_title: officeTitle,
       cicero_sk: sk,
+      district_type: districtTypeName,
       emails: official.email_addresses || [],
     },
   };
@@ -705,19 +806,22 @@ async function fetchGoogleCivic(query, apiKey) {
   return extractGoogleCivicPoliticians(payload);
 }
 
-async function fetchCicero(query, apiKey, lat, lng) {
+async function fetchCiceroPage({ apiKey, lat, lng, query, districtType, offset = 0 }) {
   const params = new URLSearchParams({
     format: "json",
     key: apiKey,
-    max: "100",
+    max: "200",
     order: "district_type",
+    offset: String(offset),
   });
+  if (districtType) params.append("district_type", districtType);
   if (lat != null && lng != null) {
     params.set("lat", String(lat));
     params.set("lon", String(lng));
   } else {
     params.set("search_loc", query);
   }
+
   const url = `${CICERO_BASE}/official?${params.toString()}`;
   const response = await fetch(url);
   const payload = await response.json();
@@ -730,9 +834,71 @@ async function fetchCicero(query, apiKey, lat, lng) {
         `Cicero lookup failed (${response.status})`
     );
   }
+  const count = payload?.response?.results?.count || {};
   return {
     politicians: extractCiceroPoliticians(payload),
+    total: Number(count.total || 0),
+    to: Number(count.to || 0),
   };
+}
+
+async function fetchCiceroDistrictType(apiKey, lat, lng, query, districtType) {
+  const politicians = [];
+  let offset = 0;
+  for (let page = 0; page < 5; page += 1) {
+    const result = await fetchCiceroPage({
+      apiKey,
+      lat,
+      lng,
+      query,
+      districtType,
+      offset,
+    });
+    politicians.push(...result.politicians);
+    if (!result.total || result.to >= result.total || !result.politicians.length) {
+      break;
+    }
+    offset = result.to;
+  }
+  return politicians;
+}
+
+async function fetchCicero(query, apiKey, lat, lng) {
+  // Explicitly request every national/state/county/local district type so we get
+  // legislative AND executive/judicial officials (Governor, AG, Mayor, Judges, etc.).
+  const settled = await Promise.allSettled(
+    CICERO_DISTRICT_TYPES.map((districtType) =>
+      fetchCiceroDistrictType(apiKey, lat, lng, query, districtType)
+    )
+  );
+
+  const politicians = [];
+  const typeErrors = [];
+  settled.forEach((result, index) => {
+    const districtType = CICERO_DISTRICT_TYPES[index];
+    if (result.status === "fulfilled") {
+      politicians.push(...result.value);
+    } else {
+      typeErrors.push({
+        district_type: districtType,
+        error: result.reason?.message || String(result.reason),
+      });
+    }
+  });
+
+  if (!politicians.length) {
+    const fallback = await fetchCiceroPage({
+      apiKey,
+      lat,
+      lng,
+      query,
+      districtType: null,
+      offset: 0,
+    });
+    politicians.push(...fallback.politicians);
+  }
+
+  return { politicians, typeErrors };
 }
 
 async function fetchOpenStates(lat, lng, apiKey, stateHint) {
@@ -827,6 +993,12 @@ module.exports = async function handler(req, res) {
       try {
         const cicero = await fetchCicero(q, ciceroKey, lat, lng);
         politicianLists.push(cicero.politicians);
+        if (cicero.typeErrors?.length) {
+          sourceErrors.push(...cicero.typeErrors.map((item) => ({
+            source: `cicero:${item.district_type}`,
+            error: item.error,
+          })));
+        }
       } catch (error) {
         sourceErrors.push({ source: "cicero", error: error.message });
       }

@@ -7,14 +7,26 @@ const US_STATES = [
 
 const LEVEL_ORDER = ["federal", "state", "county", "city", "school", "local"];
 
+// User-facing buckets: Federal → State → County → Municipal/Local
+const DISPLAY_LEVEL_ORDER = ["federal", "state", "county", "municipal"];
+
 const LEVEL_LABELS = {
   federal: "Federal",
   state: "State",
   county: "County",
-  city: "City",
-  school: "School board / district",
-  local: "Local / other",
+  city: "Municipal / Local",
+  school: "Municipal / Local",
+  local: "Municipal / Local",
+  municipal: "Municipal / Local",
 };
+
+function toDisplayLevel(level) {
+  if (level === "city" || level === "school" || level === "local") {
+    return "municipal";
+  }
+  if (DISPLAY_LEVEL_ORDER.includes(level)) return level;
+  return "municipal";
+}
 
 function escapePoliticianHtml(value) {
   return String(value || "")
@@ -25,7 +37,7 @@ function escapePoliticianHtml(value) {
 }
 
 function levelLabel(level) {
-  return LEVEL_LABELS[level] || "Other";
+  return LEVEL_LABELS[level] || LEVEL_LABELS[toDisplayLevel(level)] || "Other";
 }
 
 function readableOfficeTitle(value) {
@@ -75,6 +87,16 @@ function chamberLabel(chamber, politician = {}) {
       return "Executive";
     case "governor":
       return "Governor";
+    case "lieutenant_governor":
+      return "Lieutenant Governor";
+    case "attorney_general":
+      return "Attorney General";
+    case "state_executive":
+      return "State Executive";
+    case "judicial":
+      return "Judge";
+    case "county_commissioner":
+      return "County Commissioner";
     case "state_house":
       return "State House";
     case "state_senate":
@@ -222,11 +244,13 @@ function politicianLevels(politician) {
     ...(politician.metadata?.levels || []),
     politician.level,
   ].filter(Boolean);
-  const unique = [...new Set(fromFields)].filter((level) =>
-    LEVEL_ORDER.includes(level)
+  const unique = [
+    ...new Set(fromFields.map((level) => toDisplayLevel(level))),
+  ].filter((level) => DISPLAY_LEVEL_ORDER.includes(level));
+  unique.sort(
+    (a, b) => DISPLAY_LEVEL_ORDER.indexOf(a) - DISPLAY_LEVEL_ORDER.indexOf(b)
   );
-  unique.sort((a, b) => LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b));
-  return unique.length ? unique : ["local"];
+  return unique.length ? unique : ["municipal"];
 }
 
 function politicianOffices(politician) {
@@ -250,11 +274,10 @@ function politicianOffices(politician) {
 
 function officeForLevel(politician, sectionLevel) {
   const offices = politicianOffices(politician);
-  return (
-    offices.find((office) => office.level === sectionLevel) ||
-    offices[0] ||
-    null
+  const match = offices.find(
+    (office) => toDisplayLevel(office.level) === sectionLevel
   );
+  return match || offices[0] || null;
 }
 
 function renderPoliticianCard(
@@ -434,15 +457,16 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
     offices: politicianOffices(politician),
   }));
 
-  const byLevel = new Map(LEVEL_ORDER.map((level) => [level, []]));
+  const byLevel = new Map(DISPLAY_LEVEL_ORDER.map((level) => [level, []]));
   for (const politician of people) {
     const levels = politician.levels.length
       ? politician.levels
-      : [politician.level || "local"];
+      : [toDisplayLevel(politician.level || "local")];
     // Show this person under every level they affect.
     for (const level of levels) {
-      if (!byLevel.has(level)) byLevel.set(level, []);
-      byLevel.get(level).push(politician);
+      const displayLevel = toDisplayLevel(level);
+      if (!byLevel.has(displayLevel)) byLevel.set(displayLevel, []);
+      byLevel.get(displayLevel).push(politician);
     }
   }
 
@@ -451,7 +475,7 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
   jump.setAttribute("aria-label", "Jump to government level");
 
   let hasAny = false;
-  for (const level of LEVEL_ORDER) {
+  for (const level of DISPLAY_LEVEL_ORDER) {
     const group = byLevel.get(level) || [];
     if (!group.length) continue;
     hasAny = true;
@@ -478,7 +502,7 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
   if (!hasAny) return;
   container.append(jump);
 
-  for (const level of LEVEL_ORDER) {
+  for (const level of DISPLAY_LEVEL_ORDER) {
     const group = byLevel.get(level) || [];
     if (!group.length) continue;
 
@@ -495,9 +519,18 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
 
     const blurb = document.createElement("p");
     blurb.className = "politician-level-group__blurb";
-    blurb.textContent = `Everyone who represents this address at the ${levelLabel(
-      level
-    ).toLowerCase()} level.`;
+    const blurbs = {
+      federal: "Members of Congress and federal executives for this address.",
+      state: "Governor, statewide executives, legislators, and state courts.",
+      county: "County commissioners, county executives, and county courts.",
+      municipal:
+        "Mayors, city council, school board members, and other local officials.",
+    };
+    blurb.textContent =
+      blurbs[level] ||
+      `Everyone who represents this address at the ${levelLabel(
+        level
+      ).toLowerCase()} level.`;
 
     const grid = document.createElement("div");
     grid.className = "politician-grid";
@@ -628,7 +661,7 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
         return [...map.values()];
       })();
 
-      const levelCounts = LEVEL_ORDER.map((level) => {
+      const levelCounts = DISPLAY_LEVEL_ORDER.map((level) => {
         const count = uniquePeople.filter((p) =>
           politicianLevels(p).includes(level)
         ).length;

@@ -93,7 +93,13 @@ async function fetchStoredPoliticians(level) {
   const client = getSupabase();
   if (!client) return [];
   let query = client.from("politicians").select("*").order("name");
-  if (level && level !== "all") query = query.eq("level", level);
+  if (level && level !== "all") {
+    if (level === "municipal") {
+      query = query.in("level", ["city", "school", "local"]);
+    } else {
+      query = query.eq("level", level);
+    }
+  }
   const { data, error } = await query;
   if (error) {
     console.error(error);
@@ -109,7 +115,10 @@ function applyFilters() {
   const search = filterSearch.value.trim().toLowerCase();
 
   const filtered = allPoliticians.filter((politician) => {
-    if (level !== "all" && politician.level !== level) return false;
+    if (level !== "all") {
+      const displayLevel = toDisplayLevel(politician.level);
+      if (displayLevel !== level && politician.level !== level) return false;
+    }
     if (party) {
       const p = String(politician.party || "").toLowerCase();
       if (party.startsWith("dem") && !p.startsWith("dem")) return false;

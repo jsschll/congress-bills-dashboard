@@ -26,7 +26,7 @@ Set these for Production/Preview:
 - `SUPABASE_ANON_KEY` (also bake into deployed `config.js`, or replace config at build time)
 - `SUPABASE_SERVICE_ROLE_KEY` (server only — never expose to the browser)
 - `GEOCODIO_API_KEY` — federal + state legislators (+ school **district names**)
-- `CICERO_API_KEY` — recommended for city, county, and school **board members** ([Cicero free trial](https://www.cicerodata.com/api/))
+- `CICERO_API_KEY` — recommended for city, county, school board, governors, AGs, mayors, and judges ([Cicero free trial](https://www.cicerodata.com/api/)). The lookup API queries NATIONAL/STATE/LOCAL/COUNTY/SCHOOL/JUDICIAL district types.
 - `GOOGLE_CIVIC_API_KEY` — optional; Google’s Representatives API was turned down in April 2025, but still tried when set
 - `OPENSTATES_API_KEY` — optional enrichment for state / some municipal officials ([Open States](https://openstates.org/accounts/login/))
 
