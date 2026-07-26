@@ -14,14 +14,64 @@ function buildLoggedOutActions(actions) {
   actions.append(signIn, signUp);
 }
 
-function createNavShell(activePage = "home") {
-  const existing = document.getElementById("app-nav");
-  if (existing) existing.remove();
+function buildLoggedInActions(actions, { userLabel, onSignOut }) {
+  actions.replaceChildren();
 
-  const nav = document.createElement("nav");
-  nav.id = "app-nav";
-  nav.className = "app-nav";
-  nav.setAttribute("aria-label", "Main");
+  if (userLabel) {
+    const label = document.createElement("span");
+    label.className = "app-nav__email";
+    label.textContent = userLabel;
+    actions.append(label);
+  }
+
+  const outBtn = document.createElement("button");
+  outBtn.type = "button";
+  outBtn.className = "app-nav__button app-nav__button--primary";
+  outBtn.textContent = "Sign out";
+  outBtn.addEventListener("click", onSignOut);
+  actions.append(outBtn);
+}
+
+function syncHeaderAuth(user) {
+  const headerActions = document.querySelector(".header__actions");
+  if (!headerActions) return;
+
+  const refreshBtn = headerActions.querySelector("#refresh-btn");
+  headerActions.replaceChildren();
+
+  if (user) {
+    const outBtn = document.createElement("button");
+    outBtn.type = "button";
+    outBtn.className = "app-nav__button app-nav__button--primary";
+    outBtn.textContent = "Sign out";
+    outBtn.addEventListener("click", () => signOut());
+    headerActions.append(outBtn);
+  } else {
+    const signIn = document.createElement("a");
+    signIn.className = "app-nav__button app-nav__button--ghost";
+    signIn.href = "auth.html";
+    signIn.textContent = "Sign in";
+
+    const signUp = document.createElement("a");
+    signUp.className = "app-nav__button app-nav__button--primary";
+    signUp.href = "auth.html?mode=signup";
+    signUp.textContent = "Sign up";
+
+    headerActions.append(signIn, signUp);
+  }
+
+  if (refreshBtn) headerActions.append(refreshBtn);
+}
+
+function createNavShell(activePage = "home") {
+  let nav = document.getElementById("app-nav");
+  if (!nav) {
+    nav = document.createElement("nav");
+    nav.id = "app-nav";
+    nav.className = "app-nav";
+    nav.setAttribute("aria-label", "Main");
+    document.body.prepend(nav);
+  }
 
   nav.innerHTML = `
     <div class="app-nav__inner">
@@ -35,10 +85,22 @@ function createNavShell(activePage = "home") {
     </div>
   `;
 
-  document.body.prepend(nav);
   const actions = nav.querySelector("#app-nav-actions");
   buildLoggedOutActions(actions);
   return { nav, actions };
+}
+
+async function getProfileLabel(user) {
+  const client = getSupabase();
+  if (!client || !user) return user?.email || "Signed in";
+
+  const { data } = await client
+    .from("profiles")
+    .select("username, email")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  return data?.username || data?.email || user.email || "Signed in";
 }
 
 async function renderAppNav(activePage = "home") {
@@ -50,6 +112,8 @@ async function renderAppNav(activePage = "home") {
   } catch (error) {
     console.error(error);
   }
+
+  syncHeaderAuth(user);
 
   if (!user) {
     buildLoggedOutActions(actions);
@@ -142,21 +206,18 @@ async function renderAppNav(activePage = "home") {
 
   bellWrap.append(bellBtn, panel);
 
-  const account = document.createElement("div");
-  account.className = "app-nav__account";
-
-  const email = document.createElement("span");
-  email.className = "app-nav__email";
-  email.textContent = user.email || "Signed in";
+  const userLabel = await getProfileLabel(user);
+  const label = document.createElement("span");
+  label.className = "app-nav__email";
+  label.textContent = userLabel;
 
   const outBtn = document.createElement("button");
   outBtn.type = "button";
-  outBtn.className = "app-nav__button app-nav__button--ghost";
+  outBtn.className = "app-nav__button app-nav__button--primary";
   outBtn.textContent = "Sign out";
   outBtn.addEventListener("click", () => signOut());
 
-  account.append(email, outBtn);
-  actions.append(bellWrap, account);
+  actions.replaceChildren(bellWrap, label, outBtn);
 }
 
 function escapeHtml(value) {
@@ -182,7 +243,6 @@ function injectSupabaseScript() {
 }
 
 async function bootNav(activePage) {
-  // Show Sign in / Sign up immediately so the top-right actions never depend on network.
   createNavShell(activePage);
 
   try {

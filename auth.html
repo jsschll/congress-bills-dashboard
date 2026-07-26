@@ -34,56 +34,90 @@
           <p class="eyebrow">Account</p>
           <h1 id="auth-title">Sign in</h1>
           <p id="auth-subtitle" class="subtitle">
-            Use your email to receive a one-time code. Phone signup is coming
-            soon.
+            Sign in with your email or username and password after verifying
+            your email.
           </p>
         </div>
       </header>
 
       <p id="auth-status" class="status" hidden></p>
 
-      <form id="email-form" class="auth-card">
-        <label class="search-bar__label" for="email-input">Email</label>
+      <form id="signin-form" class="auth-card">
+        <label class="search-bar__label" for="signin-identifier"
+          >Email or username</label
+        >
         <input
-          id="email-input"
+          id="signin-identifier"
+          class="search-bar__input"
+          type="text"
+          required
+          autocomplete="username"
+          placeholder="you@example.com or username"
+        />
+        <label class="search-bar__label" for="signin-password">Password</label>
+        <input
+          id="signin-password"
+          class="search-bar__input"
+          type="password"
+          required
+          autocomplete="current-password"
+          placeholder="Your password"
+          minlength="6"
+        />
+        <button class="refresh-btn auth-card__submit" type="submit">
+          Sign in
+        </button>
+        <p class="auth-card__note">
+          New here?
+          <a href="auth.html?mode=signup">Create an account</a>
+        </p>
+      </form>
+
+      <form id="signup-form" class="auth-card" hidden>
+        <label class="search-bar__label" for="signup-username">Username</label>
+        <input
+          id="signup-username"
+          class="search-bar__input"
+          type="text"
+          required
+          autocomplete="username"
+          placeholder="choose a username"
+          minlength="3"
+          maxlength="30"
+          pattern="[A-Za-z0-9_]+"
+          title="Letters, numbers, and underscores only"
+        />
+        <label class="search-bar__label" for="signup-email">Email</label>
+        <input
+          id="signup-email"
           class="search-bar__input"
           type="email"
           required
           autocomplete="email"
           placeholder="you@example.com"
         />
-        <button class="refresh-btn auth-card__submit" type="submit">
-          Send code
-        </button>
-      </form>
-
-      <form id="otp-form" class="auth-card" hidden>
-        <label class="search-bar__label" for="otp-input">One-time code</label>
+        <label class="search-bar__label" for="signup-password">Password</label>
         <input
-          id="otp-input"
+          id="signup-password"
           class="search-bar__input"
-          type="text"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          placeholder="123456"
+          type="password"
           required
+          autocomplete="new-password"
+          placeholder="Create a password"
+          minlength="6"
         />
         <button class="refresh-btn auth-card__submit" type="submit">
-          Verify and continue
+          Create account
         </button>
+        <p class="auth-card__note">
+          We’ll email you a verification link. After you click it, you can sign
+          in.
+        </p>
+        <p class="auth-card__note">
+          Already verified?
+          <a href="auth.html">Sign in</a>
+        </p>
       </form>
-
-      <div class="auth-card auth-card--muted">
-        <label class="search-bar__label" for="phone-input">Phone</label>
-        <input
-          id="phone-input"
-          class="search-bar__input"
-          type="tel"
-          disabled
-          placeholder="Coming soon"
-        />
-        <p class="auth-card__note">SMS signup via Twilio will be added later.</p>
-      </div>
     </main>
 
     <script src="config.js"></script>
