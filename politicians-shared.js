@@ -216,10 +216,57 @@ async function unfollowPolitician(userId, politicianId) {
   if (error) throw error;
 }
 
-function renderPoliticianCard(politician, { followedIds, user, onFollowChange }) {
+function politicianLevels(politician) {
+  const fromFields = [
+    ...(politician.levels || []),
+    ...(politician.metadata?.levels || []),
+    politician.level,
+  ].filter(Boolean);
+  const unique = [...new Set(fromFields)].filter((level) =>
+    LEVEL_ORDER.includes(level)
+  );
+  unique.sort((a, b) => LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b));
+  return unique.length ? unique : ["local"];
+}
+
+function politicianOffices(politician) {
+  const offices = politician.offices || politician.metadata?.offices || [];
+  if (offices.length) return offices;
+  return [
+    {
+      level: politician.level || "local",
+      chamber: politician.chamber || "",
+      office_title:
+        politician.office_title ||
+        politician.metadata?.office_title ||
+        politician.chamber ||
+        "",
+      district: politician.district || "",
+      source: politician.source || "",
+      external_key: politician.external_key,
+    },
+  ];
+}
+
+function officeForLevel(politician, sectionLevel) {
+  const offices = politicianOffices(politician);
+  return (
+    offices.find((office) => office.level === sectionLevel) ||
+    offices[0] ||
+    null
+  );
+}
+
+function renderPoliticianCard(
+  politician,
+  { followedIds, user, onFollowChange, sectionLevel = null }
+) {
   const card = document.createElement("article");
   card.className = "politician-card";
-  card.dataset.level = politician.level || "local";
+  const levels = politicianLevels(politician);
+  const activeLevel = sectionLevel || levels[0] || politician.level || "local";
+  const activeOffice = officeForLevel(politician, activeLevel);
+  card.dataset.level = activeLevel;
 
   const media = document.createElement("div");
   media.className = "politician-card__media";
@@ -242,16 +289,59 @@ function renderPoliticianCard(politician, { followedIds, user, onFollowChange })
   name.className = "politician-card__name";
   name.textContent = politician.name;
 
+  const levelRow = document.createElement("div");
+  levelRow.className = "politician-card__levels";
+  levelRow.setAttribute("aria-label", "Levels of influence");
+  for (const level of levels) {
+    const badge = document.createElement("span");
+    badge.className = "politician-level-badge";
+    if (level === activeLevel) badge.classList.add("is-active");
+    badge.textContent = levelLabel(level);
+    levelRow.append(badge);
+  }
+
+  const officeTitle = readableOfficeTitle(
+    activeOffice?.office_title ||
+      politician.office_title ||
+      politician.metadata?.office_title
+  );
+  const viewForLabel = {
+    ...politician,
+    chamber: activeOffice?.chamber || politician.chamber,
+    office_title: officeTitle,
+    metadata: {
+      ...(politician.metadata || {}),
+      office_title: officeTitle,
+    },
+    district: activeOffice?.district || politician.district,
+  };
+
   const meta = document.createElement("p");
   meta.className = "politician-card__meta";
   meta.textContent = [
-    levelLabel(politician.level),
-    chamberLabel(politician.chamber, politician),
+    chamberLabel(viewForLabel.chamber, viewForLabel),
     politician.state,
-    formatDistrictMeta(politician.district, politician),
+    formatDistrictMeta(viewForLabel.district, viewForLabel),
   ]
     .filter(Boolean)
     .join(" · ");
+
+  const otherOffices = politicianOffices(politician).filter(
+    (office) => office.level !== activeLevel
+  );
+  let otherMeta = null;
+  if (otherOffices.length) {
+    otherMeta = document.createElement("p");
+    otherMeta.className = "politician-card__also";
+    otherMeta.textContent = `Also: ${otherOffices
+      .map((office) => {
+        const title =
+          readableOfficeTitle(office.office_title) ||
+          chamberLabel(office.chamber, { metadata: { office_title: office.office_title } });
+        return `${levelLabel(office.level)} — ${title}`;
+      })
+      .join("; ")}`;
+  }
 
   const party = document.createElement("span");
   party.className = `politician-card__party ${partyClass(politician.party)}`;
@@ -328,41 +418,99 @@ function renderPoliticianCard(politician, { followedIds, user, onFollowChange })
   });
 
   actions.append(followBtn);
-  body.append(name, meta, party, actions);
+  body.append(name, levelRow, meta);
+  if (otherMeta) body.append(otherMeta);
+  body.append(party, actions);
   card.append(media, body);
   return card;
 }
 
 function renderPoliticianGroups(container, politicians, cardOptions) {
   container.replaceChildren();
-  const byLevel = new Map();
-  for (const politician of politicians) {
-    const level = LEVEL_ORDER.includes(politician.level)
-      ? politician.level
-      : "local";
-    if (!byLevel.has(level)) byLevel.set(level, []);
-    byLevel.get(level).push(politician);
+
+  const people = politicians.map((politician) => ({
+    ...politician,
+    levels: politicianLevels(politician),
+    offices: politicianOffices(politician),
+  }));
+
+  const byLevel = new Map(LEVEL_ORDER.map((level) => [level, []]));
+  for (const politician of people) {
+    const levels = politician.levels.length
+      ? politician.levels
+      : [politician.level || "local"];
+    // Show this person under every level they affect.
+    for (const level of levels) {
+      if (!byLevel.has(level)) byLevel.set(level, []);
+      byLevel.get(level).push(politician);
+    }
   }
 
+  const jump = document.createElement("nav");
+  jump.className = "politician-level-nav";
+  jump.setAttribute("aria-label", "Jump to government level");
+
+  let hasAny = false;
   for (const level of LEVEL_ORDER) {
-    const group = byLevel.get(level);
-    if (!group?.length) continue;
+    const group = byLevel.get(level) || [];
+    if (!group.length) continue;
+    hasAny = true;
+
+    // Stable unique people within a level (already deduped upstream, but guard).
+    const unique = [];
+    const seen = new Set();
+    for (const politician of group) {
+      const key = politician.external_key || politician.name;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(politician);
+    }
+    unique.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    byLevel.set(level, unique);
+
+    const link = document.createElement("a");
+    link.className = "politician-level-nav__link";
+    link.href = `#level-${level}`;
+    link.textContent = `${levelLabel(level)} (${unique.length})`;
+    jump.append(link);
+  }
+
+  if (!hasAny) return;
+  container.append(jump);
+
+  for (const level of LEVEL_ORDER) {
+    const group = byLevel.get(level) || [];
+    if (!group.length) continue;
 
     const section = document.createElement("section");
     section.className = "politician-level-group";
+    section.id = `level-${level}`;
     section.setAttribute("aria-label", levelLabel(level));
 
     const heading = document.createElement("h3");
     heading.className = "politician-level-group__title";
-    heading.textContent = `${levelLabel(level)} (${group.length})`;
-    section.append(heading);
+    heading.textContent = `${levelLabel(level)} · ${group.length} ${
+      group.length === 1 ? "official" : "officials"
+    }`;
+
+    const blurb = document.createElement("p");
+    blurb.className = "politician-level-group__blurb";
+    blurb.textContent = `Everyone who represents this address at the ${levelLabel(
+      level
+    ).toLowerCase()} level.`;
 
     const grid = document.createElement("div");
     grid.className = "politician-grid";
     grid.append(
-      ...group.map((politician) => renderPoliticianCard(politician, cardOptions))
+      ...group.map((politician) =>
+        renderPoliticianCard(politician, {
+          ...cardOptions,
+          sectionLevel: level,
+        })
+      )
     );
-    section.append(grid);
+
+    section.append(heading, blurb, grid);
     container.append(section);
   }
 }
@@ -413,16 +561,85 @@ function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
         return;
       }
 
+      const uniquePeople = (() => {
+        // Client-side guard if an older API build still returns source duplicates.
+        const map = new Map();
+        for (const politician of saved) {
+          const key =
+            (politician.bioguide_id &&
+              `bioguide:${String(politician.bioguide_id).toLowerCase()}`) ||
+            `name:${String(politician.state || "").toUpperCase()}:${String(
+              politician.name || ""
+            )
+              .toLowerCase()
+              .replace(/[^a-z\s]/g, " ")
+              .replace(/\s+/g, " ")
+              .trim()
+              .split(" ")
+              .filter((part) => part.length > 1)
+              .join(" ")}`;
+          const existing = map.get(key);
+          if (!existing) {
+            map.set(key, {
+              ...politician,
+              levels: politicianLevels(politician),
+              offices: politicianOffices(politician),
+            });
+            continue;
+          }
+          const levels = [
+            ...new Set([
+              ...politicianLevels(existing),
+              ...politicianLevels(politician),
+            ]),
+          ].sort(
+            (a, b) => LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b)
+          );
+          const offices = [...politicianOffices(existing)];
+          for (const office of politicianOffices(politician)) {
+            const signature = `${office.level}|${office.office_title}|${office.district}`;
+            if (
+              !offices.some(
+                (item) =>
+                  `${item.level}|${item.office_title}|${item.district}` ===
+                  signature
+              )
+            ) {
+              offices.push(office);
+            }
+          }
+          map.set(key, {
+            ...existing,
+            ...politician,
+            photo_url: existing.photo_url || politician.photo_url,
+            website_url: existing.website_url || politician.website_url,
+            phone: existing.phone || politician.phone,
+            bioguide_id: existing.bioguide_id || politician.bioguide_id,
+            levels,
+            offices,
+            metadata: {
+              ...(existing.metadata || {}),
+              ...(politician.metadata || {}),
+              levels,
+              offices,
+            },
+          });
+        }
+        return [...map.values()];
+      })();
+
       const levelCounts = LEVEL_ORDER.map((level) => {
-        const count = saved.filter((p) => p.level === level).length;
+        const count = uniquePeople.filter((p) =>
+          politicianLevels(p).includes(level)
+        ).length;
         return count ? `${levelLabel(level)} ${count}` : null;
       }).filter(Boolean);
 
       setStatus(
-        `Representatives for ${data.address || input.value} · ${levelCounts.join(" · ")}`,
+        `Representatives for ${data.address || input.value} · ${uniquePeople.length} people · ${levelCounts.join(" · ")}`,
         "success"
       );
-      renderPoliticianGroups(results, saved, { followedIds, user });
+      renderPoliticianGroups(results, uniquePeople, { followedIds, user });
     } catch (error) {
       console.error(error);
       setStatus(error.message || "Address lookup failed.", "error");

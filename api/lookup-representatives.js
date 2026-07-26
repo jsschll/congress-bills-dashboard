@@ -52,18 +52,157 @@ function slugKey(value) {
     .replace(/^-|-$/g, "");
 }
 
+function normalizePersonName(name) {
+  return String(name || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, " ")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((part) => part.length > 1)
+    .join(" ");
+}
+
+function personMatchKey(politician) {
+  if (politician.bioguide_id) {
+    return `bioguide:${String(politician.bioguide_id).toLowerCase()}`;
+  }
+  const ciceroSk = politician.metadata?.cicero_sk;
+  // Prefer name+state matching across sources; cicero sk alone would prevent Geocodio merge.
+  const name = normalizePersonName(politician.name);
+  const state = String(politician.state || "").toUpperCase();
+  if (name) return `name:${state}:${name}`;
+  if (ciceroSk) return `cicero:${ciceroSk}`;
+  return `key:${politician.external_key}`;
+}
+
+function officeFromPolitician(politician) {
+  return {
+    level: politician.level || "local",
+    chamber: politician.chamber || "",
+    office_title:
+      politician.metadata?.office_title ||
+      politician.office_title ||
+      politician.chamber ||
+      "",
+    district: politician.district || "",
+    source: politician.source || "",
+    external_key: politician.external_key,
+  };
+}
+
+function preferFilled(current, next) {
+  if (next == null || next === "") return current;
+  if (current == null || current === "") return next;
+  return current;
+}
+
+function mergePersonRecords(existing, incoming) {
+  const offices = [...(existing.offices || [])];
+  const nextOffice = officeFromPolitician(incoming);
+  const officeKey = `${nextOffice.level}|${normalizePersonName(
+    nextOffice.office_title
+  )}|${String(nextOffice.district).toLowerCase()}`;
+  const already = offices.some(
+    (office) =>
+      `${office.level}|${normalizePersonName(office.office_title)}|${String(
+        office.district
+      ).toLowerCase()}` === officeKey
+  );
+  if (!already) offices.push(nextOffice);
+
+  const levels = [
+    ...new Set(
+      [...(existing.levels || []), incoming.level, ...offices.map((o) => o.level)].filter(
+        Boolean
+      )
+    ),
+  ].sort(
+    (a, b) =>
+      LEVEL_ORDER.indexOf(a) - LEVEL_ORDER.indexOf(b) || String(a).localeCompare(b)
+  );
+
+  const primaryLevel = levels[0] || incoming.level || existing.level;
+  const primaryOffice =
+    offices.find((office) => office.level === primaryLevel) || offices[0];
+
+  return {
+    ...existing,
+    external_key: preferFilled(existing.external_key, incoming.external_key),
+    bioguide_id: preferFilled(existing.bioguide_id, incoming.bioguide_id),
+    level: primaryLevel,
+    chamber: preferFilled(existing.chamber, incoming.chamber),
+    name:
+      String(incoming.name || "").length > String(existing.name || "").length
+        ? incoming.name
+        : existing.name || incoming.name,
+    party: preferFilled(existing.party, incoming.party),
+    state: preferFilled(existing.state, incoming.state),
+    district: preferFilled(
+      primaryOffice?.district || existing.district,
+      incoming.district
+    ),
+    photo_url: preferFilled(existing.photo_url, incoming.photo_url),
+    website_url: preferFilled(existing.website_url, incoming.website_url),
+    phone: preferFilled(existing.phone, incoming.phone),
+    source: preferFilled(existing.source, incoming.source),
+    levels,
+    offices,
+    metadata: {
+      ...(existing.metadata || {}),
+      ...(incoming.metadata || {}),
+      office_title:
+        primaryOffice?.office_title ||
+        existing.metadata?.office_title ||
+        incoming.metadata?.office_title,
+      levels,
+      offices,
+    },
+  };
+}
+
 function mergePoliticians(lists) {
-  const seen = new Set();
-  const merged = [];
+  const byPerson = new Map();
+
   for (const list of lists) {
     for (const politician of list || []) {
       if (!politician?.external_key || !politician?.name) continue;
-      if (seen.has(politician.external_key)) continue;
-      seen.add(politician.external_key);
-      merged.push(politician);
+      // Keep school district placeholders distinct from people.
+      if (politician.metadata?.district_only) {
+        const key = `district:${politician.external_key}`;
+        if (!byPerson.has(key)) {
+          byPerson.set(key, {
+            ...politician,
+            levels: [politician.level || "school"],
+            offices: [officeFromPolitician(politician)],
+          });
+        }
+        continue;
+      }
+
+      const key = personMatchKey(politician);
+      const existing = byPerson.get(key);
+      if (!existing) {
+        byPerson.set(key, {
+          ...politician,
+          levels: [politician.level || "local"],
+          offices: [officeFromPolitician(politician)],
+          metadata: {
+            ...(politician.metadata || {}),
+            levels: [politician.level || "local"],
+            offices: [officeFromPolitician(politician)],
+          },
+        });
+      } else {
+        byPerson.set(key, mergePersonRecords(existing, politician));
+      }
     }
   }
-  return merged.sort((a, b) => {
+
+  return [...byPerson.values()].sort((a, b) => {
     const levelDiff =
       LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level);
     if (levelDiff !== 0) return levelDiff;
