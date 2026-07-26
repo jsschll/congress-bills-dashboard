@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Recent Bills Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Congress.gov</p>
+          <h1>Recent Bills</h1>
+          <p class="subtitle">
+            Latest legislation from the 119th Congress with official CRS
+            summaries.
+          </p>
+        </div>
+        <button id="refresh-btn" class="refresh-btn" type="button">
+          Refresh
+        </button>
+      </header>
+
+      <div class="search-bar">
+        <label class="search-bar__label" for="search-input">Search bills</label>
+        <input
+          id="search-input"
+          class="search-bar__input"
+          type="search"
+          placeholder="Search Congress.gov by title or bill number (e.g. HR 5800)…"
+          autocomplete="off"
+        />
+      </div>
+
+      <p id="status" class="status" aria-live="polite">
+        Loading recent bills from Congress.gov…
+      </p>
+
+      <section
+        id="bills-grid"
+        class="grid"
+        aria-label="Recent bills"
+      ></section>
+
+      <p id="no-results" class="no-results" hidden>
+        No bills match your search.
+      </p>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
