@@ -529,6 +529,12 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   const sectionsWrap = document.createElement("div");
   sectionsWrap.className = "politician-results-sections";
 
+  function setMenuOpen(open) {
+    menu.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    filter.classList.toggle("is-open", open);
+  }
+
   function refreshToggleLabel() {
     toggle.innerHTML = "";
     const text = document.createElement("span");
@@ -673,41 +679,37 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   });
 
   toggle.addEventListener("click", (event) => {
+    event.preventDefault();
     event.stopPropagation();
-    const willOpen = menu.hidden;
-    if (willOpen) {
-      // Opening the menu resets to all categories checked/visible.
-      selected.clear();
-      availableLevels.forEach((level) => selected.add(level));
-      container._selectedLevels = selected;
-      syncCheckboxUi();
-      applySectionVisibility();
-    }
-    menu.hidden = !willOpen;
-    toggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
-    filter.classList.toggle("is-open", willOpen);
+    setMenuOpen(menu.hidden);
   });
 
   if (container._levelFilterAbort) {
     container._levelFilterAbort.abort();
   }
   container._levelFilterAbort = new AbortController();
+  const { signal } = container._levelFilterAbort;
 
   document.addEventListener(
-    "click",
+    "pointerdown",
     (event) => {
-      if (!filter.contains(event.target)) {
-        menu.hidden = true;
-        toggle.setAttribute("aria-expanded", "false");
-        filter.classList.remove("is-open");
-      }
+      if (!filter.contains(event.target)) setMenuOpen(false);
     },
-    { capture: true, signal: container._levelFilterAbort.signal }
+    { signal }
+  );
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    },
+    { signal }
   );
 
   filter.append(toggle, menu);
   toolbar.append(sortLabel, filter);
   container.append(toolbar, sectionsWrap);
+  setMenuOpen(false);
   applySectionVisibility();
 }
 

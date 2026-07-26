@@ -797,9 +797,12 @@ body {
 }
 
 .level-filter {
-  position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
   width: 100%;
+  min-width: 0;
 }
 
 .level-filter__toggle {
@@ -822,8 +825,14 @@ body {
 }
 
 .level-filter__caret {
+  flex-shrink: 0;
   color: var(--muted);
   font-size: 0.85rem;
+  transition: transform 0.15s ease;
+}
+
+.level-filter.is-open .level-filter__caret {
+  transform: rotate(180deg);
 }
 
 .level-filter__toggle:hover,
@@ -832,18 +841,20 @@ body {
 }
 
 .level-filter__menu {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  left: 0;
-  right: 0;
-  z-index: 20;
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  margin: 0;
   padding: 0.45rem;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
   box-shadow: var(--shadow);
-  display: grid;
-  gap: 0.15rem;
+}
+
+/* display:grid above would otherwise keep the menu visible forever */
+.level-filter__menu[hidden] {
+  display: none !important;
 }
 
 .level-filter__option {
