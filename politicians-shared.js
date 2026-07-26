@@ -314,17 +314,6 @@ function renderPoliticianCard(
   name.className = "politician-card__name";
   name.textContent = politician.name;
 
-  const levelRow = document.createElement("div");
-  levelRow.className = "politician-card__levels";
-  levelRow.setAttribute("aria-label", "Levels of influence");
-  for (const level of levels) {
-    const badge = document.createElement("span");
-    badge.className = "politician-level-badge";
-    if (level === activeLevel) badge.classList.add("is-active");
-    badge.textContent = levelLabel(level);
-    levelRow.append(badge);
-  }
-
   const officeTitle = readableOfficeTitle(
     activeOffice?.office_title ||
       politician.office_title ||
@@ -351,26 +340,21 @@ function renderPoliticianCard(
     .filter(Boolean)
     .join(" · ");
 
-  const otherOffices = politicianOffices(politician).filter(
-    (office) => office.level !== activeLevel
-  );
-  let otherMeta = null;
-  if (otherOffices.length) {
-    otherMeta = document.createElement("p");
-    otherMeta.className = "politician-card__also";
-    otherMeta.textContent = `Also: ${otherOffices
-      .map((office) => {
-        const title =
-          readableOfficeTitle(office.office_title) ||
-          chamberLabel(office.chamber, { metadata: { office_title: office.office_title } });
-        return `${levelLabel(office.level)} — ${title}`;
-      })
-      .join("; ")}`;
-  }
+  const extras = document.createElement("div");
+  extras.className = "politician-card__extras";
 
   const party = document.createElement("span");
   party.className = `politician-card__party ${partyClass(politician.party)}`;
   party.textContent = politician.party || "Independent/Other";
+  extras.append(party);
+
+  const otherLevels = levels.filter((level) => level !== activeLevel);
+  if (otherLevels.length) {
+    const also = document.createElement("span");
+    also.className = "politician-card__also-levels";
+    also.textContent = `Also: ${otherLevels.map(levelLabel).join(", ")}`;
+    extras.append(also);
+  }
 
   const actions = document.createElement("div");
   actions.className = "politician-card__actions";
@@ -381,7 +365,7 @@ function renderPoliticianCard(
     link.href = politician.website_url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = "Official site";
+    link.textContent = "Site";
     actions.append(link);
   }
 
@@ -392,7 +376,7 @@ function renderPoliticianCard(
   const isDistrictOnly = Boolean(politician.metadata?.district_only);
   const isFollowed = politician.id && followedIds?.has(politician.id);
   followBtn.textContent = isDistrictOnly
-    ? "District only"
+    ? "District"
     : isFollowed
       ? "Following"
       : "Follow";
@@ -443,16 +427,12 @@ function renderPoliticianCard(
   });
 
   actions.append(followBtn);
-  body.append(name, levelRow, meta);
-  if (otherMeta) body.append(otherMeta);
-  body.append(party, actions);
-  card.append(media, body);
+  body.append(name, meta, extras);
+  card.append(media, body, actions);
   return card;
 }
 
-function renderPoliticianGroups(container, politicians, cardOptions) {
-  container.replaceChildren();
-
+function groupPoliticiansByLevel(politicians) {
   const people = politicians.map((politician) => ({
     ...politician,
     levels: politicianLevels(politician),
@@ -464,7 +444,6 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
     const levels = politician.levels.length
       ? politician.levels
       : [toDisplayLevel(politician.level || "local")];
-    // Show this person under every level they affect.
     for (const level of levels) {
       const displayLevel = toDisplayLevel(level);
       if (!byLevel.has(displayLevel)) byLevel.set(displayLevel, []);
@@ -472,17 +451,8 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
     }
   }
 
-  const jump = document.createElement("nav");
-  jump.className = "politician-level-nav";
-  jump.setAttribute("aria-label", "Jump to government level");
-
-  let hasAny = false;
   for (const level of DISPLAY_LEVEL_ORDER) {
     const group = byLevel.get(level) || [];
-    if (!group.length) continue;
-    hasAny = true;
-
-    // Stable unique people within a level (already deduped upstream, but guard).
     const unique = [];
     const seen = new Set();
     for (const politician of group) {
@@ -493,61 +463,195 @@ function renderPoliticianGroups(container, politicians, cardOptions) {
     }
     unique.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     byLevel.set(level, unique);
-
-    const link = document.createElement("a");
-    link.className = "politician-level-nav__link";
-    link.href = `#level-${level}`;
-    link.textContent = `${levelLabel(level)} (${unique.length})`;
-    jump.append(link);
   }
 
-  if (!hasAny) return;
-  container.append(jump);
+  return byLevel;
+}
 
-  for (const level of DISPLAY_LEVEL_ORDER) {
-    const group = byLevel.get(level) || [];
-    if (!group.length) continue;
+function selectedLevelsLabel(selected) {
+  if (!selected.size || selected.size === DISPLAY_LEVEL_ORDER.length) {
+    return "All levels";
+  }
+  return DISPLAY_LEVEL_ORDER.filter((level) => selected.has(level))
+    .map(levelLabel)
+    .join(", ");
+}
 
-    const section = document.createElement("section");
-    section.className = "politician-level-group";
-    section.id = `level-${level}`;
-    section.setAttribute("aria-label", levelLabel(level));
+function renderPoliticianGroups(container, politicians, cardOptions = {}) {
+  const previousSelected = container._selectedLevels;
+  const byLevel = groupPoliticiansByLevel(politicians);
+  const availableLevels = DISPLAY_LEVEL_ORDER.filter(
+    (level) => (byLevel.get(level) || []).length > 0
+  );
 
-    const heading = document.createElement("h3");
-    heading.className = "politician-level-group__title";
-    heading.textContent = `${levelLabel(level)} · ${group.length} ${
-      group.length === 1 ? "official" : "officials"
-    }`;
+  if (!availableLevels.length) {
+    container.replaceChildren();
+    return;
+  }
 
-    const blurb = document.createElement("p");
-    blurb.className = "politician-level-group__blurb";
-    const blurbs = {
-      federal: "U.S. Senators, Representative, and President for this address.",
-      state: "Governor, statewide executives, legislators, and state officials.",
-      county: "County supervisors/commissioners, sheriff, and county judges.",
-      city: "Mayor, city council, and other municipal officials.",
-      school: "School districts and school board members / trustees.",
-    };
-    blurb.textContent =
-      blurbs[level] ||
-      `Everyone who represents this address at the ${levelLabel(
-        level
-      ).toLowerCase()} level.`;
+  const selected =
+    previousSelected instanceof Set
+      ? new Set(
+          [...previousSelected].filter((level) => availableLevels.includes(level))
+        )
+      : new Set(availableLevels);
+  if (!selected.size) availableLevels.forEach((level) => selected.add(level));
 
-    const grid = document.createElement("div");
-    grid.className = "politician-grid";
-    grid.append(
-      ...group.map((politician) =>
-        renderPoliticianCard(politician, {
-          ...cardOptions,
-          sectionLevel: level,
-        })
-      )
+  container._politicianData = { politicians, cardOptions };
+  container._selectedLevels = selected;
+  container.replaceChildren();
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "politician-results-toolbar";
+
+  const filter = document.createElement("div");
+  filter.className = "level-filter";
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "level-filter__toggle";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-haspopup", "listbox");
+
+  const menu = document.createElement("div");
+  menu.className = "level-filter__menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "group");
+  menu.setAttribute("aria-label", "Choose government levels to show");
+
+  function refreshToggleLabel() {
+    const count = [...selected].reduce(
+      (sum, level) => sum + (byLevel.get(level) || []).length,
+      0
     );
-
-    section.append(heading, blurb, grid);
-    container.append(section);
+    toggle.textContent = `Show: ${selectedLevelsLabel(selected)} (${count})`;
   }
+
+  function paintSections() {
+    container.querySelectorAll(".politician-level-group").forEach((node) => {
+      node.remove();
+    });
+
+    for (const level of DISPLAY_LEVEL_ORDER) {
+      if (!selected.has(level)) continue;
+      const group = byLevel.get(level) || [];
+      if (!group.length) continue;
+
+      const section = document.createElement("section");
+      section.className = "politician-level-group";
+      section.dataset.level = level;
+      section.setAttribute("aria-label", levelLabel(level));
+
+      const heading = document.createElement("div");
+      heading.className = "politician-level-group__header";
+
+      const title = document.createElement("h3");
+      title.className = "politician-level-group__title";
+      title.textContent = levelLabel(level);
+
+      const count = document.createElement("span");
+      count.className = "politician-level-group__count";
+      count.textContent = `${group.length}`;
+
+      heading.append(title, count);
+
+      const list = document.createElement("div");
+      list.className = "politician-list";
+      list.append(
+        ...group.map((politician) =>
+          renderPoliticianCard(politician, {
+            ...cardOptions,
+            sectionLevel: level,
+          })
+        )
+      );
+
+      section.append(heading, list);
+      container.append(section);
+    }
+
+    refreshToggleLabel();
+  }
+
+  const allLabel = document.createElement("label");
+  allLabel.className = "level-filter__option";
+  const allInput = document.createElement("input");
+  allInput.type = "checkbox";
+  allInput.value = "all";
+  allInput.checked = selected.size === availableLevels.length;
+  allLabel.append(allInput, document.createTextNode(" All levels"));
+  menu.append(allLabel);
+
+  for (const level of availableLevels) {
+    const label = document.createElement("label");
+    label.className = "level-filter__option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = level;
+    input.checked = selected.has(level);
+    label.append(input, document.createTextNode(` ${levelLabel(level)}`));
+    menu.append(label);
+  }
+
+  menu.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+
+    if (input.value === "all") {
+      selected.clear();
+      if (input.checked) {
+        availableLevels.forEach((level) => selected.add(level));
+      }
+    } else if (input.checked) {
+      selected.add(input.value);
+    } else {
+      selected.delete(input.value);
+    }
+
+    if (!selected.size) {
+      availableLevels.forEach((level) => selected.add(level));
+    }
+
+    menu.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+      if (box.value === "all") {
+        box.checked = selected.size === availableLevels.length;
+      } else {
+        box.checked = selected.has(box.value);
+      }
+    });
+
+    container._selectedLevels = selected;
+    paintSections();
+  });
+
+  toggle.addEventListener("click", () => {
+    const open = menu.hidden;
+    menu.hidden = !open;
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    filter.classList.toggle("is-open", open);
+  });
+
+  if (container._levelFilterAbort) {
+    container._levelFilterAbort.abort();
+  }
+  container._levelFilterAbort = new AbortController();
+
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!filter.contains(event.target)) {
+        menu.hidden = true;
+        toggle.setAttribute("aria-expanded", "false");
+        filter.classList.remove("is-open");
+      }
+    },
+    { capture: true, signal: container._levelFilterAbort.signal }
+  );
+
+  filter.append(toggle, menu);
+  toolbar.append(filter);
+  container.append(toolbar);
+  paintSections();
 }
 
 function mountAddressLookup({ formId, inputId, statusId, resultsId }) {
