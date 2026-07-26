@@ -14,6 +14,7 @@
           <a class="app-nav__link is-active" href="index.html">Bills</a>
           <a class="app-nav__link" href="feed.html">Feed</a>
           <a class="app-nav__link" href="topics.html">Topics</a>
+          <a class="app-nav__link" href="politicians.html">Politicians</a>
         </div>
         <div class="app-nav__actions" id="app-nav-actions">
           <a class="app-nav__button app-nav__button--ghost" href="auth.html"
@@ -53,6 +54,22 @@
         </div>
       </header>
 
+      <section class="lookup-panel" aria-labelledby="home-lookup-heading">
+        <h2 id="home-lookup-heading">Who represents you?</h2>
+        <form id="home-address-form" class="keyword-form">
+          <input
+            id="home-address-input"
+            class="search-bar__input"
+            type="search"
+            placeholder="Enter your address or ZIP code"
+            required
+          />
+          <button class="refresh-btn" type="submit">Find representatives</button>
+        </form>
+        <p id="home-address-status" class="status" hidden></p>
+        <div id="home-address-results" class="politician-grid"></div>
+      </section>
+
       <div class="search-bar">
         <label class="search-bar__label" for="search-input">Search bills</label>
         <input
@@ -82,9 +99,16 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js"></script>
+    <script src="politicians-shared.js"></script>
     <script src="app.js" defer></script>
     <script>
       bootNav("home");
+      mountAddressLookup({
+        formId: "home-address-form",
+        inputId: "home-address-input",
+        statusId: "home-address-status",
+        resultsId: "home-address-results",
+      });
     </script>
   </body>
 </html>
