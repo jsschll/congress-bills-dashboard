@@ -25,14 +25,21 @@ Set these for Production/Preview:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY` (also bake into deployed `config.js`, or replace config at build time)
 - `SUPABASE_SERVICE_ROLE_KEY` (server only — never expose to the browser)
+- `GEOCODIO_API_KEY` — used by `/api/lookup-representatives` for address → representatives
 
 Cron runs `/api/watch-bills` once daily at midnight UTC (`vercel.json`).
 
-## 4. Auth flow
+## 4. Politicians feature
+1. Run [`supabase/migration-politicians.sql`](supabase/migration-politicians.sql)
+2. Open **Politicians** in the nav, or use the address lookup on the homepage
+3. Federal browse uses Congress.gov current members; state officials appear from address lookups (and are saved for browsing)
+4. Signed-in users can Follow / Unfollow politicians (stored in `followed_politicians`)
+
+## 5. Auth flow
 1. Sign up with username, email, and password
 2. User clicks the verification link in email
 3. User signs in with email or username + password
 4. Nav shows **Sign out** (Sign up is hidden while signed in)
 
-## 5. Phone signup
+## 6. Phone signup
 Deferred. Can be added later with Twilio in Supabase.

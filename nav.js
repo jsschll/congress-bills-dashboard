@@ -80,6 +80,7 @@ function createNavShell(activePage = "home") {
         <a class="app-nav__link ${activePage === "home" ? "is-active" : ""}" href="index.html">Bills</a>
         <a class="app-nav__link ${activePage === "feed" ? "is-active" : ""}" href="feed.html">Feed</a>
         <a class="app-nav__link ${activePage === "topics" ? "is-active" : ""}" href="topics.html">Topics</a>
+        <a class="app-nav__link ${activePage === "politicians" ? "is-active" : ""}" href="politicians.html">Politicians</a>
       </div>
       <div class="app-nav__actions" id="app-nav-actions"></div>
     </div>

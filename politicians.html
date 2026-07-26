@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Politicians · Congress Bills</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav id="app-nav" class="app-nav" aria-label="Main">
+      <div class="app-nav__inner">
+        <a class="app-nav__brand" href="index.html">Congress Bills</a>
+        <div class="app-nav__links">
+          <a class="app-nav__link" href="index.html">Bills</a>
+          <a class="app-nav__link" href="feed.html">Feed</a>
+          <a class="app-nav__link" href="topics.html">Topics</a>
+          <a class="app-nav__link is-active" href="politicians.html"
+            >Politicians</a
+          >
+        </div>
+        <div class="app-nav__actions" id="app-nav-actions">
+          <a class="app-nav__button app-nav__button--ghost" href="auth.html"
+            >Sign in</a
+          >
+          <a
+            class="app-nav__button app-nav__button--primary"
+            href="auth.html?mode=signup"
+            >Sign up</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <main class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Representation</p>
+          <h1>Politicians</h1>
+          <p class="subtitle">
+            Browse federal and state officials, or look up who represents your
+            address.
+          </p>
+        </div>
+      </header>
+
+      <section class="lookup-panel" aria-labelledby="lookup-heading">
+        <h2 id="lookup-heading">Find who represents you</h2>
+        <form id="address-form" class="keyword-form">
+          <input
+            id="address-input"
+            class="search-bar__input"
+            type="search"
+            placeholder="Street address or ZIP code"
+            required
+          />
+          <button class="refresh-btn" type="submit">Look up</button>
+        </form>
+        <p id="address-status" class="status" hidden></p>
+        <div id="address-results" class="politician-grid"></div>
+      </section>
+
+      <section class="topics-panel" aria-labelledby="browse-heading">
+        <div class="topics-panel__header">
+          <h2 id="browse-heading">Browse politicians</h2>
+        </div>
+
+        <div class="filter-bar">
+          <label>
+            Level
+            <select id="filter-level" class="search-bar__input">
+              <option value="federal">Federal</option>
+              <option value="state">State</option>
+              <option value="all">All</option>
+            </select>
+          </label>
+          <label>
+            Party
+            <select id="filter-party" class="search-bar__input">
+              <option value="">Any party</option>
+              <option value="Democratic">Democratic</option>
+              <option value="Republican">Republican</option>
+              <option value="Independent">Independent</option>
+            </select>
+          </label>
+          <label>
+            State
+            <select id="filter-state" class="search-bar__input">
+              <option value="">All states</option>
+            </select>
+          </label>
+          <label class="filter-bar__search">
+            Search
+            <input
+              id="filter-search"
+              class="search-bar__input"
+              type="search"
+              placeholder="Name or district"
+            />
+          </label>
+        </div>
+
+        <p id="browse-status" class="status" hidden></p>
+        <div id="politicians-grid" class="politician-grid"></div>
+      </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js"></script>
+    <script src="politicians-shared.js"></script>
+    <script src="politicians.js" defer></script>
+  </body>
+</html>
