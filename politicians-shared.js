@@ -225,6 +225,21 @@ async function loadFollowedPoliticianIds(userId) {
   return new Set((data || []).map((row) => row.politician_id));
 }
 
+function normalizeNationalOfficialRow(row) {
+  if (!row || typeof row !== "object") return null;
+  const fullName =
+    row.full_name || row.name || row.official_name || row.fullName || "";
+  if (!String(fullName).trim()) return null;
+  return {
+    id: row.id,
+    full_name: String(fullName).trim(),
+    title: row.title || row.office_title || row.position || "",
+    category: row.category || row.type || row.group || row.section || "",
+    branch: row.branch || "",
+    department: row.department || row.agency || "",
+  };
+}
+
 function classifyNationalOfficial(row) {
   const hay = [row.category, row.branch, row.title, row.department]
     .filter(Boolean)
@@ -249,14 +264,16 @@ function classifyNationalOfficial(row) {
 }
 
 function mapNationalOfficial(row) {
-  const group = classifyNationalOfficial(row);
-  const title = readableOfficeTitle(row.title) || row.department || "";
+  const normalized = normalizeNationalOfficialRow(row) || row;
+  const group = classifyNationalOfficial(normalized);
+  const title =
+    readableOfficeTitle(normalized.title) || normalized.department || "";
   return {
-    external_key: `national:${row.id}`,
+    external_key: `national:${normalized.id}`,
     bioguide_id: null,
     level: "federal",
     chamber: group === "supreme_court" ? "supreme_court" : "cabinet",
-    name: row.full_name || "Unknown",
+    name: normalized.full_name || "Unknown",
     party: "",
     state: "US",
     district: "",
@@ -267,10 +284,10 @@ function mapNationalOfficial(row) {
     office_title: title,
     metadata: {
       office_title: title,
-      department: row.department || "",
-      branch: row.branch || "",
-      category: row.category || "",
-      national_official_id: row.id,
+      department: normalized.department || "",
+      branch: normalized.branch || "",
+      category: normalized.category || "",
+      national_official_id: normalized.id,
       national_group: group,
     },
     levels: ["federal"],
@@ -281,30 +298,96 @@ function mapNationalOfficial(row) {
         office_title: title,
         district: "",
         source: "national_officials",
-        external_key: `national:${row.id}`,
+        external_key: `national:${normalized.id}`,
       },
     ],
   };
 }
 
-/** Fetch every row from public.national_officials and map for Federal UI. */
-async function fetchNationalOfficials() {
-  const client = getSupabase();
-  if (!client) return [];
+async function fetchNationalOfficialsViaRest() {
+  if (!isSupabaseConfigured()) return { data: [], error: "Supabase is not configured." };
 
-  const { data, error } = await client
-    .from("national_officials")
-    .select("id, full_name, title, category, branch, department")
-    .order("full_name");
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/national_officials?select=*`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Accept: "application/json",
+      },
+    }
+  );
 
-  if (error) {
-    console.error(error);
-    return [];
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message =
+      payload?.message ||
+      payload?.error_description ||
+      payload?.hint ||
+      `national_officials request failed (${response.status})`;
+    return { data: [], error: message };
   }
 
-  return (data || [])
-    .filter((row) => row?.full_name)
-    .map(mapNationalOfficial);
+  return { data: Array.isArray(payload) ? payload : [], error: null };
+}
+
+/** Fetch every row from public.national_officials and map for Federal UI. */
+async function fetchNationalOfficials() {
+  try {
+    if (typeof injectSupabaseScript === "function") {
+      await injectSupabaseScript().catch((error) => {
+        console.warn("Supabase script load warning:", error);
+      });
+    }
+
+    const client = getSupabase();
+    let rows = [];
+    let errorMessage = null;
+
+    if (client) {
+      const { data, error } = await client.from("national_officials").select("*");
+
+      if (error) {
+        errorMessage = error.message || String(error);
+        console.error("national_officials Supabase error:", error);
+      } else {
+        rows = data || [];
+      }
+    } else {
+      console.warn(
+        "Supabase client unavailable; falling back to REST for national_officials."
+      );
+    }
+
+    if (!rows.length) {
+      const rest = await fetchNationalOfficialsViaRest();
+      if (rest.error) {
+        errorMessage = rest.error;
+        console.error("national_officials REST error:", rest.error);
+      } else {
+        rows = rest.data || [];
+      }
+    }
+
+    if (!rows.length) {
+      console.warn(
+        "national_officials returned 0 rows. If the table is populated in Supabase, enable a public SELECT policy and GRANT SELECT to anon/authenticated.",
+        errorMessage || ""
+      );
+      return [];
+    }
+
+    const mapped = rows
+      .map(normalizeNationalOfficialRow)
+      .filter(Boolean)
+      .map(mapNationalOfficial);
+
+    console.info(`Loaded ${mapped.length} national_officials`);
+    return mapped;
+  } catch (error) {
+    console.error("fetchNationalOfficials failed:", error);
+    return [];
+  }
 }
 
 function appendPoliticianSubgroup(list, heading, politicians, cardOptions, sectionLevel) {

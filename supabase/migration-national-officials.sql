@@ -1,11 +1,7 @@
 -- National officials (Cabinet Secretaries + Supreme Court Justices)
--- Table was created in Supabase; this documents the expected shape for the app.
--- Columns used by the client: id, full_name, title, category, branch, department
---
--- category / branch / title are used to bucket rows into:
---   - Cabinet Secretaries
---   - Supreme Court Justices
--- Prefer category values like "Cabinet Secretaries" or "Supreme Court Justices".
+-- Run this in the Supabase SQL editor if Cabinet / SCOTUS rows exist in the
+-- table but do not appear in the app. An empty client response usually means
+-- RLS is enabled without a public SELECT policy (or anon lacks GRANT SELECT).
 
 create table if not exists public.national_officials (
   id uuid primary key default gen_random_uuid(),
@@ -24,7 +20,15 @@ create index if not exists national_officials_category_idx
 
 alter table public.national_officials enable row level security;
 
+grant usage on schema public to anon, authenticated;
+grant select on table public.national_officials to anon, authenticated;
+
 drop policy if exists "Anyone can read national officials" on public.national_officials;
 create policy "Anyone can read national officials"
-  on public.national_officials for select
+  on public.national_officials
+  for select
+  to anon, authenticated
   using (true);
+
+-- Optional: confirm the app can see rows
+-- select count(*) from public.national_officials;

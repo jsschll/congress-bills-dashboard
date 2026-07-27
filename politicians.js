@@ -175,10 +175,20 @@ async function loadBrowseList() {
     let list = [];
 
     if (level === "federal" || level === "all") {
-      const federal = await fetchFederalMembers();
-      list = list.concat(federal);
-      const national = await fetchNationalOfficials();
-      list = list.concat(national);
+      // Load national officials independently so Congress.gov failures don't hide them.
+      const [federal, national] = await Promise.all([
+        fetchFederalMembers().catch((error) => {
+          console.error("Congress.gov members failed:", error);
+          return [];
+        }),
+        fetchNationalOfficials(),
+      ]);
+      list = list.concat(federal, national);
+      if (!national.length) {
+        console.warn(
+          "No national_officials rows loaded. Check Supabase RLS SELECT policy for anon."
+        );
+      }
     }
 
     const stored = await fetchStoredPoliticians(level === "all" ? "all" : level);
