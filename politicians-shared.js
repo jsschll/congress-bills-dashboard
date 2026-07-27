@@ -307,6 +307,19 @@ async function loadFollowedPoliticianIds(userId) {
   return new Set((data || []).map((row) => row.politician_id));
 }
 
+function normalizePartyLabel(party) {
+  const value = String(party || "").trim();
+  if (!value) return "";
+  const lower = value.toLowerCase();
+  if (lower.startsWith("dem")) return "Democrat";
+  if (lower.startsWith("rep")) return "Republican";
+  if (lower.startsWith("ind")) return "Independent";
+  if (lower.includes("nonpartisan") || lower.includes("non-partisan")) {
+    return "Nonpartisan";
+  }
+  return value;
+}
+
 function normalizeNationalOfficialRow(row) {
   if (!row || typeof row !== "object") return null;
   const fullName =
@@ -319,7 +332,42 @@ function normalizeNationalOfficialRow(row) {
     category: row.category || row.type || row.group || row.section || "",
     branch: row.branch || "",
     department: row.department || row.agency || "",
+    party: normalizePartyLabel(row.party || row.party_name || ""),
+    photo_url: row.photo_url || row.photoUrl || row.image_url || row.image || "",
   };
+}
+
+/** Fallback portraits/party when DB rows predate party/photo_url columns. */
+const NATIONAL_EXECUTIVE_DEFAULTS = {
+  "donald j trump": {
+    party: "Republican",
+    photo_url:
+      "https://upload.wikimedia.org/wikipedia/commons/d/d6/Donald_Trump_official_portrait%2C_2025_%28cropped_headshot%29.jpg",
+  },
+  "donald trump": {
+    party: "Republican",
+    photo_url:
+      "https://upload.wikimedia.org/wikipedia/commons/d/d6/Donald_Trump_official_portrait%2C_2025_%28cropped_headshot%29.jpg",
+  },
+  "jd vance": {
+    party: "Republican",
+    photo_url:
+      "https://upload.wikimedia.org/wikipedia/commons/7/71/JD_Vance_official_portrait_%28cropped_headshot%29.jpg",
+  },
+  "j d vance": {
+    party: "Republican",
+    photo_url:
+      "https://upload.wikimedia.org/wikipedia/commons/7/71/JD_Vance_official_portrait_%28cropped_headshot%29.jpg",
+  },
+};
+
+function nationalExecutiveDefaults(fullName) {
+  const key = String(fullName || "")
+    .toLowerCase()
+    .replace(/[.'’]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return NATIONAL_EXECUTIVE_DEFAULTS[key] || null;
 }
 
 function classifyNationalOfficial(row) {
@@ -402,16 +450,25 @@ function mapNationalOfficial(row) {
   const chamber = nationalOfficialChamber(group);
   const title =
     readableOfficeTitle(normalized.title) || normalized.department || "";
+  const defaults =
+    group === "executive"
+      ? nationalExecutiveDefaults(normalized.full_name)
+      : null;
+  const party =
+    normalizePartyLabel(normalized.party) ||
+    defaults?.party ||
+    "";
+  const photoUrl = normalized.photo_url || defaults?.photo_url || "";
   return {
     external_key: `national:${normalized.id}`,
     bioguide_id: null,
     level: "federal",
     chamber,
     name: normalized.full_name || "Unknown",
-    party: "",
+    party,
     state: "US",
     district: "",
-    photo_url: "",
+    photo_url: photoUrl,
     website_url: "",
     phone: "",
     source: "national_officials",

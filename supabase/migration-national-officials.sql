@@ -18,7 +18,9 @@ create table if not exists public.national_officials (
   title text,
   category text,
   branch text,
-  department text
+  department text,
+  party text,
+  photo_url text
 );
 
 create index if not exists national_officials_full_name_idx
