@@ -18,8 +18,8 @@ create table if not exists public.county_district_mapping (
   id uuid primary key default gen_random_uuid(),
   state_code text not null,
   county_name text not null,
-  appellate_district_numbers text[] not null default '{}'::text[],
-  judicial_district_numbers text[] not null default '{}'::text[],
+  appellate_district_numbers integer[] not null default '{}'::integer[],
+  judicial_district_numbers integer[] not null default '{}'::integer[],
   unique (state_code, county_name)
 );
 

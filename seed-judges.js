@@ -49,14 +49,14 @@ const COUNTY_MAPPINGS = [
   {
     state_code: "TX",
     county_name: "Fort Bend",
-    appellate_district_numbers: ["1", "14"],
-    judicial_district_numbers: ["240", "268", "328", "387", "434", "458"],
+    appellate_district_numbers: [1, 14],
+    judicial_district_numbers: [240, 268, 328, 387, 434, 458],
   },
   {
     state_code: "TX",
     county_name: "Harris",
-    appellate_district_numbers: ["1", "14"],
-    judicial_district_numbers: ["11", "55", "61", "80", "113", "125"],
+    appellate_district_numbers: [1, 14],
+    judicial_district_numbers: [11, 55, 61, 80, 113, 125],
   },
 ];
 
