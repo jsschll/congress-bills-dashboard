@@ -244,30 +244,39 @@ function normalizeNationalOfficialRow(row) {
 
 function classifyNationalOfficial(row) {
   const category = String(row.category || "").toLowerCase().trim();
-  const hay = [row.category, row.branch, row.title, row.department]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  const title = String(row.title || "").toLowerCase();
+  const department = String(row.department || "").toLowerCase();
 
-  if (
-    category === "agency director" ||
-    category.includes("agency director") ||
-    /agency\s+director/.test(hay)
-  ) {
+  // Prefer the explicit Supabase category so DOJ / "Justice" titles stay Cabinet.
+  if (category === "agency director" || category.includes("agency director")) {
     return "agency_director";
   }
   if (
-    category.includes("supreme") ||
-    category.includes("court") ||
-    /supreme|scotus|chief justice|\bjustices?\b|judicial/.test(hay)
+    category === "cabinet secretary" ||
+    category.includes("cabinet")
+  ) {
+    return "cabinet";
+  }
+  if (
+    category === "supreme court" ||
+    category.includes("supreme court") ||
+    (category.includes("supreme") && category.includes("justice"))
   ) {
     return "supreme_court";
   }
+
+  // Fallback heuristics only when category is missing/unknown.
+  if (/agency\s+director/.test(`${title} ${department} ${category}`)) {
+    return "agency_director";
+  }
   if (
-    category.includes("cabinet") ||
-    category.includes("secretary") ||
-    /cabinet|secretary|attorney general/.test(hay)
+    /supreme\s+court|scotus|chief\s+justice/.test(title) ||
+    (/\bassociate\s+justice\b|\bjustices?\b/.test(title) &&
+      !/department of justice|attorney general/.test(`${title} ${department}`))
   ) {
+    return "supreme_court";
+  }
+  if (/cabinet|secretary|attorney general/.test(`${title} ${department} ${category}`)) {
     return "cabinet";
   }
   return "other";
