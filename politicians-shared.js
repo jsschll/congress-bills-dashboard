@@ -109,6 +109,10 @@ function chamberLabel(chamber, politician = {}) {
       return "City Council";
     case "county":
       return "County office";
+    case "cabinet":
+      return "Cabinet";
+    case "supreme_court":
+      return "Supreme Court";
     case "school_board":
       return "School Board";
     case "school_district":
@@ -219,6 +223,112 @@ async function loadFollowedPoliticianIds(userId) {
     return new Set();
   }
   return new Set((data || []).map((row) => row.politician_id));
+}
+
+function classifyNationalOfficial(row) {
+  const hay = [row.category, row.branch, row.title, row.department]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (/supreme|scotus|chief justice|\bjustices?\b|judicial/.test(hay)) {
+    return "supreme_court";
+  }
+  if (/cabinet|secretary|attorney general|department of|executive/.test(hay)) {
+    return "cabinet";
+  }
+
+  const category = String(row.category || "").toLowerCase();
+  if (category.includes("supreme") || category.includes("court")) {
+    return "supreme_court";
+  }
+  if (category.includes("cabinet") || category.includes("secretary")) {
+    return "cabinet";
+  }
+  return "other";
+}
+
+function mapNationalOfficial(row) {
+  const group = classifyNationalOfficial(row);
+  const title = readableOfficeTitle(row.title) || row.department || "";
+  return {
+    external_key: `national:${row.id}`,
+    bioguide_id: null,
+    level: "federal",
+    chamber: group === "supreme_court" ? "supreme_court" : "cabinet",
+    name: row.full_name || "Unknown",
+    party: "",
+    state: "US",
+    district: "",
+    photo_url: "",
+    website_url: "",
+    phone: "",
+    source: "national_officials",
+    office_title: title,
+    metadata: {
+      office_title: title,
+      department: row.department || "",
+      branch: row.branch || "",
+      category: row.category || "",
+      national_official_id: row.id,
+      national_group: group,
+    },
+    levels: ["federal"],
+    offices: [
+      {
+        level: "federal",
+        chamber: group === "supreme_court" ? "supreme_court" : "cabinet",
+        office_title: title,
+        district: "",
+        source: "national_officials",
+        external_key: `national:${row.id}`,
+      },
+    ],
+  };
+}
+
+/** Fetch every row from public.national_officials and map for Federal UI. */
+async function fetchNationalOfficials() {
+  const client = getSupabase();
+  if (!client) return [];
+
+  const { data, error } = await client
+    .from("national_officials")
+    .select("id, full_name, title, category, branch, department")
+    .order("full_name");
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  return (data || [])
+    .filter((row) => row?.full_name)
+    .map(mapNationalOfficial);
+}
+
+function appendPoliticianSubgroup(list, heading, politicians, cardOptions, sectionLevel) {
+  if (!politicians.length) return 0;
+
+  const subgroup = document.createElement("div");
+  subgroup.className = "politician-subgroup";
+
+  const title = document.createElement("h4");
+  title.className = "politician-subgroup__title";
+  title.textContent = heading;
+  subgroup.append(title);
+
+  for (const politician of politicians) {
+    subgroup.append(
+      renderPoliticianCard(politician, {
+        ...cardOptions,
+        sectionLevel,
+      })
+    );
+  }
+
+  list.append(subgroup);
+  return politicians.length;
 }
 
 async function followPolitician(userId, politicianId) {
@@ -599,10 +709,19 @@ function selectedLevelsLabel(selected, availableLevels, showAll = false) {
 }
 
 function renderPoliticianGroups(container, politicians, cardOptions = {}) {
+  const nationalOfficials = Array.isArray(cardOptions.nationalOfficials)
+    ? cardOptions.nationalOfficials
+    : [];
   const byLevel = groupPoliticiansByLevel(politicians);
-  const availableLevels = DISPLAY_LEVEL_ORDER.filter(
+  let availableLevels = DISPLAY_LEVEL_ORDER.filter(
     (level) => (byLevel.get(level) || []).length > 0
   );
+
+  if (nationalOfficials.length && !availableLevels.includes("federal")) {
+    availableLevels = DISPLAY_LEVEL_ORDER.filter(
+      (level) => level === "federal" || availableLevels.includes(level)
+    );
+  }
 
   if (!availableLevels.length) {
     container.replaceChildren();
@@ -704,7 +823,25 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
 
   // Build every available category section up front; checkboxes fold them.
   for (const level of availableLevels) {
-    const group = byLevel.get(level) || [];
+    const group = (byLevel.get(level) || []).filter(
+      (politician) => politician.source !== "national_officials"
+    );
+
+    const cabinet = level === "federal"
+      ? nationalOfficials.filter((p) => p.metadata?.national_group === "cabinet")
+      : [];
+    const justices = level === "federal"
+      ? nationalOfficials.filter(
+          (p) => p.metadata?.national_group === "supreme_court"
+        )
+      : [];
+    const otherNational = level === "federal"
+      ? nationalOfficials.filter((p) => p.metadata?.national_group === "other")
+      : [];
+
+    const totalCount =
+      group.length + cabinet.length + justices.length + otherNational.length;
+    if (!totalCount) continue;
 
     const section = document.createElement("section");
     section.className = "politician-level-group";
@@ -727,7 +864,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
 
     const count = document.createElement("span");
     count.className = "politician-level-group__count";
-    count.textContent = `${group.length}`;
+    count.textContent = `${totalCount}`;
 
     header.append(arrow, title, count);
 
@@ -740,14 +877,50 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
 
     const list = document.createElement("div");
     list.className = "politician-list";
-    list.append(
-      ...group.map((politician) =>
-        renderPoliticianCard(politician, {
-          ...cardOptions,
-          sectionLevel: level,
-        })
-      )
-    );
+
+    if (level === "federal") {
+      if (group.length) {
+        appendPoliticianSubgroup(
+          list,
+          "Congress & elected officials",
+          group,
+          cardOptions,
+          level
+        );
+      }
+      appendPoliticianSubgroup(
+        list,
+        "Cabinet Secretaries",
+        cabinet,
+        cardOptions,
+        level
+      );
+      appendPoliticianSubgroup(
+        list,
+        "Supreme Court Justices",
+        justices,
+        cardOptions,
+        level
+      );
+      if (otherNational.length) {
+        appendPoliticianSubgroup(
+          list,
+          "Other national officials",
+          otherNational,
+          cardOptions,
+          level
+        );
+      }
+    } else {
+      list.append(
+        ...group.map((politician) =>
+          renderPoliticianCard(politician, {
+            ...cardOptions,
+            sectionLevel: level,
+          })
+        )
+      );
+    }
 
     section.append(header, list);
     sectionsWrap.append(section);
@@ -937,8 +1110,9 @@ function mountAddressResultsPage({
 
       const data = await lookupRepresentatives(address);
       const uniquePeople = dedupeLookupPoliticians(data.politicians || []);
+      const nationalOfficials = await fetchNationalOfficials();
 
-      if (!uniquePeople.length) {
+      if (!uniquePeople.length && !nationalOfficials.length) {
         setStatus(
           "No representatives found for that address. Try a fuller street address.",
           "error"
@@ -947,20 +1121,26 @@ function mountAddressResultsPage({
       }
 
       const levelCounts = DISPLAY_LEVEL_ORDER.map((level) => {
-        const count = uniquePeople.filter((p) =>
+        let count = uniquePeople.filter((p) =>
           politicianLevels(p).includes(level)
         ).length;
+        if (level === "federal") count += nationalOfficials.length;
         return count ? `${levelLabel(level)} ${count}` : null;
       }).filter(Boolean);
 
       const resolvedAddress = data.address || address;
       if (queryLabel) queryLabel.textContent = resolvedAddress;
 
+      const totalPeople = uniquePeople.length + nationalOfficials.length;
       setStatus(
-        `${uniquePeople.length} people · ${levelCounts.join(" · ")}`,
+        `${totalPeople} people · ${levelCounts.join(" · ")}`,
         "success"
       );
-      renderPoliticianGroups(results, uniquePeople, { followedIds, user });
+      renderPoliticianGroups(results, uniquePeople, {
+        followedIds,
+        user,
+        nationalOfficials,
+      });
 
       // SORT BY stays first; summary line sits directly under it.
       const toolbar = results.querySelector(".politician-results-toolbar");

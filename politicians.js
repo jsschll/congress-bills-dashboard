@@ -135,6 +135,8 @@ function applyFilters() {
         politician.chamber,
         politician.office_title,
         politician.metadata?.office_title,
+        politician.metadata?.department,
+        politician.metadata?.category,
         politician.state,
         politician.level,
       ]
@@ -145,15 +147,23 @@ function applyFilters() {
     return true;
   });
 
+  const nationalOfficials = filtered.filter(
+    (politician) => politician.source === "national_officials"
+  );
+  const others = filtered.filter(
+    (politician) => politician.source !== "national_officials"
+  );
+
   politiciansGrid.replaceChildren();
   if (!filtered.length) {
     setBrowseStatus("No politicians match these filters.", "error");
     return;
   }
 
-  renderPoliticianGroups(politiciansGrid, filtered, {
+  renderPoliticianGroups(politiciansGrid, others, {
     followedIds,
     user: currentUser,
+    nationalOfficials,
   });
   setBrowseStatus(`Showing ${filtered.length} politicians.`, "success");
 }
@@ -167,6 +177,8 @@ async function loadBrowseList() {
     if (level === "federal" || level === "all") {
       const federal = await fetchFederalMembers();
       list = list.concat(federal);
+      const national = await fetchNationalOfficials();
+      list = list.concat(national);
     }
 
     const stored = await fetchStoredPoliticians(level === "all" ? "all" : level);

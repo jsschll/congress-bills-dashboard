@@ -948,6 +948,27 @@ body {
   padding: 0 0.95rem 0.95rem;
 }
 
+.politician-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.politician-subgroup + .politician-subgroup {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.politician-subgroup__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .politician-level-group__header {
   appearance: none;
   width: 100%;
