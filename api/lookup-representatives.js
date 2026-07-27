@@ -1313,6 +1313,7 @@ function isRelevantOfficeholder(politician) {
   if (politician.chamber === "senate" || politician.chamber === "house") {
     return true;
   }
+  if (politician.chamber === "executive") return true;
   const title = String(
     politician.metadata?.office_title || politician.chamber || ""
   ).toLowerCase();

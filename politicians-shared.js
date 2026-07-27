@@ -64,6 +64,17 @@ function stateDisplayName(stateCode) {
   return US_STATE_NAMES[code] || code || "this state";
 }
 
+function normalizeStateCode(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+  if (US_STATE_NAMES[upper]) return upper;
+  const byName = Object.entries(US_STATE_NAMES).find(
+    ([, name]) => name.toLowerCase() === raw.toLowerCase()
+  );
+  return byName ? byName[0] : upper.slice(0, 2);
+}
+
 const LEVEL_ORDER = ["federal", "state", "county", "city", "school", "local"];
 
 // User-facing buckets from highest to lowest authority.
@@ -315,6 +326,20 @@ function classifyNationalOfficial(row) {
   const category = String(row.category || "").toLowerCase().trim();
   const title = String(row.title || "").toLowerCase();
   const department = String(row.department || "").toLowerCase();
+  const blob = `${category} ${title} ${department}`;
+
+  // White House executive — before cabinet heuristics (AG, secretaries, etc.).
+  if (
+    category === "president" ||
+    category === "vice president" ||
+    category.includes("white house") ||
+    category === "executive" ||
+    /\bvice\s+president\b/.test(blob) ||
+    (/\bpresident\b/.test(blob) &&
+      !/pro\s+tempore|president\s+pro|university|college|board/.test(blob))
+  ) {
+    return "executive";
+  }
 
   // Prefer the explicit Supabase category so DOJ / "Justice" titles stay Cabinet.
   if (category === "agency director" || category.includes("agency director")) {
@@ -335,17 +360,17 @@ function classifyNationalOfficial(row) {
   }
 
   // Fallback heuristics only when category is missing/unknown.
-  if (/agency\s+director/.test(`${title} ${department} ${category}`)) {
+  if (/agency\s+director/.test(blob)) {
     return "agency_director";
   }
   if (
     /supreme\s+court|scotus|chief\s+justice/.test(title) ||
     (/\bassociate\s+justice\b|\bjustices?\b/.test(title) &&
-      !/department of justice|attorney general/.test(`${title} ${department}`))
+      !/department of justice|attorney general/.test(blob))
   ) {
     return "supreme_court";
   }
-  if (/cabinet|secretary|attorney general/.test(`${title} ${department} ${category}`)) {
+  if (/cabinet|secretary of|attorney general/.test(blob)) {
     return "cabinet";
   }
   return "other";
@@ -354,7 +379,21 @@ function classifyNationalOfficial(row) {
 function nationalOfficialChamber(group) {
   if (group === "supreme_court") return "supreme_court";
   if (group === "agency_director") return "agency_director";
+  if (group === "executive") return "executive";
   return "cabinet";
+}
+
+function isFederalExecutivePerson(person) {
+  const title = String(
+    person?.office_title || person?.metadata?.office_title || person?.chamber || ""
+  ).toLowerCase();
+  const chamber = String(person?.chamber || "").toLowerCase();
+  const group = String(person?.metadata?.national_group || "").toLowerCase();
+  if (group === "executive") return true;
+  if (chamber === "executive") return true;
+  if (title.includes("vice president")) return true;
+  if (/\bpresident\b/.test(title) && !title.includes("pro tempore")) return true;
+  return false;
 }
 
 function mapNationalOfficial(row) {
@@ -546,7 +585,7 @@ async function fetchStateOfficialsForAddress({
   state_code,
   county_name,
 } = {}) {
-  const stateCode = String(state_code || "").toUpperCase();
+  const stateCode = normalizeStateCode(state_code);
   const countyName = normalizeCountyName(county_name);
   if (!stateCode) return [];
 
@@ -691,12 +730,15 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     (person) => person.source === "state_officials"
   );
 
-  // High courts: ONLY Statewide rows from state_officials — never Civic legislators.
+  // High courts: ONLY Statewide rows from state_officials for this state.
   const statewideCourts = dedupePoliticiansInGroup(
     dbOfficials.filter((person) => {
       const officialLevel = String(
         person.metadata?.official_level || ""
       ).toLowerCase();
+      const personState = String(person.state || "").toUpperCase();
+      const geoState = String(geography.state || "").toUpperCase();
+      if (geoState && personState && personState !== geoState) return false;
       return (
         officialLevel === "statewide" ||
         person.metadata?.court_group === "statewide"
@@ -739,26 +781,6 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     );
   };
 
-  const isLegislativePerson = (person) => {
-    const title = String(
-      person.office_title || person.metadata?.office_title || ""
-    ).toLowerCase();
-    const chamber = String(person.chamber || "").toLowerCase();
-    return (
-      chamber.includes("upper") ||
-      chamber.includes("lower") ||
-      chamber.includes("senate") ||
-      chamber.includes("house") ||
-      chamber === "state_senate" ||
-      chamber === "state_house" ||
-      title.includes("senator") ||
-      title.includes("representative") ||
-      title.includes("assembly") ||
-      title.includes("delegate") ||
-      title.includes("legislat")
-    );
-  };
-
   // Address-lookup / Civic people — keep out of judicial sections.
   const civicPeople = group.filter((person) => {
     if (
@@ -771,21 +793,12 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     return !coveredNames.has(normalizePersonName(person.name));
   });
 
-  const legislature = dedupePoliticiansInGroup(
-    civicPeople.filter(isLegislativePerson)
-  );
-  const legislatureNames = new Set(
-    legislature.map((person) => normalizePersonName(person.name))
-  );
-  // Other statewide civic officials (governor, AG, etc.) if Civic returned them.
-  const executives = dedupePoliticiansInGroup(
-    civicPeople.filter(
-      (person) => !legislatureNames.has(normalizePersonName(person.name))
-    )
-  );
+  // All non-judicial civic state people belong under Legislature / Representatives.
+  const legislature = dedupePoliticiansInGroup(civicPeople);
+  const executives = [];
 
   const hasLocalGeography = Boolean(normalizeCountyName(geography.county));
-  const stateCode = String(geography.state || "").toUpperCase();
+  const stateCode = normalizeStateCode(geography.state);
   const stateName = stateDisplayName(stateCode);
 
   return {
@@ -959,6 +972,40 @@ function appendPoliticianSubgroup(
   subgroup.append(header, body);
   list.append(subgroup);
   return uniquePoliticians.length;
+}
+
+function appendStateCategorySection(
+  list,
+  heading,
+  politicians,
+  emptyMessage,
+  cardOptions,
+  sectionLevel
+) {
+  const count = appendPoliticianSubgroup(
+    list,
+    heading,
+    politicians,
+    cardOptions,
+    sectionLevel,
+    { startCollapsed: false }
+  );
+  if (count) return count;
+
+  const section = document.createElement("div");
+  section.className = "politician-subgroup politician-subgroup--empty";
+
+  const title = document.createElement("h4");
+  title.className = "politician-subgroup__title";
+  title.textContent = heading;
+
+  const hint = document.createElement("p");
+  hint.className = "politician-subgroup-hint";
+  hint.textContent = emptyMessage;
+
+  section.append(title, hint);
+  list.append(section);
+  return 0;
 }
 
 async function followPolitician(userId, politicianId) {
@@ -1485,6 +1532,13 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           )
         )
       : [];
+    const nationalExecutives = level === "federal"
+      ? dedupePoliticiansInGroup(
+          nationalOfficials.filter(
+            (p) => p.metadata?.national_group === "executive"
+          )
+        )
+      : [];
     const otherNational = level === "federal"
       ? dedupePoliticiansInGroup(
           nationalOfficials.filter((p) => p.metadata?.national_group === "other")
@@ -1493,13 +1547,32 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
 
     // Keep address-based federal officials out of national subgroups by name.
     const nationalNames = new Set(
-      [...cabinet, ...agencyDirectors, ...justices, ...otherNational].map((p) =>
-        normalizePersonName(p.name)
-      )
+      [
+        ...nationalExecutives,
+        ...cabinet,
+        ...agencyDirectors,
+        ...justices,
+        ...otherNational,
+      ].map((p) => normalizePersonName(p.name))
     );
-    const localGroup = dedupePoliticiansInGroup(
+    const addressFederal = dedupePoliticiansInGroup(
       group.filter((p) => !nationalNames.has(normalizePersonName(p.name)))
     );
+    const addressExecutives = dedupePoliticiansInGroup(
+      addressFederal.filter(isFederalExecutivePerson)
+    );
+    const executiveNames = new Set(
+      addressExecutives.map((p) => normalizePersonName(p.name))
+    );
+    const localGroup = dedupePoliticiansInGroup(
+      addressFederal.filter(
+        (p) => !executiveNames.has(normalizePersonName(p.name))
+      )
+    );
+    const executives = dedupePoliticiansInGroup([
+      ...nationalExecutives,
+      ...addressExecutives,
+    ]);
 
     const stateSplit =
       level === "state"
@@ -1516,6 +1589,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     const totalCount =
       level === "federal"
         ? localGroup.length +
+          executives.length +
           cabinet.length +
           agencyDirectors.length +
           justices.length +
@@ -1567,6 +1641,25 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     list.className = "politician-list";
 
     if (level === "federal") {
+      if (executives.length) {
+        appendPoliticianSubgroup(
+          list,
+          "President & Vice President",
+          executives,
+          cardOptions,
+          level,
+          { startCollapsed: false }
+        );
+      } else {
+        appendStateCategorySection(
+          list,
+          "President & Vice President",
+          [],
+          "President and Vice President were not returned for this search.",
+          cardOptions,
+          level
+        );
+      }
       if (localGroup.length) {
         appendPoliticianSubgroup(
           list,
@@ -1608,81 +1701,65 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       }
     } else if (level === "state") {
       const stateName = stateSplit.stateName || stateDisplayName(geography.state);
+      const countyLabel = stateSplit.hasLocalGeography
+        ? geography.county
+        : null;
+      const needAddressHint =
+        "Enter a street address to see judges for your county.";
+      const populating = (kind) =>
+        `${kind} for ${stateName}${
+          countyLabel ? ` (${countyLabel} County)` : ""
+        } are currently being populated`;
 
-      // Judicial high courts: DB Statewide only — never merge Civic legislators here.
-      if (stateSplit.statewideCourts.length) {
-        appendPoliticianSubgroup(
-          list,
-          `Statewide High Courts (${stateName})`,
-          stateSplit.statewideCourts,
-          cardOptions,
-          level
-        );
-      } else {
-        const hint = document.createElement("p");
-        hint.className = "politician-subgroup-hint";
-        hint.textContent = `Statewide judicial records for ${stateName} are currently being populated`;
-        list.append(hint);
-      }
-
-      if (stateSplit.legislature.length || stateSplit.executives.length) {
-        appendPoliticianSubgroup(
-          list,
-          "State Legislature / Representatives",
-          dedupePoliticiansInGroup([
-            ...stateSplit.legislature,
-            ...stateSplit.executives,
-          ]),
-          cardOptions,
-          level
-        );
-      }
-
-      if (stateSplit.appellateCourts.length) {
-        appendPoliticianSubgroup(
-          list,
-          "Regional Courts of Appeals",
-          stateSplit.appellateCourts,
-          cardOptions,
-          level
-        );
-      } else if (!stateSplit.hasLocalGeography) {
-        const hint = document.createElement("p");
-        hint.className = "politician-subgroup-hint";
-        hint.textContent =
-          "Enter a street address to see Court of Appeals justices for your county.";
-        list.append(hint);
-      }
-      if (stateSplit.districtCourts.length) {
-        appendPoliticianSubgroup(
-          list,
-          "State District Trial Courts",
-          stateSplit.districtCourts,
-          cardOptions,
-          level
-        );
-      } else if (!stateSplit.hasLocalGeography) {
-        const hint = document.createElement("p");
-        hint.className = "politician-subgroup-hint";
-        hint.textContent =
-          "Enter a street address to see district court judges for your county.";
-        list.append(hint);
-      }
-      if (stateSplit.countyCourts.length) {
-        appendPoliticianSubgroup(
-          list,
-          "County Courts & Local Magistrates / Justices of the Peace",
-          stateSplit.countyCourts,
-          cardOptions,
-          level
-        );
-      } else if (!stateSplit.hasLocalGeography) {
-        const hint = document.createElement("p");
-        hint.className = "politician-subgroup-hint";
-        hint.textContent =
-          "Enter a street address to see county court judges and magistrates for your county.";
-        list.append(hint);
-      }
+      appendStateCategorySection(
+        list,
+        `Statewide High Courts (${stateName})`,
+        stateSplit.statewideCourts,
+        `Statewide judicial records for ${stateName} are currently being populated`,
+        cardOptions,
+        level
+      );
+      appendStateCategorySection(
+        list,
+        "State Legislature / Representatives",
+        dedupePoliticiansInGroup([
+          ...stateSplit.legislature,
+          ...stateSplit.executives,
+        ]),
+        "No state legislators found for this address.",
+        cardOptions,
+        level
+      );
+      appendStateCategorySection(
+        list,
+        "Regional Courts of Appeals",
+        stateSplit.appellateCourts,
+        stateSplit.hasLocalGeography
+          ? populating("Regional Court of Appeals records")
+          : needAddressHint,
+        cardOptions,
+        level
+      );
+      appendStateCategorySection(
+        list,
+        "State District Trial Courts",
+        stateSplit.districtCourts,
+        stateSplit.hasLocalGeography
+          ? populating("State district trial court records")
+          : needAddressHint,
+        cardOptions,
+        level
+      );
+      appendStateCategorySection(
+        list,
+        "County Courts & Local Magistrates / Justices of the Peace",
+        stateSplit.countyCourts,
+        stateSplit.hasLocalGeography
+          ? populating("County court and magistrate records")
+          : needAddressHint,
+        cardOptions,
+        level
+      );
     } else {
       list.append(
         ...dedupePoliticiansInGroup(group).map((politician) =>
@@ -1907,10 +1984,11 @@ function mountAddressResultsPage({
 
       const geography = lookupResult.ok
         ? {
-            state:
+            state: normalizeStateCode(
               lookupResult.data.geography?.state ||
-              lookupResult.data.state ||
-              "",
+                lookupResult.data.state ||
+                ""
+            ),
             county: normalizeCountyName(
               lookupResult.data.geography?.county ||
                 lookupResult.data.county ||
