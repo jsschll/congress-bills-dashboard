@@ -66,9 +66,27 @@ function normalizePersonName(name) {
     .join(" ");
 }
 
+function normalizeSchoolDistrictName(name) {
+  return normalizePersonName(name)
+    .replace(/\b(independent\s+)?school\s+district\b/g, " ")
+    .replace(/\b(unified|elementary|secondary|high)\s+school\s+district\b/g, " ")
+    .replace(/\bisd\b/g, " ")
+    .replace(/\busd\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function personIdentityKeys(politician) {
   if (politician?.metadata?.district_only) {
-    return [`district:${politician.external_key}`];
+    const keys = [];
+    if (politician.external_key) {
+      keys.push(`district:${politician.external_key}`);
+    }
+    // Merge Geocodio + Cicero placeholders for the same school district.
+    const name = normalizeSchoolDistrictName(politician.name);
+    const state = String(politician.state || "").toUpperCase();
+    if (name) keys.push(`school-district:${state}:${name}`);
+    return keys.length ? keys : [`district:${politician.external_key || politician.name}`];
   }
 
   const keys = [];
@@ -183,16 +201,35 @@ function mergePoliticians(lists) {
     for (const politician of list || []) {
       if (!politician?.external_key || !politician?.name) continue;
 
-      // Keep school district placeholders distinct from people.
+      // Keep school district placeholders distinct from people, but merge
+      // duplicate district rows from Geocodio + Cicero by name/state.
       if (politician.metadata?.district_only) {
-        const key = `district:${politician.external_key}`;
-        if (!keyToIndex.has(key)) {
-          keyToIndex.set(key, records.length);
+        const keys = personIdentityKeys(politician);
+        let index = null;
+        for (const key of keys) {
+          if (keyToIndex.has(key)) {
+            index = keyToIndex.get(key);
+            break;
+          }
+        }
+
+        if (index == null) {
+          index = records.length;
           records.push({
             ...politician,
             levels: [politician.level || "school"],
             offices: [officeFromPolitician(politician)],
           });
+        } else {
+          records[index] = mergePersonRecords(records[index], politician);
+          records[index].metadata = {
+            ...(records[index].metadata || {}),
+            district_only: true,
+          };
+        }
+
+        for (const key of personIdentityKeys(records[index])) {
+          keyToIndex.set(key, index);
         }
         continue;
       }

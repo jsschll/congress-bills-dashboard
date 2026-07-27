@@ -444,9 +444,29 @@ function normalizePersonName(name) {
     .join(" ");
 }
 
+function normalizeSchoolDistrictName(name) {
+  return normalizePersonName(name)
+    .replace(/\b(independent\s+)?school\s+district\b/g, " ")
+    .replace(/\b(unified|elementary|secondary|high)\s+school\s+district\b/g, " ")
+    .replace(/\bisd\b/g, " ")
+    .replace(/\busd\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function personIdentityKeys(politician) {
   if (politician?.metadata?.district_only) {
-    return [`district:${politician.external_key}`];
+    const keys = [];
+    if (politician.external_key) {
+      keys.push(`district:${politician.external_key}`);
+    }
+    // Merge Geocodio + Cicero placeholders for the same school district.
+    const name = normalizeSchoolDistrictName(politician.name);
+    const state = String(politician.state || "").toUpperCase();
+    if (name) keys.push(`school-district:${state}:${name}`);
+    return keys.length
+      ? keys
+      : [`district:${politician.external_key || politician.name}`];
   }
 
   const keys = [];
