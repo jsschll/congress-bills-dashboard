@@ -432,8 +432,9 @@ function mapStateOfficialRow(row) {
   } else if (levelKey === "district") {
     courtGroup = "district";
     chamber = "state_district";
-  } else if (levelKey === "county") {
-    courtGroup = "district";
+  } else if (levelKey.startsWith("county")) {
+    // Matches "County" and "County/Magistrate"
+    courtGroup = "county";
     chamber = "county_court";
   }
 
@@ -479,7 +480,8 @@ function mapStateOfficialRow(row) {
 /**
  * Option A: 2-step address lookup
  * 1) county_district_mapping by state_code + county_name
- * 2) state_officials for Statewide / Appellate / District / County matches
+ *    -> appellate_district_numbers[], judicial_district_numbers[]
+ * 2) state_officials for Statewide / Appellate / District / County/Magistrate
  */
 async function fetchStateOfficialsForAddress({
   state_code,
@@ -509,9 +511,7 @@ async function fetchStateOfficialsForAddress({
       for (const variant of countyVariants) {
         const { data, error } = await client
           .from("county_district_mapping")
-          .select(
-            "state_code, county_name, appellate_district_number, judicial_district_numbers"
-          )
+          .select("*")
           .eq("state_code", stateCode)
           .ilike("county_name", variant)
           .limit(1);
@@ -529,9 +529,7 @@ async function fetchStateOfficialsForAddress({
       if (!mapping) {
         const { data, error } = await client
           .from("county_district_mapping")
-          .select(
-            "state_code, county_name, appellate_district_number, judicial_district_numbers"
-          )
+          .select("*")
           .eq("state_code", stateCode)
           .ilike("county_name", `%${countyName}%`)
           .limit(1);
@@ -541,7 +539,7 @@ async function fetchStateOfficialsForAddress({
     }
 
     const appellateNumbers = parseDistrictNumberList(
-      mapping?.appellate_district_number
+      mapping?.appellate_district_numbers ?? mapping?.appellate_district_number
     );
     const judicialNumbers = parseDistrictNumberList(
       mapping?.judicial_district_numbers
@@ -573,7 +571,7 @@ async function fetchStateOfficialsForAddress({
             .from("state_officials")
             .select("*")
             .eq("state_code", stateCode)
-            .eq("level", "County")
+            .in("level", ["County/Magistrate", "County"])
         : Promise.resolve({ data: [], error: null }),
     ];
 
@@ -634,22 +632,27 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     (person) => person.source === "state_officials"
   );
 
-  // Prefer Option A DB rows for court/leadership subgroups.
-  const statewideLeadership = dedupePoliticiansInGroup(
+  const statewideCourts = dedupePoliticiansInGroup(
     dbOfficials.filter((person) => person.metadata?.court_group === "statewide")
   );
   const appellateCourts = dedupePoliticiansInGroup(
     dbOfficials.filter((person) => person.metadata?.court_group === "appellate")
   );
-  const localCourts = dedupePoliticiansInGroup(
+  const districtCourts = dedupePoliticiansInGroup(
     dbOfficials.filter((person) => person.metadata?.court_group === "district")
+  );
+  const countyCourts = dedupePoliticiansInGroup(
+    dbOfficials.filter((person) => person.metadata?.court_group === "county")
   );
 
   // Keep non-DB address lookup people (legislators, etc.) that aren't already covered.
   const coveredNames = new Set(
-    [...statewideLeadership, ...appellateCourts, ...localCourts].map((person) =>
-      normalizePersonName(person.name)
-    )
+    [
+      ...statewideCourts,
+      ...appellateCourts,
+      ...districtCourts,
+      ...countyCourts,
+    ].map((person) => normalizePersonName(person.name))
   );
   const executives = dedupePoliticiansInGroup(
     group.filter((person) => {
@@ -680,9 +683,12 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
 
   return {
     executives,
-    statewideCourts: statewideLeadership,
+    statewideCourts,
     appellateCourts,
-    localCourts,
+    districtCourts,
+    countyCourts,
+    // Back-compat alias used by older call sites
+    localCourts: [...districtCourts, ...countyCourts],
     hasLocalGeography,
   };
 }
@@ -1408,7 +1414,8 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           ? stateSplit.executives.length +
             stateSplit.statewideCourts.length +
             stateSplit.appellateCourts.length +
-            stateSplit.localCourts.length
+            stateSplit.districtCourts.length +
+            stateSplit.countyCourts.length
           : group.length;
     if (!totalCount) continue;
 
@@ -1488,16 +1495,15 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         );
       }
     } else if (level === "state") {
-      // Merge DB statewide leadership with any remaining address-lookup executives.
-      const leadership = dedupePoliticiansInGroup([
+      const statewideGroup = dedupePoliticiansInGroup([
         ...stateSplit.statewideCourts,
         ...stateSplit.executives,
       ]);
-      if (leadership.length) {
+      if (statewideGroup.length) {
         appendPoliticianSubgroup(
           list,
-          "Statewide Leadership & High Courts",
-          leadership,
+          "Statewide Courts (Texas Supreme Court & Court of Criminal Appeals)",
+          statewideGroup,
           cardOptions,
           level
         );
@@ -1505,7 +1511,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       if (stateSplit.appellateCourts.length) {
         appendPoliticianSubgroup(
           list,
-          "Regional Court of Appeals",
+          "Regional Courts of Appeals",
           stateSplit.appellateCourts,
           cardOptions,
           level
@@ -1517,11 +1523,11 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           "Enter a street address to see Court of Appeals justices for your county.";
         list.append(hint);
       }
-      if (stateSplit.localCourts.length) {
+      if (stateSplit.districtCourts.length) {
         appendPoliticianSubgroup(
           list,
-          "County District & Trial Courts",
-          stateSplit.localCourts,
+          "State District Trial Courts",
+          stateSplit.districtCourts,
           cardOptions,
           level
         );
@@ -1529,7 +1535,22 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         const hint = document.createElement("p");
         hint.className = "politician-subgroup-hint";
         hint.textContent =
-          "Enter a street address to see district and county court judges for your county.";
+          "Enter a street address to see district court judges for your county.";
+        list.append(hint);
+      }
+      if (stateSplit.countyCourts.length) {
+        appendPoliticianSubgroup(
+          list,
+          "County Courts & Local Magistrates / Justices of the Peace",
+          stateSplit.countyCourts,
+          cardOptions,
+          level
+        );
+      } else if (!stateSplit.hasLocalGeography) {
+        const hint = document.createElement("p");
+        hint.className = "politician-subgroup-hint";
+        hint.textContent =
+          "Enter a street address to see county court judges and magistrates for your county.";
         list.append(hint);
       }
     } else {
