@@ -348,7 +348,7 @@ async function fetchNationalOfficialsViaRest() {
   return { data: Array.isArray(payload) ? payload : [], error: null };
 }
 
-/** Fetch every row from public.national_officials and map for Federal UI. */
+/** Fetch every row from public.national_officials (nationwide; not address-based). */
 async function fetchNationalOfficials() {
   try {
     if (typeof injectSupabaseScript === "function") {
@@ -1250,7 +1250,10 @@ function mountAddressResultsPage({
 
   (async () => {
     results.replaceChildren();
-    setStatus("Looking up officials at every level of government…", "loading");
+    setStatus(
+      "Loading nationwide officials and looking up district representatives…",
+      "loading"
+    );
 
     try {
       await injectSupabaseScript().catch(() => {});
@@ -1259,17 +1262,38 @@ function mountAddressResultsPage({
         ? await loadFollowedPoliticianIds(user.id)
         : new Set();
 
-      const data = await lookupRepresentatives(address);
-      const uniquePeople = dedupeLookupPoliticians(data.politicians || []);
-      const nationalOfficials = await fetchNationalOfficials();
+      // Nationwide roles never depend on address — always load the full table.
+      // Address lookup only supplies district / local officeholders.
+      const [lookupResult, nationalOfficials] = await Promise.all([
+        lookupRepresentatives(address)
+          .then((data) => ({ ok: true, data }))
+          .catch((error) => ({
+            ok: false,
+            error: error?.message || String(error) || "Address lookup failed.",
+          })),
+        fetchNationalOfficials(),
+      ]);
+
+      const uniquePeople = lookupResult.ok
+        ? dedupeLookupPoliticians(lookupResult.data.politicians || []).filter(
+            (politician) => politician.source !== "national_officials"
+          )
+        : [];
 
       if (!uniquePeople.length && !nationalOfficials.length) {
         setStatus(
-          "No representatives found for that address. Try a fuller street address.",
+          lookupResult.ok
+            ? "No representatives found for that address. Try a fuller street address."
+            : lookupResult.error,
           "error"
         );
         return;
       }
+
+      const resolvedAddress = lookupResult.ok
+        ? lookupResult.data.address || address
+        : address;
+      if (queryLabel) queryLabel.textContent = resolvedAddress;
 
       const levelCounts = DISPLAY_LEVEL_ORDER.map((level) => {
         let count = uniquePeople.filter((p) =>
@@ -1279,14 +1303,30 @@ function mountAddressResultsPage({
         return count ? `${levelLabel(level)} ${count}` : null;
       }).filter(Boolean);
 
-      const resolvedAddress = data.address || address;
-      if (queryLabel) queryLabel.textContent = resolvedAddress;
+      const localCount = uniquePeople.length;
+      const nationalCount = nationalOfficials.length;
+      const summaryParts = [
+        nationalCount
+          ? `${nationalCount} nationwide (Cabinet, agencies, Court)`
+          : null,
+        localCount ? `${localCount} for this address` : null,
+        levelCounts.length ? levelCounts.join(" · ") : null,
+      ].filter(Boolean);
 
-      const totalPeople = uniquePeople.length + nationalOfficials.length;
-      setStatus(
-        `${totalPeople} people · ${levelCounts.join(" · ")}`,
-        "success"
-      );
+      if (!lookupResult.ok && nationalCount) {
+        setStatus(
+          `${summaryParts.join(" · ")}. Address lookup failed: ${lookupResult.error}`,
+          "error"
+        );
+      } else if (!localCount && nationalCount) {
+        setStatus(
+          `${summaryParts.join(" · ")}. No district officials found for that address.`,
+          "success"
+        );
+      } else {
+        setStatus(summaryParts.join(" · "), "success");
+      }
+
       renderPoliticianGroups(results, uniquePeople, {
         followedIds,
         user,
