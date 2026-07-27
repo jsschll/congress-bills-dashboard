@@ -1101,7 +1101,7 @@ body {
 
 .politician-card {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   gap: 0.75rem;
   align-items: center;
   padding: 0.75rem 0.85rem;
@@ -1113,11 +1113,13 @@ body {
 
 .politician-card__media img,
 .politician-card__avatar {
-  width: 52px;
-  height: 52px;
+  width: 72px;
+  height: 72px;
   border-radius: 0.55rem;
   object-fit: cover;
+  object-position: center 15%;
   background: var(--accent-soft);
+  image-rendering: auto;
 }
 
 .politician-card__avatar {

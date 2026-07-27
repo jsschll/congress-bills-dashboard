@@ -23,7 +23,7 @@ from (
       'Executive',
       'White House',
       'Republican',
-      'https://upload.wikimedia.org/wikipedia/commons/d/d6/Donald_Trump_official_portrait%2C_2025_%28cropped_headshot%29.jpg'
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg/960px-January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg'
     ),
     (
       'JD Vance',
@@ -32,7 +32,7 @@ from (
       'Executive',
       'White House',
       'Republican',
-      'https://upload.wikimedia.org/wikipedia/commons/7/71/JD_Vance_official_portrait_%28cropped_headshot%29.jpg'
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg/960px-January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg'
     )
 ) as v(full_name, title, category, branch, department, party, photo_url)
 where not exists (
@@ -49,7 +49,7 @@ set
   branch = 'Executive',
   department = 'White House',
   party = 'Republican',
-  photo_url = 'https://upload.wikimedia.org/wikipedia/commons/d/d6/Donald_Trump_official_portrait%2C_2025_%28cropped_headshot%29.jpg'
+  photo_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg/960px-January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg'
 where lower(full_name) in ('donald j. trump', 'donald trump', 'donald john trump')
    or (
      lower(coalesce(category, '')) = 'president'
@@ -63,7 +63,7 @@ set
   branch = 'Executive',
   department = 'White House',
   party = 'Republican',
-  photo_url = 'https://upload.wikimedia.org/wikipedia/commons/7/71/JD_Vance_official_portrait_%28cropped_headshot%29.jpg'
+  photo_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg/960px-January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg'
 where lower(full_name) in ('jd vance', 'j.d. vance', 'james david vance')
    or (
      lower(coalesce(category, '')) = 'vice president'

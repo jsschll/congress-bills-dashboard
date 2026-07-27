@@ -342,22 +342,22 @@ const NATIONAL_EXECUTIVE_DEFAULTS = {
   "donald j trump": {
     party: "Republican",
     photo_url:
-      "https://upload.wikimedia.org/wikipedia/commons/d/d6/Donald_Trump_official_portrait%2C_2025_%28cropped_headshot%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg/960px-January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg",
   },
   "donald trump": {
     party: "Republican",
     photo_url:
-      "https://upload.wikimedia.org/wikipedia/commons/d/d6/Donald_Trump_official_portrait%2C_2025_%28cropped_headshot%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg/960px-January_2025_Official_Presidential_Portrait_of_Donald_J._Trump.jpg",
   },
   "jd vance": {
     party: "Republican",
     photo_url:
-      "https://upload.wikimedia.org/wikipedia/commons/7/71/JD_Vance_official_portrait_%28cropped_headshot%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg/960px-January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg",
   },
   "j d vance": {
     party: "Republican",
     photo_url:
-      "https://upload.wikimedia.org/wikipedia/commons/7/71/JD_Vance_official_portrait_%28cropped_headshot%29.jpg",
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg/960px-January_2025_Official_Vice_Presidential_Portrait_of_JD_Vance.jpg",
   },
 };
 
@@ -1144,6 +1144,11 @@ function renderPoliticianCard(
     img.src = politician.photo_url;
     img.alt = politician.name;
     img.loading = "lazy";
+    img.decoding = "async";
+    img.width = 96;
+    img.height = 96;
+    // Prefer a sharper face crop for vertical official portraits.
+    img.style.objectPosition = "center 15%";
     media.append(img);
   } else {
     media.innerHTML = `<div class="politician-card__avatar">${escapePoliticianHtml(
