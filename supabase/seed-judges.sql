@@ -1,8 +1,8 @@
 -- seed-judges.sql
 -- Paste into Supabase → SQL Editor → Run
 -- Matches integer[] district columns on county_district_mapping.
+-- Prefer: node scripts/import-county-mapping.js data/tx-county-mapping.csv
 
--- 1) County → district mapping
 insert into public.county_district_mapping (
   state_code,
   county_name,

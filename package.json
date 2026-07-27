@@ -1,0 +1,13 @@
+{
+  "name": "congress-bills-dashboard",
+  "private": true,
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.9"
+  },
+  "scripts": {
+    "seed:judges": "node seed-judges.js",
+    "import:mapping": "node scripts/import-county-mapping.js",
+    "import:officials": "node scripts/import-state-officials.js",
+    "coverage:judges": "node scripts/coverage-report.js"
+  }
+}

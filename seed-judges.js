@@ -14,8 +14,12 @@
  *   $env:SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
  *   node seed-judges.js
  *
- * Requires the service role key (anon cannot insert under typical RLS).
- * Never commit the service role key.
+ * Prefer the CSV importers for ongoing work:
+ *   node scripts/import-county-mapping.js data/tx-county-mapping.csv
+ *   node scripts/import-state-officials.js data/tx-local.csv
+ *   node scripts/coverage-report.js TX
+ *
+ * This file remains a Fort Bend / Harris smoke seed.
  */
 
 const { createClient } = require("@supabase/supabase-js");
@@ -105,7 +109,7 @@ const STATE_OFFICIALS = [
     title: "Chief Justice, First Court of Appeals",
     level: "Appellate",
     state_code: "TX",
-    district_number: "1",
+    district_number: 1,
     county_name: null,
   },
   {
@@ -113,7 +117,7 @@ const STATE_OFFICIALS = [
     title: "Justice, First Court of Appeals",
     level: "Appellate",
     state_code: "TX",
-    district_number: "1",
+    district_number: 1,
     county_name: null,
   },
   {
@@ -121,7 +125,7 @@ const STATE_OFFICIALS = [
     title: "Chief Justice, Fourteenth Court of Appeals",
     level: "Appellate",
     state_code: "TX",
-    district_number: "14",
+    district_number: 14,
     county_name: null,
   },
   {
@@ -129,7 +133,7 @@ const STATE_OFFICIALS = [
     title: "Justice, Fourteenth Court of Appeals",
     level: "Appellate",
     state_code: "TX",
-    district_number: "14",
+    district_number: 14,
     county_name: null,
   },
 
@@ -139,7 +143,7 @@ const STATE_OFFICIALS = [
     title: "Judge, 268th District Court",
     level: "District",
     state_code: "TX",
-    district_number: "268",
+    district_number: 268,
     county_name: "Fort Bend",
   },
   {
@@ -147,7 +151,7 @@ const STATE_OFFICIALS = [
     title: "Judge, 240th District Court",
     level: "District",
     state_code: "TX",
-    district_number: "240",
+    district_number: 240,
     county_name: "Fort Bend",
   },
   {
@@ -155,7 +159,7 @@ const STATE_OFFICIALS = [
     title: "Judge, 434th District Court",
     level: "District",
     state_code: "TX",
-    district_number: "434",
+    district_number: 434,
     county_name: "Fort Bend",
   },
   {
@@ -163,7 +167,7 @@ const STATE_OFFICIALS = [
     title: "Judge, 458th District Court",
     level: "District",
     state_code: "TX",
-    district_number: "458",
+    district_number: 458,
     county_name: "Fort Bend",
   },
 
