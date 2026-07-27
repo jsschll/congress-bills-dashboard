@@ -1655,7 +1655,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           list,
           "President & Vice President",
           [],
-          "President and Vice President were not returned for this search.",
+          "Add President and Vice President rows to the national_officials table in Supabase (see supabase/seed-national-executive.sql).",
           cardOptions,
           level
         );

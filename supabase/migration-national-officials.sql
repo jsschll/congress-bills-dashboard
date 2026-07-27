@@ -1,8 +1,13 @@
--- National officials (Cabinet, Agency Directors, Supreme Court)
+-- National officials (President/VP, Cabinet, Agency Directors, Supreme Court)
 -- Categories used by the app:
+--   - President / Vice President  -> President & Vice President
 --   - Cabinet Secretaries
---   - Agency Director  -> Federal Agency Directors
+--   - Agency Director            -> Federal Agency Directors
 --   - Supreme Court Justices
+--
+-- President & VP are NOT returned by Geocodio address lookup. Seed them with:
+--   supabase/seed-national-executive.sql
+--
 -- Run this in the Supabase SQL editor if rows exist in the table but do not
 -- appear in the app. An empty client response usually means RLS is enabled
 -- without a public SELECT policy (or anon lacks GRANT SELECT).
