@@ -1,73 +1,63 @@
-# Judge data CSVs (Option A) — published via GitHub → Supabase
+# Judge data — published to cloud Supabase
 
-Users only **read** Supabase at search time. You **publish** judge data by
-editing CSVs in this repo; GitHub Actions loads them into cloud Supabase.
+The live site already reads from **cloud Supabase**. Publishing means loading
+CSVs from this repo into that database (not keeping anything only on your laptop).
 
-## One-time GitHub setup
+## Preferred: publish via Vercel API
 
-1. Open the repo on GitHub → **Settings** → **Secrets and variables** → **Actions**
-2. Add two repository secrets:
-   - `SUPABASE_URL` — e.g. `https://xxxx.supabase.co`
-   - `SUPABASE_SERVICE_ROLE_KEY` — Project Settings → API → **service_role** (secret)
-3. Never put the service role key in `config.js` or commit it
+### One-time setup (Vercel)
+1. Vercel project → **Settings** → **Environment Variables**
+2. Add:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY` (service_role secret — not the anon key)
+   - `JUDGES_IMPORT_SECRET` (any long random string you invent)
+3. Redeploy so env vars apply
 
-## How to publish (cloud — preferred)
+### Publish after you change CSVs
+1. Edit files under `data/` (e.g. add another county’s judges)
+2. Commit + push to `main` (site/repo update)
+3. Call the publish endpoint (PowerShell):
 
-1. Edit / append rows in the CSVs under `data/` (in Cursor or GitHub)
-2. Commit and push to `main`
-3. GitHub Action **Publish judge data to Supabase** runs automatically
-4. Friends hard-refresh the live site and search their address
+```powershell
+Invoke-RestMethod -Method POST `
+  -Uri "https://congress-bills-dashboard.vercel.app/api/publish-judges" `
+  -Headers @{ Authorization = "Bearer YOUR_JUDGES_IMPORT_SECRET" }
+```
 
-You can also run it manually: GitHub → **Actions** → **Publish judge data to Supabase** → **Run workflow**.
+Friends hard-refresh and search — they hit the same cloud DB.
 
-## Files
+## Files to edit
 
 | Path | Purpose |
 |------|---------|
-| `templates/county-district-mapping.csv` | Column header template for mapping |
-| `templates/state-officials.csv` | Column header template for officials |
-| `tx-county-mapping.csv` | Texas county → district numbers |
+| `tx-county-mapping.csv` | County → appellate/judicial districts |
 | `tx-statewide.csv` | Statewide courts / leadership |
 | `tx-appellate.csv` | Courts of Appeals |
 | `tx-local.csv` | District + County/Magistrate |
 
-## Column formats
-
-### county-district-mapping.csv
-
+### Mapping columns
 ```text
 state_code,county_name,appellate_district_numbers,judicial_district_numbers
 TX,Fort Bend,"1|14","240|268|328|387|434|458"
 ```
 
-- `state_code`: 2-letter (e.g. `TX`)
-- `county_name`: without trailing `County` (e.g. `Fort Bend`)
-- District lists: pipe `|` or semicolon `;` separated integers (CSV-safe)
-
-### state-officials.csv
-
+### Officials columns
 ```text
 full_name,title,level,state_code,district_number,county_name
-Jimmy Blacklock,Chief Justice Supreme Court of Texas,Statewide,TX,,
 Steve Rogers,Judge 268th District Court,District,TX,268,Fort Bend
 ```
 
-- `level` must be one of: `Statewide`, `Appellate`, `District`, `County/Magistrate`
-- `district_number`: integer for Appellate/District; leave blank for Statewide / many County rows
-- `county_name`: required for `County/Magistrate`; optional for District
+`level`: `Statewide` | `Appellate` | `District` | `County/Magistrate`
 
 ## Friend-testing loop
+1. Add their county to the CSVs  
+2. Push to `main`  
+3. POST `/api/publish-judges` with your secret  
+4. They refresh and search  
 
-1. Add judges for a friend’s county to the CSVs
-2. Push to `main` (Action publishes to Supabase)
-3. Friend hard-refreshes and searches
-
-## Local override (optional)
-
-Only if you need to debug imports on your PC:
-
+## Optional local debug
 ```powershell
-$env:SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
-$env:SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+$env:SUPABASE_URL="..."
+$env:SUPABASE_SERVICE_ROLE_KEY="..."
 node scripts/import-all-judges.js
 ```
