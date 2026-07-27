@@ -407,19 +407,45 @@ async function fetchNationalOfficials() {
   }
 }
 
-function appendPoliticianSubgroup(list, heading, politicians, cardOptions, sectionLevel) {
+function appendPoliticianSubgroup(
+  list,
+  heading,
+  politicians,
+  cardOptions,
+  sectionLevel,
+  { startCollapsed = true } = {}
+) {
   if (!politicians.length) return 0;
 
   const subgroup = document.createElement("div");
   subgroup.className = "politician-subgroup";
+  if (startCollapsed) subgroup.classList.add("is-collapsed");
+
+  const header = document.createElement("button");
+  header.type = "button";
+  header.className = "politician-subgroup__header";
+  header.setAttribute("aria-expanded", startCollapsed ? "false" : "true");
+
+  const arrow = document.createElement("span");
+  arrow.className = "politician-subgroup__arrow";
+  arrow.setAttribute("aria-hidden", "true");
+  arrow.textContent = startCollapsed ? "▸" : "▾";
 
   const title = document.createElement("h4");
   title.className = "politician-subgroup__title";
   title.textContent = heading;
-  subgroup.append(title);
+
+  const count = document.createElement("span");
+  count.className = "politician-subgroup__count";
+  count.textContent = `${politicians.length}`;
+
+  header.append(arrow, title, count);
+
+  const body = document.createElement("div");
+  body.className = "politician-subgroup__body";
 
   for (const politician of politicians) {
-    subgroup.append(
+    body.append(
       renderPoliticianCard(politician, {
         ...cardOptions,
         sectionLevel,
@@ -427,6 +453,15 @@ function appendPoliticianSubgroup(list, heading, politicians, cardOptions, secti
     );
   }
 
+  header.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const collapsed = subgroup.classList.toggle("is-collapsed");
+    arrow.textContent = collapsed ? "▸" : "▾";
+    header.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  });
+
+  subgroup.append(header, body);
   list.append(subgroup);
   return politicians.length;
 }
