@@ -355,10 +355,22 @@ function mapStateLegislator(legislator, state, district, chamberHint) {
 
 function extractGeocodioPoliticians(geocodeResult) {
   const result = geocodeResult?.results?.[0];
-  if (!result) return { address: null, state: "", lat: null, lng: null, politicians: [] };
+  if (!result) {
+    return {
+      address: null,
+      state: "",
+      county: "",
+      lat: null,
+      lng: null,
+      politicians: [],
+    };
+  }
 
   const components = result.address_components || {};
   const state = (components.state || "").toUpperCase();
+  const county = String(components.county || components.county_name || "")
+    .replace(/\s+county$/i, "")
+    .trim();
   const formatted = result.formatted_address || null;
   const fields = result.fields || {};
   const politicians = [];
@@ -441,7 +453,7 @@ function extractGeocodioPoliticians(geocodeResult) {
     });
   }
 
-  return { address: formatted, state, lat, lng, politicians };
+  return { address: formatted, state, county, lat, lng, politicians };
 }
 
 function mapGoogleCivicLevel(levels = [], roles = [], officeName = "") {
@@ -610,17 +622,51 @@ function mapCiceroDistrictType(districtType = "", officeTitle = "") {
     return { level: "state", chamber: "state_executive" };
   }
   if (title.includes("judge") || title.includes("justice")) {
+    // Keep all benches under State for the State tab court subgroups.
+    if (title.includes("criminal appeals")) {
+      return {
+        level: "state",
+        chamber: "state_criminal_appeals",
+        court_group: "statewide",
+      };
+    }
+    if (title.includes("supreme")) {
+      return {
+        level: "state",
+        chamber: "state_supreme",
+        court_group: "statewide",
+      };
+    }
+    if (title.includes("appeals") || title.includes("appellate")) {
+      return {
+        level: "state",
+        chamber: "state_appeals",
+        court_group: "appellate",
+      };
+    }
     if (
-      title.includes("supreme") ||
-      title.includes("appeals") ||
-      title.includes("appellate")
+      title.includes("district court") ||
+      title.includes("district judge") ||
+      /\b\d+(st|nd|rd|th)\b/.test(title)
     ) {
-      return { level: "state", chamber: "judicial" };
+      return {
+        level: "state",
+        chamber: "state_district",
+        court_group: "district",
+      };
     }
-    if (title.includes("county") || title.includes("circuit") || title.includes("superior")) {
-      return { level: "county", chamber: "judicial" };
+    if (title.includes("county")) {
+      return {
+        level: "state",
+        chamber: "county_court",
+        court_group: "district",
+      };
     }
-    return { level: "local", chamber: "judicial" };
+    return {
+      level: "state",
+      chamber: "state_district",
+      court_group: "district",
+    };
   }
 
   if (type.startsWith("NATIONAL")) {
@@ -640,7 +686,11 @@ function mapCiceroDistrictType(districtType = "", officeTitle = "") {
     return { level: "school", chamber: "school_board" };
   }
   if (type === "JUDICIAL" || type.includes("JUDICIAL")) {
-    return { level: "county", chamber: "judicial" };
+    return {
+      level: "state",
+      chamber: "state_district",
+      court_group: "district",
+    };
   }
   if (type.startsWith("LOCAL") || type === "LOCAL") {
     return {
@@ -734,6 +784,15 @@ function mapCiceroOfficial(official) {
       "",
     { level: mapped.level, chamber: mapped.chamber }
   );
+  const countyHint = String(
+    district.county ||
+      district.county_name ||
+      office.representing_county ||
+      primaryAddress.county ||
+      ""
+  )
+    .replace(/\s+county$/i, "")
+    .trim();
 
   return {
     external_key: sk
@@ -756,8 +815,12 @@ function mapCiceroOfficial(official) {
     source: "cicero",
     metadata: {
       office_title: officeTitle,
+      court_name: officeTitle,
       cicero_sk: sk,
       district_type: districtTypeName,
+      court_group: mapped.court_group || null,
+      county: countyHint || null,
+      district_label: district.label || districtValue || null,
       emails: official.email_addresses || [],
     },
   };
@@ -931,6 +994,91 @@ async function fetchCiceroDistrictType(apiKey, lat, lng, query, districtType) {
   return politicians;
 }
 
+function parseJudicialDistrictMeta(label = "") {
+  const text = String(label || "").trim();
+  const lower = text.toLowerCase();
+  const numberMatch = text.match(/(\d+)(st|nd|rd|th)?/i);
+  const number = numberMatch ? numberMatch[1] : "";
+
+  if (
+    lower.includes("court of appeals") ||
+    lower.includes("appeals court") ||
+    lower.includes("appellate")
+  ) {
+    return {
+      kind: "appellate",
+      appellateDistrict: number || text,
+      trialDistrict: "",
+      label: text,
+    };
+  }
+  if (
+    lower.includes("supreme") ||
+    lower.includes("criminal appeals")
+  ) {
+    return {
+      kind: "statewide",
+      appellateDistrict: "",
+      trialDistrict: "",
+      label: text,
+    };
+  }
+  if (lower.includes("district") || lower.includes("judicial") || number) {
+    return {
+      kind: "trial",
+      appellateDistrict: "",
+      trialDistrict: number ? `${number}${numberMatch?.[2] || ""}` : text,
+      label: text,
+    };
+  }
+  return {
+    kind: "other",
+    appellateDistrict: "",
+    trialDistrict: text,
+    label: text,
+  };
+}
+
+function emptyGeography(state = "", county = "") {
+  return {
+    state: String(state || "").toUpperCase(),
+    county: String(county || "").replace(/\s+county$/i, "").trim(),
+    appellateDistricts: [],
+    trialDistricts: [],
+    judicialDistrictLabels: [],
+  };
+}
+
+function mergeGeography(...parts) {
+  const merged = emptyGeography();
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.state) merged.state = String(part.state).toUpperCase();
+    if (part.county) {
+      merged.county = String(part.county).replace(/\s+county$/i, "").trim();
+    }
+    for (const value of part.appellateDistricts || []) {
+      const key = String(value).trim();
+      if (key && !merged.appellateDistricts.includes(key)) {
+        merged.appellateDistricts.push(key);
+      }
+    }
+    for (const value of part.trialDistricts || []) {
+      const key = String(value).trim();
+      if (key && !merged.trialDistricts.includes(key)) {
+        merged.trialDistricts.push(key);
+      }
+    }
+    for (const value of part.judicialDistrictLabels || []) {
+      const key = String(value).trim();
+      if (key && !merged.judicialDistrictLabels.includes(key)) {
+        merged.judicialDistrictLabels.push(key);
+      }
+    }
+  }
+  return merged;
+}
+
 async function fetchCicero(query, apiKey, lat, lng) {
   // Explicitly request every national/state/county/local district type so we get
   // legislative AND executive/judicial officials (Governor, AG, Mayor, Judges, etc.).
@@ -954,6 +1102,8 @@ async function fetchCicero(query, apiKey, lat, lng) {
     }
   });
 
+  let geography = emptyGeography();
+
   // Non-legislative districts (school / county / judicial) often need a district
   // lookup first, then an officials query by district_id to return board members,
   // sheriffs, and judges.
@@ -966,6 +1116,7 @@ async function fetchCicero(query, apiKey, lat, lng) {
     );
     politicians.push(...nonleg.politicians);
     typeErrors.push(...nonleg.typeErrors);
+    geography = mergeGeography(geography, nonleg.geography);
   } catch (error) {
     typeErrors.push({
       district_type: "nonlegislative",
@@ -988,6 +1139,7 @@ async function fetchCicero(query, apiKey, lat, lng) {
   return {
     politicians: politicians.filter(isRelevantOfficeholder),
     typeErrors,
+    geography,
   };
 }
 
@@ -995,6 +1147,7 @@ async function fetchCiceroNonlegislativeOfficials(apiKey, lat, lng, query) {
   const types = ["SCHOOL", "COUNTY", "JUDICIAL"];
   const politicians = [];
   const typeErrors = [];
+  const geography = emptyGeography();
 
   for (const districtType of types) {
     try {
@@ -1037,6 +1190,28 @@ async function fetchCiceroNonlegislativeOfficials(apiKey, lat, lng, query) {
           district.city ||
           district.district_id ||
           `${districtType} district`;
+
+        if (districtType === "COUNTY" && districtName) {
+          const countyName = String(districtName)
+            .replace(/\s+county$/i, "")
+            .trim();
+          if (countyName && !geography.county) geography.county = countyName;
+        }
+
+        if (districtType === "JUDICIAL" && districtName) {
+          const meta = parseJudicialDistrictMeta(districtName);
+          geography.judicialDistrictLabels.push(String(districtName));
+          if (meta.kind === "appellate" && meta.appellateDistrict) {
+            if (!geography.appellateDistricts.includes(meta.appellateDistrict)) {
+              geography.appellateDistricts.push(meta.appellateDistrict);
+            }
+          }
+          if (meta.kind === "trial" && meta.trialDistrict) {
+            if (!geography.trialDistricts.includes(meta.trialDistrict)) {
+              geography.trialDistricts.push(meta.trialDistrict);
+            }
+          }
+        }
 
         // Always surface the district itself so school districts appear even when
         // Cicero has no individual board-member records for that area.
@@ -1086,7 +1261,7 @@ async function fetchCiceroNonlegislativeOfficials(apiKey, lat, lng, query) {
                 (districtType === "SCHOOL"
                   ? "school"
                   : districtType === "JUDICIAL"
-                    ? "county"
+                    ? "state"
                     : "county")
             );
           });
@@ -1126,7 +1301,7 @@ async function fetchCiceroNonlegislativeOfficials(apiKey, lat, lng, query) {
     }
   }
 
-  return { politicians, typeErrors };
+  return { politicians, typeErrors, geography };
 }
 
 function isRelevantOfficeholder(politician) {
@@ -1200,8 +1375,10 @@ module.exports = async function handler(req, res) {
   const politicianLists = [];
   let address = null;
   let state = "";
+  let county = "";
   let lat = null;
   let lng = null;
+  let geography = emptyGeography();
 
   try {
     // 1) Geocode whenever possible — also supplies federal/state (+ school district names).
@@ -1211,9 +1388,14 @@ module.exports = async function handler(req, res) {
         const geo = await fetchGeocodio(q, geocodioKey);
         address = geo.address || address;
         state = geo.state || state;
+        county = geo.county || county;
         lat = geo.lat;
         lng = geo.lng;
         politicianLists.push(geo.politicians);
+        geography = mergeGeography(geography, {
+          state: geo.state,
+          county: geo.county,
+        });
       } catch (error) {
         sourceErrors.push({ source: "geocodio", error: error.message });
       }
@@ -1238,6 +1420,10 @@ module.exports = async function handler(req, res) {
       try {
         const cicero = await fetchCicero(q, ciceroKey, lat, lng);
         politicianLists.push(cicero.politicians);
+        geography = mergeGeography(geography, cicero.geography, {
+          state,
+          county,
+        });
         if (cicero.typeErrors?.length) {
           sourceErrors.push(...cicero.typeErrors.map((item) => ({
             source: `cicero:${item.district_type}`,
@@ -1268,19 +1454,24 @@ module.exports = async function handler(req, res) {
           "No representatives found. Try a full street address. For city, county, and school board coverage, set CICERO_API_KEY (Google Civic Representatives was turned down in 2025).",
         sourcesTried,
         sourceErrors,
+        geography: mergeGeography(geography, { state, county }),
       });
     }
+
+    geography = mergeGeography(geography, { state, county });
 
     return json(res, 200, {
       ok: true,
       query: q,
       address,
-      state,
+      state: geography.state || state,
+      county: geography.county || county,
+      geography,
       politicians,
       sourcesTried,
       sourceErrors,
       coverageNote:
-        "Federal/state legislators come from Geocodio (+ Open States when configured). City, county, and school board members require Cicero or a working Google Civic key.",
+        "Federal/state legislators come from Geocodio (+ Open States when configured). City, county, school board, and judges require Cicero or a working Google Civic key. State court benches can also be loaded from the state_judges table.",
     });
   } catch (error) {
     console.error(error);

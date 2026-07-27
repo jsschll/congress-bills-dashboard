@@ -150,8 +150,13 @@ function applyFilters() {
   const nationalOfficials = filtered.filter(
     (politician) => politician.source === "national_officials"
   );
+  const stateJudges = filtered.filter(
+    (politician) => politician.source === "state_judges"
+  );
   const others = filtered.filter(
-    (politician) => politician.source !== "national_officials"
+    (politician) =>
+      politician.source !== "national_officials" &&
+      politician.source !== "state_judges"
   );
 
   politiciansGrid.replaceChildren();
@@ -160,10 +165,19 @@ function applyFilters() {
     return;
   }
 
+  const geography = {
+    state: filterState.value || "",
+    county: "",
+    appellateDistricts: [],
+    trialDistricts: [],
+  };
+
   renderPoliticianGroups(politiciansGrid, others, {
     followedIds,
     user: currentUser,
     nationalOfficials,
+    stateJudges,
+    geography,
   });
   setBrowseStatus(`Showing ${filtered.length} politicians.`, "success");
 }
@@ -188,6 +202,19 @@ async function loadBrowseList() {
         console.warn(
           "No national_officials rows loaded. Check Supabase RLS SELECT policy for anon."
         );
+      }
+    }
+
+    if (level === "state" || level === "all") {
+      const stateCode = filterState.value || "";
+      if (stateCode) {
+        const statewideJudges = await fetchStateJudgesForGeography({
+          state: stateCode,
+          county: "",
+          appellateDistricts: [],
+          trialDistricts: [],
+        });
+        list = list.concat(statewideJudges);
       }
     }
 

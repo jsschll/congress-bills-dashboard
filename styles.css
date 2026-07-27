@@ -1014,6 +1014,16 @@ body {
   display: none;
 }
 
+.politician-subgroup-hint {
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.55rem;
+  background: #f8fafc;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .politician-level-group__header {
   appearance: none;
   width: 100%;
