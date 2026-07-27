@@ -111,6 +111,8 @@ function chamberLabel(chamber, politician = {}) {
       return "County office";
     case "cabinet":
       return "Cabinet";
+    case "agency_director":
+      return "Agency Director";
     case "supreme_court":
       return "Supreme Court";
     case "school_board":
@@ -241,38 +243,53 @@ function normalizeNationalOfficialRow(row) {
 }
 
 function classifyNationalOfficial(row) {
+  const category = String(row.category || "").toLowerCase().trim();
   const hay = [row.category, row.branch, row.title, row.department]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 
-  if (/supreme|scotus|chief justice|\bjustices?\b|judicial/.test(hay)) {
+  if (
+    category === "agency director" ||
+    category.includes("agency director") ||
+    /agency\s+director/.test(hay)
+  ) {
+    return "agency_director";
+  }
+  if (
+    category.includes("supreme") ||
+    category.includes("court") ||
+    /supreme|scotus|chief justice|\bjustices?\b|judicial/.test(hay)
+  ) {
     return "supreme_court";
   }
-  if (/cabinet|secretary|attorney general|department of|executive/.test(hay)) {
-    return "cabinet";
-  }
-
-  const category = String(row.category || "").toLowerCase();
-  if (category.includes("supreme") || category.includes("court")) {
-    return "supreme_court";
-  }
-  if (category.includes("cabinet") || category.includes("secretary")) {
+  if (
+    category.includes("cabinet") ||
+    category.includes("secretary") ||
+    /cabinet|secretary|attorney general/.test(hay)
+  ) {
     return "cabinet";
   }
   return "other";
 }
 
+function nationalOfficialChamber(group) {
+  if (group === "supreme_court") return "supreme_court";
+  if (group === "agency_director") return "agency_director";
+  return "cabinet";
+}
+
 function mapNationalOfficial(row) {
   const normalized = normalizeNationalOfficialRow(row) || row;
   const group = classifyNationalOfficial(normalized);
+  const chamber = nationalOfficialChamber(group);
   const title =
     readableOfficeTitle(normalized.title) || normalized.department || "";
   return {
     external_key: `national:${normalized.id}`,
     bioguide_id: null,
     level: "federal",
-    chamber: group === "supreme_court" ? "supreme_court" : "cabinet",
+    chamber,
     name: normalized.full_name || "Unknown",
     party: "",
     state: "US",
@@ -294,7 +311,7 @@ function mapNationalOfficial(row) {
     offices: [
       {
         level: "federal",
-        chamber: group === "supreme_court" ? "supreme_court" : "cabinet",
+        chamber,
         office_title: title,
         district: "",
         source: "national_officials",
@@ -913,6 +930,11 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     const cabinet = level === "federal"
       ? nationalOfficials.filter((p) => p.metadata?.national_group === "cabinet")
       : [];
+    const agencyDirectors = level === "federal"
+      ? nationalOfficials.filter(
+          (p) => p.metadata?.national_group === "agency_director"
+        )
+      : [];
     const justices = level === "federal"
       ? nationalOfficials.filter(
           (p) => p.metadata?.national_group === "supreme_court"
@@ -923,7 +945,11 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       : [];
 
     const totalCount =
-      group.length + cabinet.length + justices.length + otherNational.length;
+      group.length +
+      cabinet.length +
+      agencyDirectors.length +
+      justices.length +
+      otherNational.length;
     if (!totalCount) continue;
 
     const section = document.createElement("section");
@@ -975,6 +1001,13 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         list,
         "Cabinet Secretaries",
         cabinet,
+        cardOptions,
+        level
+      );
+      appendPoliticianSubgroup(
+        list,
+        "Federal Agency Directors",
+        agencyDirectors,
         cardOptions,
         level
       );

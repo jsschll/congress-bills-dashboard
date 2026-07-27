@@ -1,7 +1,11 @@
--- National officials (Cabinet Secretaries + Supreme Court Justices)
--- Run this in the Supabase SQL editor if Cabinet / SCOTUS rows exist in the
--- table but do not appear in the app. An empty client response usually means
--- RLS is enabled without a public SELECT policy (or anon lacks GRANT SELECT).
+-- National officials (Cabinet, Agency Directors, Supreme Court)
+-- Categories used by the app:
+--   - Cabinet Secretaries
+--   - Agency Director  -> Federal Agency Directors
+--   - Supreme Court Justices
+-- Run this in the Supabase SQL editor if rows exist in the table but do not
+-- appear in the app. An empty client response usually means RLS is enabled
+-- without a public SELECT policy (or anon lacks GRANT SELECT).
 
 create table if not exists public.national_officials (
   id uuid primary key default gen_random_uuid(),
