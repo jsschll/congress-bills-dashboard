@@ -399,12 +399,52 @@ async function fetchNationalOfficials() {
       .filter(Boolean)
       .map(mapNationalOfficial);
 
-    console.info(`Loaded ${mapped.length} national_officials`);
-    return mapped;
+    // Table may contain duplicate people; keep one entry per subcategory.
+    const deduped = dedupePoliticiansInGroup(mapped);
+    console.info(
+      `Loaded ${deduped.length} national_officials (${mapped.length} raw rows)`
+    );
+    return deduped;
   } catch (error) {
     console.error("fetchNationalOfficials failed:", error);
     return [];
   }
+}
+
+function dedupePoliticiansInGroup(politicians) {
+  const unique = [];
+  const seen = new Map();
+
+  for (const politician of politicians || []) {
+    if (!politician?.name) continue;
+    const group = politician.metadata?.national_group || "";
+    const key = group
+      ? `${group}:${normalizePersonName(politician.name)}`
+      : personIdentityKey(politician);
+    if (!key || key.endsWith(":")) continue;
+
+    const existingIndex = seen.get(key);
+    if (existingIndex == null) {
+      seen.set(key, unique.length);
+      unique.push(politician);
+      continue;
+    }
+
+    // Prefer the row with a richer title/department when duplicates exist.
+    const existing = unique[existingIndex];
+    const existingScore =
+      String(existing.office_title || existing.metadata?.office_title || "")
+        .length + String(existing.metadata?.department || "").length;
+    const nextScore =
+      String(politician.office_title || politician.metadata?.office_title || "")
+        .length + String(politician.metadata?.department || "").length;
+    if (nextScore > existingScore) {
+      unique[existingIndex] = politician;
+    }
+  }
+
+  unique.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return unique;
 }
 
 function appendPoliticianSubgroup(
@@ -415,7 +455,8 @@ function appendPoliticianSubgroup(
   sectionLevel,
   { startCollapsed = true } = {}
 ) {
-  if (!politicians.length) return 0;
+  const uniquePoliticians = dedupePoliticiansInGroup(politicians);
+  if (!uniquePoliticians.length) return 0;
 
   const subgroup = document.createElement("div");
   subgroup.className = "politician-subgroup";
@@ -437,14 +478,14 @@ function appendPoliticianSubgroup(
 
   const count = document.createElement("span");
   count.className = "politician-subgroup__count";
-  count.textContent = `${politicians.length}`;
+  count.textContent = `${uniquePoliticians.length}`;
 
   header.append(arrow, title, count);
 
   const body = document.createElement("div");
   body.className = "politician-subgroup__body";
 
-  for (const politician of politicians) {
+  for (const politician of uniquePoliticians) {
     body.append(
       renderPoliticianCard(politician, {
         ...cardOptions,
@@ -463,7 +504,7 @@ function appendPoliticianSubgroup(
 
   subgroup.append(header, body);
   list.append(subgroup);
-  return politicians.length;
+  return uniquePoliticians.length;
 }
 
 async function followPolitician(userId, politicianId) {
@@ -963,24 +1004,42 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     );
 
     const cabinet = level === "federal"
-      ? nationalOfficials.filter((p) => p.metadata?.national_group === "cabinet")
+      ? dedupePoliticiansInGroup(
+          nationalOfficials.filter((p) => p.metadata?.national_group === "cabinet")
+        )
       : [];
     const agencyDirectors = level === "federal"
-      ? nationalOfficials.filter(
-          (p) => p.metadata?.national_group === "agency_director"
+      ? dedupePoliticiansInGroup(
+          nationalOfficials.filter(
+            (p) => p.metadata?.national_group === "agency_director"
+          )
         )
       : [];
     const justices = level === "federal"
-      ? nationalOfficials.filter(
-          (p) => p.metadata?.national_group === "supreme_court"
+      ? dedupePoliticiansInGroup(
+          nationalOfficials.filter(
+            (p) => p.metadata?.national_group === "supreme_court"
+          )
         )
       : [];
     const otherNational = level === "federal"
-      ? nationalOfficials.filter((p) => p.metadata?.national_group === "other")
+      ? dedupePoliticiansInGroup(
+          nationalOfficials.filter((p) => p.metadata?.national_group === "other")
+        )
       : [];
 
+    // Keep address-based federal officials out of national subgroups by name.
+    const nationalNames = new Set(
+      [...cabinet, ...agencyDirectors, ...justices, ...otherNational].map((p) =>
+        normalizePersonName(p.name)
+      )
+    );
+    const localGroup = dedupePoliticiansInGroup(
+      group.filter((p) => !nationalNames.has(normalizePersonName(p.name)))
+    );
+
     const totalCount =
-      group.length +
+      localGroup.length +
       cabinet.length +
       agencyDirectors.length +
       justices.length +
@@ -1023,11 +1082,11 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     list.className = "politician-list";
 
     if (level === "federal") {
-      if (group.length) {
+      if (localGroup.length) {
         appendPoliticianSubgroup(
           list,
           "Congress & elected officials",
-          group,
+          localGroup,
           cardOptions,
           level
         );
@@ -1064,7 +1123,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       }
     } else {
       list.append(
-        ...group.map((politician) =>
+        ...dedupePoliticiansInGroup(group).map((politician) =>
           renderPoliticianCard(politician, {
             ...cardOptions,
             sectionLevel: level,
