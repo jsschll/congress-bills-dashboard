@@ -8,6 +8,7 @@
     "seed:judges": "node seed-judges.js",
     "import:mapping": "node scripts/import-county-mapping.js",
     "import:officials": "node scripts/import-state-officials.js",
+    "import:all": "node scripts/import-all-judges.js",
     "coverage:judges": "node scripts/coverage-report.js"
   }
 }
