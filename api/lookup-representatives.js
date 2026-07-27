@@ -66,17 +66,28 @@ function normalizePersonName(name) {
     .join(" ");
 }
 
-function personMatchKey(politician) {
+function personIdentityKeys(politician) {
+  if (politician?.metadata?.district_only) {
+    return [`district:${politician.external_key}`];
+  }
+
+  const keys = [];
   if (politician.bioguide_id) {
-    return `bioguide:${String(politician.bioguide_id).toLowerCase()}`;
+    keys.push(`bioguide:${String(politician.bioguide_id).toLowerCase()}`);
   }
   const ciceroSk = politician.metadata?.cicero_sk;
-  // Prefer name+state matching across sources; cicero sk alone would prevent Geocodio merge.
+  if (ciceroSk) keys.push(`cicero:${ciceroSk}`);
+
   const name = normalizePersonName(politician.name);
   const state = String(politician.state || "").toUpperCase();
-  if (name) return `name:${state}:${name}`;
-  if (ciceroSk) return `cicero:${ciceroSk}`;
-  return `key:${politician.external_key}`;
+  if (name) keys.push(`name:${state}:${name}`);
+
+  if (politician.external_key) keys.push(`key:${politician.external_key}`);
+  return keys;
+}
+
+function personMatchKey(politician) {
+  return personIdentityKeys(politician)[0] || `key:${politician.external_key}`;
 }
 
 function officeFromPolitician(politician) {
@@ -165,16 +176,19 @@ function mergePersonRecords(existing, incoming) {
 }
 
 function mergePoliticians(lists) {
-  const byPerson = new Map();
+  const records = [];
+  const keyToIndex = new Map();
 
   for (const list of lists) {
     for (const politician of list || []) {
       if (!politician?.external_key || !politician?.name) continue;
+
       // Keep school district placeholders distinct from people.
       if (politician.metadata?.district_only) {
         const key = `district:${politician.external_key}`;
-        if (!byPerson.has(key)) {
-          byPerson.set(key, {
+        if (!keyToIndex.has(key)) {
+          keyToIndex.set(key, records.length);
+          records.push({
             ...politician,
             levels: [politician.level || "school"],
             offices: [officeFromPolitician(politician)],
@@ -183,10 +197,18 @@ function mergePoliticians(lists) {
         continue;
       }
 
-      const key = personMatchKey(politician);
-      const existing = byPerson.get(key);
-      if (!existing) {
-        byPerson.set(key, {
+      const keys = personIdentityKeys(politician);
+      let index = null;
+      for (const key of keys) {
+        if (keyToIndex.has(key)) {
+          index = keyToIndex.get(key);
+          break;
+        }
+      }
+
+      if (index == null) {
+        index = records.length;
+        records.push({
           ...politician,
           levels: [politician.level || "local"],
           offices: [officeFromPolitician(politician)],
@@ -197,12 +219,17 @@ function mergePoliticians(lists) {
           },
         });
       } else {
-        byPerson.set(key, mergePersonRecords(existing, politician));
+        records[index] = mergePersonRecords(records[index], politician);
+      }
+
+      // Bind every known identity key so bioguide + name aliases merge later.
+      for (const key of personIdentityKeys(records[index])) {
+        keyToIndex.set(key, index);
       }
     }
   }
 
-  return [...byPerson.values()].sort((a, b) => {
+  return records.sort((a, b) => {
     const levelDiff =
       LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level);
     if (levelDiff !== 0) return levelDiff;

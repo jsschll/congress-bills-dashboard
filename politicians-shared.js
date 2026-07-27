@@ -432,6 +432,96 @@ function renderPoliticianCard(
   return card;
 }
 
+function normalizePersonName(name) {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, " ")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((part) => part.length > 1)
+    .join(" ");
+}
+
+function personIdentityKeys(politician) {
+  if (politician?.metadata?.district_only) {
+    return [`district:${politician.external_key}`];
+  }
+
+  const keys = [];
+  if (politician.bioguide_id) {
+    keys.push(`bioguide:${String(politician.bioguide_id).toLowerCase()}`);
+  }
+  const ciceroSk = politician.metadata?.cicero_sk;
+  if (ciceroSk) keys.push(`cicero:${ciceroSk}`);
+
+  const name = normalizePersonName(politician.name);
+  const state = String(politician.state || "").toUpperCase();
+  if (name) keys.push(`name:${state}:${name}`);
+
+  if (politician.external_key) keys.push(`key:${politician.external_key}`);
+  return keys;
+}
+
+function personIdentityKey(politician) {
+  return personIdentityKeys(politician)[0] || `key:${politician.external_key || politician.name}`;
+}
+
+function mergeOfficeLists(existingOffices, incomingOffices) {
+  const offices = [...existingOffices];
+  for (const office of incomingOffices) {
+    const signature = `${toDisplayLevel(office.level)}|${normalizePersonName(
+      office.office_title
+    )}|${String(office.district || "").toLowerCase()}`;
+    const already = offices.some(
+      (item) =>
+        `${toDisplayLevel(item.level)}|${normalizePersonName(
+          item.office_title
+        )}|${String(item.district || "").toLowerCase()}` === signature
+    );
+    if (!already) offices.push(office);
+  }
+  return offices;
+}
+
+function mergePersonRecordsClient(existing, incoming) {
+  const levels = [
+    ...new Set([
+      ...politicianLevels(existing),
+      ...politicianLevels(incoming),
+    ]),
+  ].sort(
+    (a, b) => DISPLAY_LEVEL_ORDER.indexOf(a) - DISPLAY_LEVEL_ORDER.indexOf(b)
+  );
+  const offices = mergeOfficeLists(
+    politicianOffices(existing),
+    politicianOffices(incoming)
+  );
+
+  return {
+    ...existing,
+    ...incoming,
+    name:
+      String(incoming.name || "").length > String(existing.name || "").length
+        ? incoming.name
+        : existing.name || incoming.name,
+    photo_url: existing.photo_url || incoming.photo_url,
+    website_url: existing.website_url || incoming.website_url,
+    phone: existing.phone || incoming.phone,
+    bioguide_id: existing.bioguide_id || incoming.bioguide_id,
+    external_key: existing.external_key || incoming.external_key,
+    levels,
+    offices,
+    metadata: {
+      ...(existing.metadata || {}),
+      ...(incoming.metadata || {}),
+      levels,
+      offices,
+    },
+  };
+}
+
 function groupPoliticiansByLevel(politicians) {
   const people = politicians.map((politician) => ({
     ...politician,
@@ -441,11 +531,17 @@ function groupPoliticiansByLevel(politicians) {
 
   const byLevel = new Map(DISPLAY_LEVEL_ORDER.map((level) => [level, []]));
   for (const politician of people) {
-    const levels = politician.levels.length
-      ? politician.levels
-      : [toDisplayLevel(politician.level || "local")];
-    for (const level of levels) {
-      const displayLevel = toDisplayLevel(level);
+    // One listing per government level this person holds.
+    const levels = [
+      ...new Set(
+        (politician.levels.length
+          ? politician.levels
+          : [politician.level || "local"]
+        ).map((level) => toDisplayLevel(level))
+      ),
+    ].filter((level) => DISPLAY_LEVEL_ORDER.includes(level));
+
+    for (const displayLevel of levels) {
       if (!byLevel.has(displayLevel)) byLevel.set(displayLevel, []);
       byLevel.get(displayLevel).push(politician);
     }
@@ -454,11 +550,15 @@ function groupPoliticiansByLevel(politicians) {
   for (const level of DISPLAY_LEVEL_ORDER) {
     const group = byLevel.get(level) || [];
     const unique = [];
-    const seen = new Set();
+    const seen = new Map();
     for (const politician of group) {
-      const key = politician.external_key || politician.name;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const key = personIdentityKey(politician);
+      const existing = seen.get(key);
+      if (existing != null) {
+        unique[existing] = mergePersonRecordsClient(unique[existing], politician);
+        continue;
+      }
+      seen.set(key, unique.length);
       unique.push(politician);
     }
     unique.sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -725,68 +825,38 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
 }
 
 function dedupeLookupPoliticians(politicians) {
-  const map = new Map();
+  const records = [];
+  const keyToIndex = new Map();
+
   for (const politician of politicians) {
-    const key =
-      (politician.bioguide_id &&
-        `bioguide:${String(politician.bioguide_id).toLowerCase()}`) ||
-      `name:${String(politician.state || "").toUpperCase()}:${String(
-        politician.name || ""
-      )
-        .toLowerCase()
-        .replace(/[^a-z\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .split(" ")
-        .filter((part) => part.length > 1)
-        .join(" ")}`;
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, {
+    if (!politician?.name) continue;
+
+    const keys = personIdentityKeys(politician);
+    let index = null;
+    for (const key of keys) {
+      if (keyToIndex.has(key)) {
+        index = keyToIndex.get(key);
+        break;
+      }
+    }
+
+    if (index == null) {
+      index = records.length;
+      records.push({
         ...politician,
         levels: politicianLevels(politician),
         offices: politicianOffices(politician),
       });
-      continue;
+    } else {
+      records[index] = mergePersonRecordsClient(records[index], politician);
     }
-    const levels = [
-      ...new Set([
-        ...politicianLevels(existing),
-        ...politicianLevels(politician),
-      ]),
-    ].sort(
-      (a, b) => DISPLAY_LEVEL_ORDER.indexOf(a) - DISPLAY_LEVEL_ORDER.indexOf(b)
-    );
-    const offices = [...politicianOffices(existing)];
-    for (const office of politicianOffices(politician)) {
-      const signature = `${office.level}|${office.office_title}|${office.district}`;
-      if (
-        !offices.some(
-          (item) =>
-            `${item.level}|${item.office_title}|${item.district}` === signature
-        )
-      ) {
-        offices.push(office);
-      }
+
+    for (const key of personIdentityKeys(records[index])) {
+      keyToIndex.set(key, index);
     }
-    map.set(key, {
-      ...existing,
-      ...politician,
-      photo_url: existing.photo_url || politician.photo_url,
-      website_url: existing.website_url || politician.website_url,
-      phone: existing.phone || politician.phone,
-      bioguide_id: existing.bioguide_id || politician.bioguide_id,
-      levels,
-      offices,
-      metadata: {
-        ...(existing.metadata || {}),
-        ...(politician.metadata || {}),
-        levels,
-        offices,
-      },
-    });
   }
-  return [...map.values()];
+
+  return records;
 }
 
 function politiciansResultsUrl(address) {
