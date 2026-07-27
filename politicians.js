@@ -151,11 +151,14 @@ function applyFilters() {
     (politician) => politician.source === "national_officials"
   );
   const stateJudges = filtered.filter(
-    (politician) => politician.source === "state_judges"
+    (politician) =>
+      politician.source === "state_officials" ||
+      politician.source === "state_judges"
   );
   const others = filtered.filter(
     (politician) =>
       politician.source !== "national_officials" &&
+      politician.source !== "state_officials" &&
       politician.source !== "state_judges"
   );
 
@@ -208,13 +211,12 @@ async function loadBrowseList() {
     if (level === "state" || level === "all") {
       const stateCode = filterState.value || "";
       if (stateCode) {
-        const statewideJudges = await fetchStateJudgesForGeography({
-          state: stateCode,
-          county: "",
-          appellateDistricts: [],
-          trialDistricts: [],
+        // Without a county, Option A still returns Statewide leadership/high courts.
+        const statewideOfficials = await fetchStateOfficialsForAddress({
+          state_code: stateCode,
+          county_name: "",
         });
-        list = list.concat(statewideJudges);
+        list = list.concat(statewideOfficials);
       }
     }
 

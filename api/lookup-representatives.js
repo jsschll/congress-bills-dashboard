@@ -1471,7 +1471,7 @@ module.exports = async function handler(req, res) {
       sourcesTried,
       sourceErrors,
       coverageNote:
-        "Federal/state legislators come from Geocodio (+ Open States when configured). City, county, school board, and judges require Cicero or a working Google Civic key. State court benches can also be loaded from the state_judges table.",
+        "Federal/state legislators come from Geocodio (+ Open States when configured). City, county, school board, and judges require Cicero or a working Google Civic key. State / appellate / county benches load from state_officials via county_district_mapping.",
     });
   } catch (error) {
     console.error(error);

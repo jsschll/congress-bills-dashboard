@@ -367,74 +367,100 @@ async function fetchNationalOfficialsViaRest() {
   return { data: Array.isArray(payload) ? payload : [], error: null };
 }
 
-function classifyCourtGroupFromTitle(title = "", chamber = "") {
-  const hay = `${title} ${chamber}`.toLowerCase();
-  if (hay.includes("criminal appeals") || hay.includes("supreme")) {
-    return "statewide";
-  }
-  if (hay.includes("appeals") || hay.includes("appellate")) {
-    return "appellate";
-  }
-  if (
-    hay.includes("district") ||
-    hay.includes("county court") ||
-    hay.includes("judge") ||
-    hay.includes("justice")
-  ) {
-    return "district";
-  }
-  return "";
+function normalizeCountyName(value) {
+  return String(value || "")
+    .replace(/\s+county$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function mapStateJudgeRow(row) {
-  const courtLevel = String(row.court_level || "").toLowerCase();
-  const chamber =
-    courtLevel === "statewide"
-      ? String(row.title || "").toLowerCase().includes("criminal")
-        ? "state_criminal_appeals"
-        : "state_supreme"
-      : courtLevel === "appellate"
-        ? "state_appeals"
-        : courtLevel === "county"
-          ? "county_court"
-          : "state_district";
-  const title = readableOfficeTitle(row.title) || row.court_name || "";
-  const district =
-    row.district_number ||
-    row.appellate_district ||
-    (Array.isArray(row.counties_served) && row.counties_served[0]) ||
-    row.county ||
-    "";
+function normalizeDistrictToken(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  return digits || raw.toLowerCase();
+}
+
+function parseDistrictNumberList(value) {
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((item) => String(item).trim()).filter(Boolean))];
+  }
+  if (value == null || value === "") return [];
+  if (typeof value === "number") return [String(value)];
+  return [
+    ...new Set(
+      String(value)
+        .split(/[,;/|]+/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function districtNumbersMatch(left, rightList) {
+  const leftToken = normalizeDistrictToken(left);
+  if (!leftToken) return false;
+  return (rightList || []).some((value) => {
+    const rightToken = normalizeDistrictToken(value);
+    return (
+      rightToken &&
+      (leftToken === rightToken ||
+        String(left).trim().toLowerCase() === String(value).trim().toLowerCase())
+    );
+  });
+}
+
+function mapStateOfficialRow(row) {
+  const level = String(row.level || "").trim();
+  const levelKey = level.toLowerCase();
+  const title = readableOfficeTitle(row.title) || "";
+  const titleLower = title.toLowerCase();
+
+  let chamber = "state_executive";
+  let courtGroup = "leadership";
+  if (levelKey === "statewide") {
+    courtGroup = "statewide";
+    if (titleLower.includes("criminal appeals")) chamber = "state_criminal_appeals";
+    else if (titleLower.includes("supreme") || titleLower.includes("justice")) {
+      chamber = "state_supreme";
+    } else if (titleLower.includes("governor")) chamber = "governor";
+    else if (titleLower.includes("attorney general")) chamber = "attorney_general";
+    else chamber = "state_executive";
+  } else if (levelKey === "appellate") {
+    courtGroup = "appellate";
+    chamber = "state_appeals";
+  } else if (levelKey === "district") {
+    courtGroup = "district";
+    chamber = "state_district";
+  } else if (levelKey === "county") {
+    courtGroup = "district";
+    chamber = "county_court";
+  }
+
+  const district = String(row.district_number || row.county_name || "");
 
   return {
-    external_key: `state-judge:${row.id}`,
+    external_key: `state-official:${row.id}`,
     bioguide_id: null,
     level: "state",
     chamber,
     name: row.full_name || "Unknown",
     party: "",
-    state: String(row.state || "").toUpperCase(),
-    district: String(district || ""),
+    state: String(row.state_code || "").toUpperCase(),
+    district,
     photo_url: "",
     website_url: "",
     phone: "",
-    source: "state_judges",
+    source: "state_officials",
     office_title: title,
     metadata: {
       office_title: title,
-      court_name: row.court_name || title,
-      court_group:
-        courtLevel === "statewide"
-          ? "statewide"
-          : courtLevel === "appellate"
-            ? "appellate"
-            : "district",
-      court_level: courtLevel,
-      county: row.county || "",
-      district_number: row.district_number || "",
-      appellate_district: row.appellate_district || "",
-      counties_served: row.counties_served || [],
-      state_judge_id: row.id,
+      court_name: title,
+      court_group: courtGroup,
+      official_level: level,
+      county: normalizeCountyName(row.county_name),
+      district_number: row.district_number != null ? String(row.district_number) : "",
+      state_official_id: row.id,
     },
     levels: ["state"],
     offices: [
@@ -442,180 +468,221 @@ function mapStateJudgeRow(row) {
         level: "state",
         chamber,
         office_title: title,
-        district: String(district || ""),
-        source: "state_judges",
-        external_key: `state-judge:${row.id}`,
+        district,
+        source: "state_officials",
+        external_key: `state-official:${row.id}`,
       },
     ],
   };
 }
 
 /**
- * Address-based state judge query:
- * - statewide courts for the state
- * - appellate courts matching appellate districts or counties_served
- * - district/county courts matching county or trial district numbers
+ * Option A: 2-step address lookup
+ * 1) county_district_mapping by state_code + county_name
+ * 2) state_officials for Statewide / Appellate / District / County matches
  */
-async function fetchStateJudgesForGeography(geography = {}) {
-  const state = String(geography.state || "").toUpperCase();
-  if (!state) return [];
+async function fetchStateOfficialsForAddress({
+  state_code,
+  county_name,
+} = {}) {
+  const stateCode = String(state_code || "").toUpperCase();
+  const countyName = normalizeCountyName(county_name);
+  if (!stateCode) return [];
 
   try {
     if (typeof injectSupabaseScript === "function") {
       await injectSupabaseScript().catch(() => {});
     }
     const client = getSupabase();
-    if (!client) return [];
-
-    const county = String(geography.county || "")
-      .replace(/\s+county$/i, "")
-      .trim();
-    const appellateDistricts = (geography.appellateDistricts || []).map(String);
-    const trialDistricts = (geography.trialDistricts || []).map(String);
-
-    const { data: statewide, error: statewideError } = await client
-      .from("state_judges")
-      .select("*")
-      .eq("state", state)
-      .eq("court_level", "statewide");
-    if (statewideError) console.error("state_judges statewide:", statewideError);
-
-    let appellate = [];
-    const { data: appellateAll, error: appellateError } = await client
-      .from("state_judges")
-      .select("*")
-      .eq("state", state)
-      .eq("court_level", "appellate");
-    if (appellateError) console.error("state_judges appellate:", appellateError);
-    else {
-      appellate = (appellateAll || []).filter((row) => {
-        const district = String(row.appellate_district || "");
-        const served = (row.counties_served || []).map((value) =>
-          String(value).replace(/\s+county$/i, "").toLowerCase()
-        );
-        if (
-          appellateDistricts.some(
-            (value) =>
-              district === value ||
-              district.replace(/\D/g, "") === String(value).replace(/\D/g, "")
-          )
-        ) {
-          return true;
-        }
-        if (county && served.includes(county.toLowerCase())) return true;
-        // No geography yet: keep empty so UI can prompt for an address.
-        return false;
-      });
+    if (!client) {
+      console.warn("Supabase client unavailable for state_officials lookup.");
+      return [];
     }
 
-    let localBench = [];
-    const { data: localAll, error: localError } = await client
-      .from("state_judges")
-      .select("*")
-      .eq("state", state)
-      .in("court_level", ["district", "county"]);
-    if (localError) console.error("state_judges local:", localError);
-    else {
-      localBench = (localAll || []).filter((row) => {
-        const rowCounty = String(row.county || "")
-          .replace(/\s+county$/i, "")
-          .trim()
-          .toLowerCase();
-        const rowDistrict = String(row.district_number || "");
-        if (county && rowCounty === county.toLowerCase()) return true;
-        if (
-          trialDistricts.some(
-            (value) =>
-              rowDistrict.toLowerCase() === String(value).toLowerCase() ||
-              rowDistrict.replace(/\D/g, "") === String(value).replace(/\D/g, "")
+    let mapping = null;
+    if (countyName) {
+      const countyVariants = [
+        countyName,
+        `${countyName} County`,
+        countyName.replace(/\s+parish$/i, ""),
+      ];
+      for (const variant of countyVariants) {
+        const { data, error } = await client
+          .from("county_district_mapping")
+          .select(
+            "state_code, county_name, appellate_district_number, judicial_district_numbers"
           )
-        ) {
-          return true;
+          .eq("state_code", stateCode)
+          .ilike("county_name", variant)
+          .limit(1);
+        if (error) {
+          console.error("county_district_mapping error:", error);
+          break;
         }
-        return false;
-      });
+        if (data?.length) {
+          mapping = data[0];
+          break;
+        }
+      }
+
+      // Fallback: contains match (e.g. mapping stored as "Fort Bend County")
+      if (!mapping) {
+        const { data, error } = await client
+          .from("county_district_mapping")
+          .select(
+            "state_code, county_name, appellate_district_number, judicial_district_numbers"
+          )
+          .eq("state_code", stateCode)
+          .ilike("county_name", `%${countyName}%`)
+          .limit(1);
+        if (error) console.error("county_district_mapping fallback:", error);
+        mapping = data?.[0] || null;
+      }
     }
 
-    return dedupePoliticiansInGroup(
-      [...(statewide || []), ...appellate, ...localBench].map(mapStateJudgeRow)
+    const appellateNumbers = parseDistrictNumberList(
+      mapping?.appellate_district_number
     );
+    const judicialNumbers = parseDistrictNumberList(
+      mapping?.judicial_district_numbers
+    );
+
+    // Fetch by level, then filter Appellate/District client-side so "1" matches "1st".
+    const queries = [
+      client
+        .from("state_officials")
+        .select("*")
+        .eq("state_code", stateCode)
+        .eq("level", "Statewide"),
+      appellateNumbers.length
+        ? client
+            .from("state_officials")
+            .select("*")
+            .eq("state_code", stateCode)
+            .eq("level", "Appellate")
+        : Promise.resolve({ data: [], error: null }),
+      judicialNumbers.length
+        ? client
+            .from("state_officials")
+            .select("*")
+            .eq("state_code", stateCode)
+            .eq("level", "District")
+        : Promise.resolve({ data: [], error: null }),
+      countyName
+        ? client
+            .from("state_officials")
+            .select("*")
+            .eq("state_code", stateCode)
+            .eq("level", "County")
+        : Promise.resolve({ data: [], error: null }),
+    ];
+
+    const [statewideRes, appellateRes, districtRes, countyRes] =
+      await Promise.all(queries);
+
+    for (const result of [statewideRes, appellateRes, districtRes, countyRes]) {
+      if (result.error) console.error("state_officials query error:", result.error);
+    }
+
+    const appellateRows = (appellateRes.data || []).filter((row) =>
+      districtNumbersMatch(row.district_number, appellateNumbers)
+    );
+    const districtRows = (districtRes.data || []).filter((row) =>
+      districtNumbersMatch(row.district_number, judicialNumbers)
+    );
+    const countyRows = (countyRes.data || []).filter((row) => {
+      if (!countyName) return false;
+      return (
+        normalizeCountyName(row.county_name).toLowerCase() ===
+        countyName.toLowerCase()
+      );
+    });
+
+    const rows = [
+      ...(statewideRes.data || []),
+      ...appellateRows,
+      ...districtRows,
+      ...countyRows,
+    ];
+
+    console.info(
+      `state_officials loaded ${rows.length} rows for ${stateCode}/${countyName || "(no county)"}`,
+      {
+        mapping,
+        appellateNumbers,
+        judicialNumbers,
+      }
+    );
+
+    return dedupePoliticiansInGroup(rows.map(mapStateOfficialRow));
   } catch (error) {
-    console.error("fetchStateJudgesForGeography failed:", error);
+    console.error("fetchStateOfficialsForAddress failed:", error);
     return [];
   }
 }
 
-function splitStateOfficials(group = [], stateJudges = [], geography = {}) {
-  const courtChambers = new Set([
-    "judicial",
-    "state_supreme",
-    "state_criminal_appeals",
-    "state_appeals",
-    "state_district",
-    "county_court",
-  ]);
-
-  const fromLookupCourts = group.filter((person) => {
-    if (person.source === "state_judges") return false;
-    const chamber = String(person.chamber || "");
-    const title = String(
-      person.office_title || person.metadata?.office_title || ""
-    ).toLowerCase();
-    if (courtChambers.has(chamber)) return true;
-    return title.includes("judge") || title.includes("justice");
+/** @deprecated use fetchStateOfficialsForAddress */
+async function fetchStateJudgesForGeography(geography = {}) {
+  return fetchStateOfficialsForAddress({
+    state_code: geography.state,
+    county_name: geography.county,
   });
+}
 
-  const executives = group.filter((person) => {
-    if (person.source === "state_judges") return false;
-    return !fromLookupCourts.includes(person);
-  });
-
-  const combinedCourts = dedupePoliticiansInGroup([
-    ...fromLookupCourts,
-    ...stateJudges,
-  ]);
-
-  const statewideCourts = combinedCourts.filter((person) => {
-    const groupName =
-      person.metadata?.court_group ||
-      classifyCourtGroupFromTitle(
-        person.metadata?.office_title || person.office_title,
-        person.chamber
-      );
-    return groupName === "statewide";
-  });
-
-  const appellateCourts = combinedCourts.filter((person) => {
-    const groupName =
-      person.metadata?.court_group ||
-      classifyCourtGroupFromTitle(
-        person.metadata?.office_title || person.office_title,
-        person.chamber
-      );
-    return groupName === "appellate";
-  });
-
-  const localCourts = combinedCourts.filter((person) => {
-    const groupName =
-      person.metadata?.court_group ||
-      classifyCourtGroupFromTitle(
-        person.metadata?.office_title || person.office_title,
-        person.chamber
-      );
-    return groupName === "district" || !groupName;
-  });
-
-  const hasLocalGeography = Boolean(
-    geography.county ||
-      (geography.appellateDistricts || []).length ||
-      (geography.trialDistricts || []).length
+function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
+  const dbOfficials = (stateOfficials || []).filter(
+    (person) => person.source === "state_officials"
   );
 
+  // Prefer Option A DB rows for court/leadership subgroups.
+  const statewideLeadership = dedupePoliticiansInGroup(
+    dbOfficials.filter((person) => person.metadata?.court_group === "statewide")
+  );
+  const appellateCourts = dedupePoliticiansInGroup(
+    dbOfficials.filter((person) => person.metadata?.court_group === "appellate")
+  );
+  const localCourts = dedupePoliticiansInGroup(
+    dbOfficials.filter((person) => person.metadata?.court_group === "district")
+  );
+
+  // Keep non-DB address lookup people (legislators, etc.) that aren't already covered.
+  const coveredNames = new Set(
+    [...statewideLeadership, ...appellateCourts, ...localCourts].map((person) =>
+      normalizePersonName(person.name)
+    )
+  );
+  const executives = dedupePoliticiansInGroup(
+    group.filter((person) => {
+      if (
+        person.source === "state_officials" ||
+        person.source === "state_judges"
+      ) {
+        return false;
+      }
+      const title = String(
+        person.office_title || person.metadata?.office_title || ""
+      ).toLowerCase();
+      const chamber = String(person.chamber || "");
+      const isJudge =
+        chamber.includes("state_supreme") ||
+        chamber.includes("state_appeals") ||
+        chamber.includes("state_district") ||
+        chamber.includes("county_court") ||
+        chamber === "judicial" ||
+        title.includes("judge") ||
+        title.includes("justice");
+      if (isJudge) return false;
+      return !coveredNames.has(normalizePersonName(person.name));
+    })
+  );
+
+  const hasLocalGeography = Boolean(normalizeCountyName(geography.county));
+
   return {
-    executives: dedupePoliticiansInGroup(executives),
-    statewideCourts: dedupePoliticiansInGroup(statewideCourts),
-    appellateCourts: dedupePoliticiansInGroup(appellateCourts),
-    localCourts: dedupePoliticiansInGroup(localCourts),
+    executives,
+    statewideCourts: statewideLeadership,
+    appellateCourts,
+    localCourts,
     hasLocalGeography,
   };
 }
@@ -1321,7 +1388,10 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     const stateSplit =
       level === "state"
         ? splitStateOfficials(
-            group.filter((p) => p.source !== "state_judges"),
+            group.filter(
+              (p) =>
+                p.source !== "state_judges" && p.source !== "state_officials"
+            ),
             stateJudges,
             geography
           )
@@ -1418,22 +1488,20 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         );
       }
     } else if (level === "state") {
-      if (stateSplit.executives.length) {
+      // Merge DB statewide leadership with any remaining address-lookup executives.
+      const leadership = dedupePoliticiansInGroup([
+        ...stateSplit.statewideCourts,
+        ...stateSplit.executives,
+      ]);
+      if (leadership.length) {
         appendPoliticianSubgroup(
           list,
-          "Statewide executive & legislature",
-          stateSplit.executives,
+          "Statewide Leadership & High Courts",
+          leadership,
           cardOptions,
           level
         );
       }
-      appendPoliticianSubgroup(
-        list,
-        "Statewide Courts (Supreme Court / Court of Criminal Appeals)",
-        stateSplit.statewideCourts,
-        cardOptions,
-        level
-      );
       if (stateSplit.appellateCourts.length) {
         appendPoliticianSubgroup(
           list,
@@ -1446,13 +1514,13 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         const hint = document.createElement("p");
         hint.className = "politician-subgroup-hint";
         hint.textContent =
-          "Enter a street address to see Court of Appeals justices for your appellate district.";
+          "Enter a street address to see Court of Appeals justices for your county.";
         list.append(hint);
       }
       if (stateSplit.localCourts.length) {
         appendPoliticianSubgroup(
           list,
-          "Local District & County Courts",
+          "County District & Trial Courts",
           stateSplit.localCourts,
           cardOptions,
           level
@@ -1681,7 +1749,8 @@ function mountAddressResultsPage({
         ? dedupeLookupPoliticians(lookupResult.data.politicians || []).filter(
             (politician) =>
               politician.source !== "national_officials" &&
-              politician.source !== "state_judges"
+              politician.source !== "state_judges" &&
+              politician.source !== "state_officials"
           )
         : [];
 
@@ -1691,10 +1760,11 @@ function mountAddressResultsPage({
               lookupResult.data.geography?.state ||
               lookupResult.data.state ||
               "",
-            county:
+            county: normalizeCountyName(
               lookupResult.data.geography?.county ||
-              lookupResult.data.county ||
-              "",
+                lookupResult.data.county ||
+                ""
+            ),
             appellateDistricts:
               lookupResult.data.geography?.appellateDistricts || [],
             trialDistricts: lookupResult.data.geography?.trialDistricts || [],
@@ -1703,7 +1773,11 @@ function mountAddressResultsPage({
           }
         : {};
 
-      const stateJudges = await fetchStateJudgesForGeography(geography);
+      const stateOfficials = await fetchStateOfficialsForAddress({
+        state_code: geography.state,
+        county_name: geography.county,
+      });
+      const stateJudges = stateOfficials;
 
       if (
         !uniquePeople.length &&
