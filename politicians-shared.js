@@ -632,11 +632,12 @@ function mapStateOfficialRow(row) {
   const blob = `${titleLower} ${agencyLower}`;
 
   // Prefer "Chief Justice, Texas Supreme Court" when title and agency are split.
-  // Skip appending generic "Executive Branch" — title alone is clearer.
+  // Skip appending generic branch labels — title alone is clearer.
   const officeTitle =
     title &&
     agency &&
     agencyLower !== "executive branch" &&
+    agencyLower !== "legislative branch" &&
     !titleLower.includes(agencyLower)
       ? `${title}, ${agency}`
       : title || agency;
@@ -1089,22 +1090,6 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     );
   };
 
-  // Address-lookup / Civic people — keep out of judicial + executive sections.
-  const civicPeople = group.filter((person) => {
-    if (
-      person.source === "state_officials" ||
-      person.source === "state_judges"
-    ) {
-      return false;
-    }
-    if (isJudicialPerson(person)) return false;
-    if (isStateExecutiveOfficeTitle(person.office_title || person.chamber)) {
-      return false;
-    }
-    if (isCivicLegislator(person)) return false;
-    return !coveredNames.has(normalizePersonName(person.name));
-  });
-
   // Pull civic executives into Executive Branch when address APIs return them.
   const civicExecutives = dedupePoliticiansInGroup(
     group.filter((person) => {
@@ -1146,16 +1131,13 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     ...civicLegislators,
   ]);
 
-  // Other civic state people (rare leftovers).
-  const otherCivic = dedupePoliticiansInGroup(civicPeople);
-
   const hasLocalGeography = Boolean(normalizeCountyName(geography.county));
   const stateCode = normalizeStateCode(geography.state);
   const stateName = stateDisplayName(stateCode);
 
   return {
     executives: executivesWithCivic,
-    legislature: dedupePoliticiansInGroup([...legislature, ...otherCivic]),
+    legislature,
     statewideCourts,
     appellateCourts,
     districtCourts,
@@ -1463,7 +1445,13 @@ function renderPoliticianCard(
       politician.office_title ||
       politician.metadata?.office_title
   );
-  const courtName = readableOfficeTitle(politician.metadata?.court_name);
+  const courtNameRaw = readableOfficeTitle(politician.metadata?.court_name);
+  const courtNameLower = String(courtNameRaw || "").toLowerCase();
+  const courtName =
+    courtNameLower === "executive branch" ||
+    courtNameLower === "legislative branch"
+      ? ""
+      : courtNameRaw;
   const viewForLabel = {
     ...politician,
     chamber: activeOffice?.chamber || politician.chamber,
