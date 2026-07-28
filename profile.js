@@ -219,9 +219,18 @@ function syncAddressView() {
   const hasAddress = Boolean(String(profile.home_address || "").trim());
   const showForm = !hasAddress || editingAddress;
 
-  if (addressForm) addressForm.hidden = !showForm;
-  if (addressSaved) addressSaved.hidden = showForm || !hasAddress;
-  if (addressCancelBtn) addressCancelBtn.hidden = !editingAddress || !hasAddress;
+  if (addressForm) {
+    addressForm.hidden = !showForm;
+    addressForm.classList.toggle("is-hidden", !showForm);
+  }
+  if (addressSaved) {
+    const showSaved = !showForm && hasAddress;
+    addressSaved.hidden = !showSaved;
+    addressSaved.classList.toggle("is-hidden", !showSaved);
+  }
+  if (addressCancelBtn) {
+    addressCancelBtn.hidden = !editingAddress || !hasAddress;
+  }
 
   if (addressSavedValue) {
     addressSavedValue.textContent = profile.home_address || "";
@@ -243,8 +252,15 @@ function syncRegistrationView() {
   const hasStatus = Boolean(status);
   const showForm = !hasStatus || editingRegistration;
 
-  if (registrationForm) registrationForm.hidden = !showForm;
-  if (registrationSaved) registrationSaved.hidden = showForm || !hasStatus;
+  if (registrationForm) {
+    registrationForm.hidden = !showForm;
+    registrationForm.classList.toggle("is-hidden", !showForm);
+  }
+  if (registrationSaved) {
+    const showSaved = !showForm && hasStatus;
+    registrationSaved.hidden = !showSaved;
+    registrationSaved.classList.toggle("is-hidden", !showSaved);
+  }
   if (registrationCancelBtn) {
     registrationCancelBtn.hidden = !editingRegistration || !hasStatus;
   }
