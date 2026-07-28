@@ -621,6 +621,90 @@ async function fetchNationalOfficialsViaRest() {
   return { data: Array.isArray(payload) ? payload : [], error: null };
 }
 
+/** Normalize a politicians-table row into the shape used by result cards. */
+function normalizeStoredPolitician(row) {
+  if (!row) return null;
+  const officeTitle =
+    row.office_title || row.metadata?.office_title || row.chamber || "";
+  const level = row.level || "federal";
+  return {
+    ...row,
+    office_title: officeTitle,
+    metadata: {
+      ...(row.metadata || {}),
+      office_title: officeTitle,
+    },
+    levels: Array.isArray(row.levels)
+      ? row.levels
+      : Array.isArray(row.metadata?.levels)
+        ? row.metadata.levels
+        : [level],
+    offices: Array.isArray(row.offices)
+      ? row.offices
+      : Array.isArray(row.metadata?.offices)
+        ? row.metadata.offices
+        : [
+            {
+              level,
+              chamber: row.chamber || "",
+              office_title: officeTitle,
+              district: row.district || "",
+              source: row.source || "politicians",
+              external_key: row.external_key,
+            },
+          ],
+  };
+}
+
+/**
+ * Nationwide federal executives saved from prior Cicero lookups
+ * (White House / EOP, and any cabinet/agency rows not yet in national_officials).
+ * Address search alone often omits these when Cicero is unavailable.
+ */
+async function fetchStoredFederalExecutives() {
+  if (!isSupabaseConfigured()) return [];
+
+  try {
+    await injectSupabaseScript().catch(() => {});
+    const client = getSupabase();
+    if (client) {
+      const { data, error } = await client
+        .from("politicians")
+        .select("*")
+        .eq("level", "federal")
+        .eq("chamber", "executive")
+        .order("name");
+      if (error) {
+        console.error("stored federal executives error:", error);
+      } else if (Array.isArray(data) && data.length) {
+        return data.map(normalizeStoredPolitician).filter(Boolean);
+      }
+    }
+
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/politicians?select=*&level=eq.federal&chamber=eq.executive&order=name`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      console.error("stored federal executives REST error:", payload);
+      return [];
+    }
+    return (Array.isArray(payload) ? payload : [])
+      .map(normalizeStoredPolitician)
+      .filter(Boolean);
+  } catch (error) {
+    console.error("fetchStoredFederalExecutives failed:", error);
+    return [];
+  }
+}
+
 function normalizeCountyName(value) {
   return String(value || "")
     .replace(/\s+county$/i, "")
@@ -2752,25 +2836,30 @@ function mountAddressResultsPage({
 
       // Nationwide roles never depend on address — always load the full table.
       // Address lookup only supplies district / local officeholders.
-      // State judges are filtered by geography from the same lookup.
-      const [lookupResult, nationalOfficials] = await Promise.all([
-        lookupRepresentatives(address)
-          .then((data) => ({ ok: true, data }))
-          .catch((error) => ({
-            ok: false,
-            error: error?.message || String(error) || "Address lookup failed.",
-          })),
-        fetchNationalOfficials(),
-      ]);
+      // Also pull saved federal executives (White House / EOP) so that section
+      // stays populated when live Cicero NATIONAL_EXEC data is missing.
+      const [lookupResult, nationalOfficials, storedExecutives] =
+        await Promise.all([
+          lookupRepresentatives(address)
+            .then((data) => ({ ok: true, data }))
+            .catch((error) => ({
+              ok: false,
+              error:
+                error?.message || String(error) || "Address lookup failed.",
+            })),
+          fetchNationalOfficials(),
+          fetchStoredFederalExecutives(),
+        ]);
 
-      const uniquePeople = lookupResult.ok
-        ? dedupeLookupPoliticians(lookupResult.data.politicians || []).filter(
-            (politician) =>
-              politician.source !== "national_officials" &&
-              politician.source !== "state_judges" &&
-              politician.source !== "state_officials"
-          )
-        : [];
+      const uniquePeople = dedupeLookupPoliticians([
+        ...(lookupResult.ok ? lookupResult.data.politicians || [] : []),
+        ...storedExecutives,
+      ]).filter(
+        (politician) =>
+          politician.source !== "national_officials" &&
+          politician.source !== "state_judges" &&
+          politician.source !== "state_officials"
+      );
 
       const geography = lookupResult.ok
         ? {
@@ -2859,7 +2948,7 @@ function mountAddressResultsPage({
         geography.stateHouseDistricts?.length || 0;
       const summaryParts = [
         nationalCount
-          ? `${nationalCount} nationwide (Cabinet, agencies, Court)`
+          ? `${nationalCount} nationwide (White House, Cabinet, agencies, Court)`
           : null,
         executiveCount ? `${executiveCount} statewide executives` : null,
         legislatureCount

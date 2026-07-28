@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Your representatives · Congress Bills</title>
-    <link rel="stylesheet" href="styles.css?v=20260727e" />
+    <link rel="stylesheet" href="styles.css?v=20260728h" />
   </head>
   <body>
     <nav id="app-nav" class="app-nav" aria-label="Main">
@@ -36,7 +36,7 @@
       <header class="header">
         <div>
           <p class="eyebrow">
-            <a class="text-link" href="politicians.html">← New search</a>
+            <a class="text-link" href="politicians.html">← Politicians</a>
           </p>
           <h1>Your representatives</h1>
           <p class="subtitle">
@@ -44,6 +44,22 @@
           </p>
         </div>
       </header>
+
+      <section class="lookup-panel" aria-labelledby="results-lookup-heading">
+        <h2 id="results-lookup-heading">Search another address</h2>
+        <form id="address-form" class="keyword-form">
+          <input
+            id="address-input"
+            class="search-bar__input"
+            type="search"
+            name="address"
+            placeholder="Street address or ZIP code"
+            autocomplete="street-address"
+            required
+          />
+          <button class="refresh-btn" type="submit">Look up</button>
+        </form>
+      </section>
 
       <section
         class="lookup-results-panel"
@@ -58,7 +74,7 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js"></script>
-    <script src="politicians-shared.js?v=20260728g"></script>
-    <script src="politicians-results.js?v=20260728d" defer></script>
+    <script src="politicians-shared.js?v=20260728h"></script>
+    <script src="politicians-results.js?v=20260728e" defer></script>
   </body>
 </html>
