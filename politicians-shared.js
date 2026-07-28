@@ -153,6 +153,8 @@ function chamberLabel(chamber, politician = {}) {
       return "U.S. Senate";
     case "executive":
       return "Executive";
+    case "white_house":
+      return "White House / Executive Office";
     case "governor":
       return "Governor";
     case "lieutenant_governor":
@@ -374,47 +376,114 @@ function nationalExecutiveDefaults(fullName) {
   return NATIONAL_EXECUTIVE_DEFAULTS[key] || null;
 }
 
-function classifyNationalOfficial(row) {
-  const category = String(row.category || "").toLowerCase().trim();
-  const title = String(row.title || "").toLowerCase();
-  const department = String(row.department || "").toLowerCase();
-  const blob = `${category} ${title} ${department}`;
+function officeTitleText(personOrTitle) {
+  if (personOrTitle && typeof personOrTitle === "object") {
+    return String(
+      personOrTitle.office_title ||
+        personOrTitle.metadata?.office_title ||
+        personOrTitle.title ||
+        personOrTitle.chamber ||
+        ""
+    );
+  }
+  return String(personOrTitle || "");
+}
 
-  // White House executive — before cabinet heuristics (AG, secretaries, etc.).
+/** True only for the U.S. President or Vice President — not other executive-branch offices. */
+function isPresidentOrVicePresidentTitle(title) {
+  const raw = officeTitleText(title).toLowerCase().replace(/\s+/g, " ").trim();
+  if (!raw) return false;
   if (
+    /pro\s+tempore|president\s+pro|university|college|board|senate|council|company|bank/.test(
+      raw
+    )
+  ) {
+    return false;
+  }
+  if (
+    raw === "vice president" ||
+    /^vice\s+president\b/.test(raw) ||
+    /\bvice\s+president\s+of\s+the\s+united\s+states\b/.test(raw)
+  ) {
+    return true;
+  }
+  if (
+    raw === "president" ||
+    /^president\b/.test(raw) ||
+    /\bpresident\s+of\s+the\s+united\s+states\b/.test(raw)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Classify a federal officeholder into national subgroups.
+ * Used for national_officials rows and Cicero/Geocodio executives saved in politicians.
+ */
+function classifyFederalOfficeGroup(personOrRow) {
+  const category = String(
+    personOrRow?.category || personOrRow?.metadata?.category || ""
+  )
+    .toLowerCase()
+    .trim();
+  const title = officeTitleText(personOrRow).toLowerCase();
+  const department = String(
+    personOrRow?.department || personOrRow?.metadata?.department || ""
+  ).toLowerCase();
+  const blob = `${category} ${title} ${department}`;
+  const existingGroup = String(
+    personOrRow?.metadata?.national_group || ""
+  ).toLowerCase();
+
+  if (
+    existingGroup === "executive" ||
     category === "president" ||
     category === "vice president" ||
-    category.includes("white house") ||
-    category === "executive" ||
-    /\bvice\s+president\b/.test(blob) ||
-    (/\bpresident\b/.test(blob) &&
-      !/pro\s+tempore|president\s+pro|university|college|board/.test(blob))
+    isPresidentOrVicePresidentTitle(title)
   ) {
-    return "executive";
+    // Only the two elected White House principals — never generic "executive" / EOP staff.
+    if (
+      category === "president" ||
+      category === "vice president" ||
+      isPresidentOrVicePresidentTitle(title)
+    ) {
+      return "executive";
+    }
   }
 
-  // Prefer the explicit Supabase category so DOJ / "Justice" titles stay Cabinet.
-  if (category === "agency director" || category.includes("agency director")) {
-    return "agency_director";
-  }
   if (
-    category === "cabinet secretary" ||
-    category.includes("cabinet")
-  ) {
-    return "cabinet";
-  }
-  if (
+    existingGroup === "supreme_court" ||
     category === "supreme court" ||
     category.includes("supreme court") ||
     (category.includes("supreme") && category.includes("justice"))
   ) {
     return "supreme_court";
   }
-
-  // Fallback heuristics only when category is missing/unknown.
-  if (/agency\s+director/.test(blob)) {
+  if (
+    existingGroup === "cabinet" ||
+    category === "cabinet secretary" ||
+    category.includes("cabinet")
+  ) {
+    return "cabinet";
+  }
+  if (
+    existingGroup === "agency_director" ||
+    category === "agency director" ||
+    category.includes("agency director")
+  ) {
     return "agency_director";
   }
+  if (
+    existingGroup === "white_house" ||
+    category.includes("white house") ||
+    category.includes("executive office") ||
+    category === "eop"
+  ) {
+    return "white_house";
+  }
+
+  // Title heuristics (Cicero NATIONAL_EXEC rows often only have chamber=executive).
   if (
     /supreme\s+court|scotus|chief\s+justice/.test(title) ||
     (/\bassociate\s+justice\b|\bjustices?\b/.test(title) &&
@@ -422,30 +491,57 @@ function classifyNationalOfficial(row) {
   ) {
     return "supreme_court";
   }
-  if (/cabinet|secretary of|attorney general/.test(blob)) {
+  if (
+    (/\bsecretary of\b|\battorney general\b/.test(blob) ||
+      /cabinet/.test(blob)) &&
+    !/deputy|assistant|under\s+secretary|acting\s+assistant/.test(title)
+  ) {
     return "cabinet";
   }
+  if (
+    /white\s+house|chief\s+of\s+staff|council of economic advis|office of science and technology|united nations|trade representative|\bustr\b|national security advis|domestic policy council|council on environmental quality|executive office of the president/.test(
+      blob
+    )
+  ) {
+    return "white_house";
+  }
+  if (
+    /agency\s+director|administrator|\bdirector of\b|\bcommissioner\b|national intelligence|\bfbi\b|\bcia\b|\bepa\b|\bfema\b|secret service|\bnasa\b|management and budget|\bomb\b|small business administration/.test(
+      blob
+    )
+  ) {
+    return "agency_director";
+  }
+  if (String(personOrRow?.chamber || "").toLowerCase() === "executive") {
+    // Remaining national EXEC offices (not Congress) → White House / EOP bucket.
+    return "white_house";
+  }
   return "other";
+}
+
+function classifyNationalOfficial(row) {
+  return classifyFederalOfficeGroup(row);
 }
 
 function nationalOfficialChamber(group) {
   if (group === "supreme_court") return "supreme_court";
   if (group === "agency_director") return "agency_director";
   if (group === "executive") return "executive";
+  if (group === "white_house") return "white_house";
   return "cabinet";
 }
 
 function isFederalExecutivePerson(person) {
-  const title = String(
-    person?.office_title || person?.metadata?.office_title || person?.chamber || ""
-  ).toLowerCase();
-  const chamber = String(person?.chamber || "").toLowerCase();
   const group = String(person?.metadata?.national_group || "").toLowerCase();
   if (group === "executive") return true;
-  if (chamber === "executive") return true;
-  if (title.includes("vice president")) return true;
-  if (/\bpresident\b/.test(title) && !title.includes("pro tempore")) return true;
-  return false;
+  return isPresidentOrVicePresidentTitle(person);
+}
+
+/** First + last token only, so "Howard W. Lutnick" matches "Howard Lutnick". */
+function normalizePersonNameLoose(name) {
+  const parts = normalizePersonName(name).split(" ").filter(Boolean);
+  if (parts.length <= 1) return parts.join(" ");
+  return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
 function mapNationalOfficial(row) {
@@ -1349,6 +1445,60 @@ function dedupePoliticiansInGroup(politicians) {
   return unique;
 }
 
+/** Keep a single President and a single Vice President (prefer national_officials). */
+function dedupePresidentVicePresident(politicians) {
+  const byOffice = new Map();
+
+  for (const politician of politicians || []) {
+    if (!isPresidentOrVicePresidentTitle(politician)) continue;
+    const title = officeTitleText(politician).toLowerCase();
+    const officeKey = /vice/.test(title) ? "vice_president" : "president";
+    const existing = byOffice.get(officeKey);
+    if (!existing) {
+      byOffice.set(officeKey, politician);
+      continue;
+    }
+    const preferNext =
+      (politician.source === "national_officials" &&
+        existing.source !== "national_officials") ||
+      (Boolean(politician.photo_url) && !existing.photo_url) ||
+      officeTitleText(politician).length > officeTitleText(existing).length;
+    if (preferNext) byOffice.set(officeKey, politician);
+  }
+
+  const ordered = [];
+  if (byOffice.has("president")) ordered.push(byOffice.get("president"));
+  if (byOffice.has("vice_president")) ordered.push(byOffice.get("vice_president"));
+  return ordered;
+}
+
+function personLastNameKey(name) {
+  const parts = normalizePersonName(name).split(" ").filter(Boolean);
+  return parts[parts.length - 1] || "";
+}
+
+/** Collapse nickname / fuller-name duplicates within a national subgroup. */
+function preferNationalOfficialsByLastName(politicians) {
+  const byLast = new Map();
+  for (const politician of politicians || []) {
+    const last = personLastNameKey(politician.name);
+    if (!last) continue;
+    const existing = byLast.get(last);
+    if (!existing) {
+      byLast.set(last, politician);
+      continue;
+    }
+    const preferNext =
+      (politician.source === "national_officials" &&
+        existing.source !== "national_officials") ||
+      (Boolean(politician.photo_url) && !existing.photo_url);
+    if (preferNext) byLast.set(last, politician);
+  }
+  return [...byLast.values()].sort((a, b) =>
+    String(a.name).localeCompare(String(b.name))
+  );
+}
+
 function appendPoliticianSubgroup(
   list,
   heading,
@@ -1990,65 +2140,124 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           )
         : [];
 
-    const cabinet = level === "federal"
-      ? dedupePoliticiansInGroup(
-          nationalOfficials.filter((p) => p.metadata?.national_group === "cabinet")
-        )
-      : [];
-    const agencyDirectors = level === "federal"
-      ? dedupePoliticiansInGroup(
-          nationalOfficials.filter(
-            (p) => p.metadata?.national_group === "agency_director"
-          )
-        )
-      : [];
-    const justices = level === "federal"
-      ? dedupePoliticiansInGroup(
-          nationalOfficials.filter(
-            (p) => p.metadata?.national_group === "supreme_court"
-          )
-        )
-      : [];
-    const nationalExecutives = level === "federal"
-      ? dedupePoliticiansInGroup(
-          nationalOfficials.filter(
-            (p) => p.metadata?.national_group === "executive"
-          )
-        )
-      : [];
-    const otherNational = level === "federal"
-      ? dedupePoliticiansInGroup(
-          nationalOfficials.filter((p) => p.metadata?.national_group === "other")
-        )
-      : [];
+    const nationalByGroup = (groupName) =>
+      nationalOfficials.filter((p) => {
+        const group =
+          p.metadata?.national_group || classifyFederalOfficeGroup(p);
+        return group === groupName;
+      });
 
-    // Keep address-based federal officials out of national subgroups by name.
-    const nationalNames = new Set(
+    let cabinet =
+      level === "federal"
+        ? dedupePoliticiansInGroup(nationalByGroup("cabinet"))
+        : [];
+    let agencyDirectors =
+      level === "federal"
+        ? dedupePoliticiansInGroup(nationalByGroup("agency_director"))
+        : [];
+    let justices =
+      level === "federal"
+        ? dedupePoliticiansInGroup(nationalByGroup("supreme_court"))
+        : [];
+    let whiteHouse =
+      level === "federal"
+        ? dedupePoliticiansInGroup(nationalByGroup("white_house"))
+        : [];
+    let nationalExecutives =
+      level === "federal"
+        ? dedupePoliticiansInGroup(nationalByGroup("executive"))
+        : [];
+    let otherNational =
+      level === "federal"
+        ? dedupePoliticiansInGroup(nationalByGroup("other"))
+        : [];
+
+    // Keep address-based federal officials out of national subgroups by name
+    // (loose match drops middle initials so "Howard W. Lutnick" ≈ "Howard Lutnick").
+    const nationalNameKeys = new Set(
       [
         ...nationalExecutives,
         ...cabinet,
         ...agencyDirectors,
         ...justices,
+        ...whiteHouse,
         ...otherNational,
-      ].map((p) => normalizePersonName(p.name))
+      ].flatMap((p) => {
+        const exact = normalizePersonName(p.name);
+        const loose = normalizePersonNameLoose(p.name);
+        return exact === loose ? [exact] : [exact, loose];
+      })
     );
+    const matchesNationalName = (person) => {
+      const exact = normalizePersonName(person.name);
+      const loose = normalizePersonNameLoose(person.name);
+      return nationalNameKeys.has(exact) || nationalNameKeys.has(loose);
+    };
+
     const addressFederal = dedupePoliticiansInGroup(
-      group.filter((p) => !nationalNames.has(normalizePersonName(p.name)))
+      group.filter((p) => !matchesNationalName(p))
     );
-    const addressExecutives = dedupePoliticiansInGroup(
-      addressFederal.filter(isFederalExecutivePerson)
-    );
-    const executiveNames = new Set(
-      addressExecutives.map((p) => normalizePersonName(p.name))
-    );
+
+    // Route Cicero/Geocodio NATIONAL_EXEC rows into the right federal subgroups
+    // instead of dumping every chamber=executive into President & VP.
+    const addressByGroup = {
+      executive: [],
+      cabinet: [],
+      agency_director: [],
+      white_house: [],
+      supreme_court: [],
+      other: [],
+    };
+    const routedKeys = new Set();
+    for (const person of addressFederal) {
+      const groupName = classifyFederalOfficeGroup(person);
+      if (
+        groupName === "executive" ||
+        groupName === "cabinet" ||
+        groupName === "agency_director" ||
+        groupName === "white_house" ||
+        groupName === "supreme_court"
+      ) {
+        addressByGroup[groupName].push(person);
+        routedKeys.add(personIdentityKey(person));
+      } else if (String(person.chamber || "").toLowerCase() === "executive") {
+        addressByGroup.white_house.push(person);
+        routedKeys.add(personIdentityKey(person));
+      }
+    }
+
     const localGroup = dedupePoliticiansInGroup(
-      addressFederal.filter(
-        (p) => !executiveNames.has(normalizePersonName(p.name))
-      )
+      addressFederal.filter((p) => !routedKeys.has(personIdentityKey(p)))
     );
-    const executives = dedupePoliticiansInGroup([
+
+    cabinet = dedupePoliticiansInGroup([
+      ...cabinet,
+      ...addressByGroup.cabinet,
+    ]);
+    agencyDirectors = dedupePoliticiansInGroup([
+      ...agencyDirectors,
+      ...addressByGroup.agency_director,
+    ]);
+    justices = dedupePoliticiansInGroup([
+      ...justices,
+      ...addressByGroup.supreme_court,
+    ]);
+    whiteHouse = dedupePoliticiansInGroup([
+      ...whiteHouse,
+      ...addressByGroup.white_house,
+    ]);
+
+    // Prefer seeded national_officials when Cicero uses a nickname / fuller name
+    // for the same last name in the same subgroup (e.g. Russ vs Russell Vought).
+    cabinet = preferNationalOfficialsByLastName(cabinet);
+    agencyDirectors = preferNationalOfficialsByLastName(agencyDirectors);
+    justices = preferNationalOfficialsByLastName(justices);
+    whiteHouse = preferNationalOfficialsByLastName(whiteHouse);
+
+    // President & VP: prefer national_officials; only one person per office title.
+    const executives = dedupePresidentVicePresident([
       ...nationalExecutives,
-      ...addressExecutives,
+      ...addressByGroup.executive,
     ]);
 
     const stateSplit =
@@ -2067,6 +2276,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       level === "federal"
         ? localGroup.length +
           executives.length +
+          whiteHouse.length +
           cabinet.length +
           agencyDirectors.length +
           justices.length +
@@ -2154,6 +2364,13 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           level
         );
       }
+      appendPoliticianSubgroup(
+        list,
+        "White House & Executive Office",
+        whiteHouse,
+        cardOptions,
+        level
+      );
       appendPoliticianSubgroup(
         list,
         "Cabinet Secretaries",
