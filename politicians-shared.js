@@ -1870,11 +1870,14 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   const forceFederal = nationalOfficials.length > 0;
   const forceState =
     stateJudges.length > 0 || Boolean(String(geography.state || "").trim());
+  const forceCity =
+    localOfficials.length > 0 || Boolean(String(geography.city || "").trim());
   let availableLevels = DISPLAY_LEVEL_ORDER.filter(
     (level) =>
       (byLevel.get(level) || []).length > 0 ||
       (level === "federal" && forceFederal) ||
-      (level === "state" && forceState)
+      (level === "state" && forceState) ||
+      (level === "city" && forceCity)
   );
 
   if (!availableLevels.length) {
@@ -2075,9 +2078,17 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
             stateSplit.appellateCourts.length +
             stateSplit.districtCourts.length +
             stateSplit.countyCourts.length
+          : level === "city"
+            ? dedupePoliticiansInGroup([...dbLocalGroup, ...group]).length
           : group.length;
     // Keep State visible when we have a state code so empty judicial placeholders can show.
-    if (!totalCount && !(level === "state" && stateSplit?.stateCode)) continue;
+    if (
+      !totalCount &&
+      !(level === "state" && stateSplit?.stateCode) &&
+      !(level === "city" && geography.city)
+    ) {
+      continue;
+    }
 
     const section = document.createElement("section");
     section.className = "politician-level-group";
