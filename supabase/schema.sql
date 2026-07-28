@@ -24,6 +24,7 @@ alter table public.profiles add column if not exists notify_critical boolean;
 alter table public.profiles add column if not exists notify_digest text;
 alter table public.profiles add column if not exists notify_neighborhood boolean;
 alter table public.profiles add column if not exists voter_registration_status text;
+alter table public.profiles add column if not exists last_digest_sent_at timestamptz;
 create unique index if not exists profiles_username_lower_idx
   on public.profiles (lower(username))
   where username is not null;
@@ -45,11 +46,13 @@ create table if not exists public.notifications (
   bill_number text not null,
   bill_title text not null,
   matched_topic text not null,
-  matched_kind text not null check (matched_kind in ('policy_area', 'keyword')),
+  matched_kind text not null check (matched_kind in ('policy_area', 'keyword', 'critical', 'digest', 'neighborhood')),
+  category text default 'topic' check (category in ('topic', 'critical', 'digest', 'neighborhood')),
   action_text text,
   action_date text,
   summary_excerpt text,
   update_fingerprint text not null,
+  email_sent_at timestamptz,
   read_at timestamptz,
   created_at timestamptz not null default now(),
   unique (user_id, update_fingerprint)

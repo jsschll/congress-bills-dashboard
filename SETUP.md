@@ -15,6 +15,7 @@
    - For civic profile preferences, also run [`supabase/migration-profile-civic-prefs.sql`](supabase/migration-profile-civic-prefs.sql)
    - For the civic action tracker, also run [`supabase/migration-civic-actions.sql`](supabase/migration-civic-actions.sql)
    - For voter registration status on Profile, also run [`supabase/migration-voter-registration-status.sql`](supabase/migration-voter-registration-status.sql)
+   - For notification delivery categories/email tracking, also run [`supabase/migration-notification-delivery.sql`](supabase/migration-notification-delivery.sql)
    - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
 5. Project Settings → API: copy Project URL and the **anon / publishable** key
 
@@ -34,8 +35,13 @@ Set these for Production/Preview (Project Settings → Environment Variables, th
 - `CICERO_API_KEY` — recommended for city, county, school board, governors, AGs, mayors, and judges ([Cicero free trial](https://www.cicerodata.com/api/)). The lookup API queries NATIONAL/STATE/LOCAL/COUNTY/SCHOOL/JUDICIAL district types.
 - `GOOGLE_CIVIC_API_KEY` — optional for Politicians lookup; **required for live Election & Voting Center** polling places / contests (Representatives API was turned down in April 2025, but Elections + voterinfo still work)
 - `OPENSTATES_API_KEY` — state bill feed + optional enrichment for state / municipal officials ([Open States](https://openstates.org/accounts/login/))
+- `RESEND_API_KEY` — required for notification **email** delivery (critical alerts + digests). Get a key at [resend.com](https://resend.com)
+- `NOTIFY_FROM_EMAIL` — optional verified sender, e.g. `Congress Bills <alerts@yourdomain.com>` (defaults to Resend onboarding sender)
+- `SITE_URL` — optional canonical site URL used in email links
 
-Cron runs `/api/watch-bills` once daily at midnight UTC (`vercel.json`).
+Cron jobs (`vercel.json`):
+- `/api/watch-bills` daily at 00:00 UTC — topic matches, critical floor-vote alerts, neighborhood municipal samples
+- `/api/deliver-notifications` daily at 01:30 UTC — emails unsent critical alerts and sends daily/weekly digests per profile prefs
 
 ## 4. Politicians feature
 1. Run [`supabase/migration-politicians.sql`](supabase/migration-politicians.sql)
@@ -55,7 +61,7 @@ Cron runs `/api/watch-bills` once daily at midnight UTC (`vercel.json`).
 5. Following lists topics, politicians, and bills with unfollow controls
 6. Civic action tracker: private bill notes + representative contact log ([`supabase/migration-civic-actions.sql`](supabase/migration-civic-actions.sql))
 7. Election & voting center: upcoming elections, polling/early-vote sites, Vote.gov + state links, self-reported registration status, and ballot/hearing cues from followed bills (`/api/voter-info`, [`supabase/migration-voter-registration-status.sql`](supabase/migration-voter-registration-status.sql))
-8. Notification delivery (email/push) still wires up later from saved prefs
+8. Notification delivery: critical floor-vote alerts, daily/weekly digests, and neighborhood municipal alerts respect Profile toggles ([`supabase/migration-notification-delivery.sql`](supabase/migration-notification-delivery.sql)). In-app always; email when `RESEND_API_KEY` is set.
 
 ## 5. Auth flow
 1. Sign up with username, email, and password

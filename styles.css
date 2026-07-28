@@ -883,15 +883,29 @@ body {
 }
 
 .feed-card__topic {
-  align-self: flex-start;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  display: inline-block;
+  font-size: 0.78rem;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #3730a3;
+  background: #eef2ff;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+}
+
+.feed-card__topic.is-critical {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.feed-card__topic.is-digest {
+  color: #1e3a8a;
+  background: #dbeafe;
+}
+
+.feed-card__topic.is-neighborhood {
+  color: #065f46;
+  background: #d1fae5;
 }
 
 .feed-card__title {

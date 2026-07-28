@@ -18,6 +18,10 @@ function renderFeedCard(item, { highlight = false, suggestion = false } = {}) {
 
   const topic = document.createElement("span");
   topic.className = "feed-card__topic";
+  const category = item.category || item.matched_kind || "";
+  if (category === "critical") topic.classList.add("is-critical");
+  if (category === "digest") topic.classList.add("is-digest");
+  if (category === "neighborhood") topic.classList.add("is-neighborhood");
   topic.textContent = item.matched_topic || item.suggestion_topic || "Update";
 
   const title = document.createElement("h2");

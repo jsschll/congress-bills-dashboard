@@ -177,6 +177,9 @@ async function renderAppNav(activePage = "home") {
           item.action_text || "Updated"
         )}</span>
       `;
+      if (item.category === "critical") link.classList.add("is-critical");
+      if (item.category === "digest") link.classList.add("is-digest");
+      if (item.category === "neighborhood") link.classList.add("is-neighborhood");
       link.addEventListener("click", async (event) => {
         event.preventDefault();
         await markNotificationRead(item.id);

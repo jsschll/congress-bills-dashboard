@@ -3,6 +3,10 @@
     {
       "path": "/api/watch-bills",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/deliver-notifications",
+      "schedule": "30 1 * * *"
     }
   ]
 }
