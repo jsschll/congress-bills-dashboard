@@ -541,7 +541,7 @@ module.exports = async function handler(req, res) {
 
   try {
     let federalItems = [];
-    let federalCoverage = "ready (needs CONGRESS_API_KEY)";
+    let federalCoverage = "coming soon";
     if (apiKey) {
       federalItems = await fetchFederalBills(apiKey, limit);
       federalCoverage = "live";
@@ -568,7 +568,7 @@ module.exports = async function handler(req, res) {
     if (!merged.length) {
       return json(res, 500, {
         error:
-          "Missing CONGRESS_API_KEY. Set it in Vercel Project Settings → Environment Variables, then redeploy.",
+          "Bill updates are temporarily unavailable. Please try again shortly.",
       });
     }
 
@@ -582,7 +582,7 @@ module.exports = async function handler(req, res) {
           ? stateFilter
             ? `live (${jurisdictionNameForStateCode(stateFilter) || stateFilter})`
             : "live (selected jurisdictions)"
-          : "ready (needs OpenStates key)",
+          : "coming soon",
         City: "sample (curated)",
         District: "sample (curated)",
       },

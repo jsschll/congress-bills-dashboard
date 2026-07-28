@@ -146,8 +146,23 @@ function coverageTone(level, status) {
   if (value.includes("live") || value.includes("sample") || value.includes("client")) {
     return "is-live";
   }
-  if (value.includes("planned") || value.includes("ready")) return "is-planned";
+  if (
+    value.includes("planned") ||
+    value.includes("ready") ||
+    value.includes("coming soon")
+  ) {
+    return "is-planned";
+  }
   return "";
+}
+
+function friendlyCoverageLabel(level, status) {
+  const value = String(status || "").toLowerCase();
+  if (value.includes("live")) return "Live";
+  if (value.includes("sample") || value.includes("curated")) return "Sample";
+  if (value.includes("client")) return "Live";
+  if (value.includes("planned") || value.includes("ready")) return "Coming soon";
+  return status || "Unavailable";
 }
 
 function renderCoverageBadges(coverage = {}) {
@@ -155,7 +170,7 @@ function renderCoverageBadges(coverage = {}) {
     ...Object.entries(coverage).map(([level, status]) => {
       const badge = document.createElement("span");
       badge.className = `policy-feed-coverage__badge ${coverageTone(level, status)}`;
-      badge.textContent = `${level}: ${status}`;
+      badge.textContent = `${level}: ${friendlyCoverageLabel(level, status)}`;
       return badge;
     })
   );
@@ -164,14 +179,14 @@ function renderCoverageBadges(coverage = {}) {
 function coverageSummaryText(coverage = {}) {
   const federal = String(coverage.Federal || "").toLowerCase();
   const state = String(coverage.State || "").toLowerCase();
-  if (federal.includes("ready")) {
-    return "Set CONGRESS_API_KEY in Vercel to enable the live federal feed. City and District sample items are shown for now.";
+  if (federal.includes("ready") || federal.includes("planned")) {
+    return "Federal live updates are temporarily limited. City and District sample items are shown for now.";
   }
   if (state.includes("live")) {
     return "Federal and state feeds are live. City and District currently use curated sample items.";
   }
-  if (state.includes("ready")) {
-    return "Federal feed is live. Add OPENSTATES_API_KEY on Vercel for state bills. City and District use curated samples.";
+  if (state.includes("ready") || state.includes("planned")) {
+    return "Federal feed is live. State bills are limited right now. City and District use curated samples.";
   }
   return "Showing available bill and policy updates across covered levels.";
 }
@@ -317,7 +332,7 @@ async function saveHomeAddress(address) {
 async function fetchClientFederalFeed(limit = 12) {
   if (typeof API_KEY === "undefined" || !API_KEY || API_KEY.includes("YOUR_")) {
     throw new Error(
-      "Missing CONGRESS_API_KEY on the server and no client API_KEY in config.js."
+      "Federal bill updates are unavailable right now. Try again shortly."
     );
   }
 
@@ -391,9 +406,9 @@ async function fetchBillsFeedPayload(limit = 16, stateCode = "") {
     generatedAt: new Date().toISOString(),
     coverage: {
       Federal: "live (client fallback)",
-      State: "ready (needs OpenStates key on server)",
-      City: "planned",
-      District: "planned",
+      State: "coming soon",
+      City: "sample (curated)",
+      District: "sample (curated)",
     },
     items: clientItems,
     warning: lastError?.message || null,
