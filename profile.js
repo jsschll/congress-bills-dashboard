@@ -1056,6 +1056,29 @@ actionsLog?.addEventListener("click", async (event) => {
   }
 });
 
+registrationForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const status =
+    registrationForm.querySelector(
+      'input[name="voter_registration_status"]:checked'
+    )?.value || "";
+  if (!status) {
+    setProfileStatus("Choose a registration status.", "error");
+    return;
+  }
+  setProfileStatus("Saving registration status…", "loading");
+  try {
+    await saveProfilePatch({ voter_registration_status: status });
+    setProfileStatus("Registration status saved.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(
+      error.message || "Could not save registration status.",
+      "error"
+    );
+  }
+});
+
 (async function initProfilePage() {
   await bootNav("profile");
   currentUser = await getUser();
@@ -1070,14 +1093,15 @@ actionsLog?.addEventListener("click", async (event) => {
     profile = await loadProfileRow(currentUser.id);
     fillFormsFromProfile();
     await Promise.all([
-      loadFollows(),
+      loadFollows().then(() => renderBallotCues()),
       loadRepresentation(),
       loadCivicActions().catch((error) => {
         console.warn(error);
         if (actionsLog) {
-          actionsLog.innerHTML = `<li class="profile-follow-list__empty">Run migration-civic-actions.sql in Supabase to enable the action tracker.</li>`;
+          actionsLog.innerHTML = "<li class=\"profile-follow-list__empty\">Run migration-civic-actions.sql in Supabase to enable the action tracker.</li>";
         }
       }),
+      loadElectionCenter(),
     ]);
     setProfileStatus("", "success");
   } catch (error) {
