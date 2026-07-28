@@ -1,6 +1,42 @@
-# Judge data — published to cloud Supabase
+# Judge / official data — published to cloud Supabase
 
-## Full Texas load (mapping + high courts) — do this first
+## All 50 states — Executive Branch (start here)
+
+File: [`../supabase/seed-state-executives.sql`](../supabase/seed-state-executives.sql)
+
+Seeds **Governor, Lieutenant Governor, Attorney General, Secretary of State, and Treasurer** (or treasury equivalent) for every state, with **name, title, party, photo**.
+
+1. Open Supabase → **SQL Editor** → New query  
+2. Open that `.sql` file → **Select All → Copy**  
+3. Paste into Supabase → **Run**  
+4. Confirm:
+
+```sql
+select count(*) from state_officials where court_or_agency = 'Executive Branch';
+-- expect ~240+
+
+select state_code, title, full_name, party
+from state_officials
+where court_or_agency = 'Executive Branch' and state_code = 'TX'
+order by title;
+```
+
+UI: State tab → **Executive Branch**.
+
+Notes:
+- A few states have no Lt. Governor (AZ, ME, NH, OR, WY) or no Treasurer (AK, HI).
+- Some offices are appointed; still included when they exist.
+- Photos come from Wikipedia when a free portrait is available.
+
+Regenerate from source (optional):
+```powershell
+node scripts/generate-state-executives-seed.js
+node scripts/json-to-state-executives-sql.js
+```
+
+---
+
+## Full Texas load (mapping + high courts)
 
 File: [`../supabase/seed-tx-all-mapping-and-high-courts.sql`](../supabase/seed-tx-all-mapping-and-high-courts.sql)
 
@@ -18,10 +54,10 @@ select level, count(*) from state_officials where state_code = 'TX' group by lev
 
 What it loads:
 - **All 254 TX counties** → appellate + judicial district numbers  
-- **Statewide** (Supreme Court, Court of Criminal Appeals, Governor)  
+- **Statewide** (Supreme Court, Court of Criminal Appeals)  
 - **Appellate** chief justices for Courts of Appeals 1–14 (+ some 14th Court justices)
 
-What it does **not** wipe: your existing **District** / **County/Magistrate** rows (e.g. Fort Bend).
+What it does **not** wipe: your existing **District** / **County/Magistrate** rows (e.g. Fort Bend). Prefer running the **Executive Branch** seed separately (above) for governors/AGs.
 
 ---
 
@@ -55,6 +91,7 @@ Friends hard-refresh and search — they hit the same cloud DB.
 
 | Path | Purpose |
 |------|---------|
+| `state-executives.json` | Generated 50-state executive roster |
 | `tx-county-mapping.csv` | County → appellate/judicial districts |
 | `tx-statewide.csv` | Statewide courts / leadership |
 | `tx-appellate.csv` | Courts of Appeals |

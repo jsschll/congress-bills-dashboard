@@ -286,71 +286,76 @@ function main() {
     .join(",\n");
 
   // High courts — current as of mid-2026 (update as seats change)
+  // [full_name, title, court_or_agency]
   const statewide = [
-    ["Jimmy Blacklock", "Chief Justice, Supreme Court of Texas"],
-    ["James P. Sullivan", "Justice, Supreme Court of Texas"],
-    ["Debra Lehrmann", "Justice, Supreme Court of Texas"],
-    ["Jeffrey S. Boyd", "Justice, Supreme Court of Texas"],
-    ["John Devine", "Justice, Supreme Court of Texas"],
-    ["Jane Bland", "Justice, Supreme Court of Texas"],
-    ["Rebeca Huddle", "Justice, Supreme Court of Texas"],
-    ["Evan Young", "Justice, Supreme Court of Texas"],
-    ["Brett Busby", "Justice, Supreme Court of Texas"],
-    ["Sharon Keller", "Presiding Judge, Texas Court of Criminal Appeals"],
-    ["Barbara Hervey", "Judge, Texas Court of Criminal Appeals"],
-    ["Bert Richardson", "Judge, Texas Court of Criminal Appeals"],
-    ["Kevin Yeary", "Judge, Texas Court of Criminal Appeals"],
-    ["David Newell", "Judge, Texas Court of Criminal Appeals"],
-    ["Mary Lou Keel", "Judge, Texas Court of Criminal Appeals"],
-    ["Scott Walker", "Judge, Texas Court of Criminal Appeals"],
-    ["Jesse McClure", "Judge, Texas Court of Criminal Appeals"],
-    ["Gina Parker", "Judge, Texas Court of Criminal Appeals"],
-    ["Greg Abbott", "Governor of Texas"],
-  ].filter(([, title]) => title);
+    ["Jimmy Blacklock", "Chief Justice", "Texas Supreme Court"],
+    ["James P. Sullivan", "Justice", "Texas Supreme Court"],
+    ["Debra Lehrmann", "Justice", "Texas Supreme Court"],
+    ["Jeffrey S. Boyd", "Justice", "Texas Supreme Court"],
+    ["John Devine", "Justice", "Texas Supreme Court"],
+    ["Jane Bland", "Justice", "Texas Supreme Court"],
+    ["Rebeca Huddle", "Justice", "Texas Supreme Court"],
+    ["Evan Young", "Justice", "Texas Supreme Court"],
+    ["Brett Busby", "Justice", "Texas Supreme Court"],
+    ["Sharon Keller", "Presiding Judge", "Texas Court of Criminal Appeals"],
+    ["Barbara Hervey", "Judge", "Texas Court of Criminal Appeals"],
+    ["Bert Richardson", "Judge", "Texas Court of Criminal Appeals"],
+    ["Kevin Yeary", "Judge", "Texas Court of Criminal Appeals"],
+    ["David Newell", "Judge", "Texas Court of Criminal Appeals"],
+    ["Mary Lou Keel", "Judge", "Texas Court of Criminal Appeals"],
+    ["Scott Walker", "Judge", "Texas Court of Criminal Appeals"],
+    ["Jesse McClure", "Judge", "Texas Court of Criminal Appeals"],
+    ["Gina Parker", "Judge", "Texas Court of Criminal Appeals"],
+    // Statewide executive officers (shown under Legislature / Statewide Officers)
+    ["Greg Abbott", "Governor", "Office of the Governor"],
+    ["Dan Patrick", "Lieutenant Governor", "Office of the Lieutenant Governor"],
+    ["Ken Paxton", "Attorney General", "Office of the Attorney General"],
+    ["Jane Nelson", "Secretary of State", "Office of the Secretary of State"],
+  ];
 
-  // Chief justices of Courts of Appeals 1–14 (seed; expand places later)
+  // [district, full_name, title, court_or_agency]
+  // Chiefs for all 14 courts; fuller benches for 1st & 14th (Houston / Fort Bend).
   const appellateOfficials = [
-    [1, "Terry Adams", "Chief Justice, First Court of Appeals"],
-    [2, "Bonnie Sudderth", "Chief Justice, Second Court of Appeals"],
-    [3, "Darlene Byrne", "Chief Justice, Third Court of Appeals"],
-    [4, "Rebeca Martinez", "Chief Justice, Fourth Court of Appeals"],
-    [5, "J. Brett Busby", "Chief Justice, Fifth Court of Appeals"], // may be outdated - use common
-    [5, "J.J. Koch", "Chief Justice, Fifth Court of Appeals"],
-    [6, "Scott Stevens", "Chief Justice, Sixth Court of Appeals"],
-    [7, "Brian Quinn", "Chief Justice, Seventh Court of Appeals"],
-    [8, "Maria Salas Mendoza", "Chief Justice, Eighth Court of Appeals"],
-    [9, "Scott Golemon", "Chief Justice, Ninth Court of Appeals"],
-    [10, "Tom Gray", "Chief Justice, Tenth Court of Appeals"],
-    [11, "John Bailey", "Chief Justice, Eleventh Court of Appeals"],
-    [12, "Jim Worthen", "Chief Justice, Twelfth Court of Appeals"],
-    [13, "Gina Benavides", "Chief Justice, Thirteenth Court of Appeals"],
-    [14, "Tracy Christopher", "Chief Justice, Fourteenth Court of Appeals"],
+    [1, "Terry Adams", "Chief Justice", "First Court of Appeals"],
+    [1, "Veronica Rivas-Molloy", "Justice", "First Court of Appeals"],
+    [1, "Amparo Guerra", "Justice", "First Court of Appeals"],
+    [1, "David M. Gunn", "Justice", "First Court of Appeals"],
+    [1, "Kristin Guiney", "Justice", "First Court of Appeals"],
+    [1, "Clint Morgan", "Justice", "First Court of Appeals"],
+    [1, "Andrew Johnson", "Justice", "First Court of Appeals"],
+    [1, "Susanna Dokupil", "Justice", "First Court of Appeals"],
+    [2, "Bonnie Sudderth", "Chief Justice", "Second Court of Appeals"],
+    [3, "Darlene Byrne", "Chief Justice", "Third Court of Appeals"],
+    [4, "Rebeca Martinez", "Chief Justice", "Fourth Court of Appeals"],
+    [5, "J.J. Koch", "Chief Justice", "Fifth Court of Appeals"],
+    [6, "Scott Stevens", "Chief Justice", "Sixth Court of Appeals"],
+    [7, "Brian Quinn", "Chief Justice", "Seventh Court of Appeals"],
+    [8, "Maria Salas Mendoza", "Chief Justice", "Eighth Court of Appeals"],
+    [9, "Scott Golemon", "Chief Justice", "Ninth Court of Appeals"],
+    [10, "Tom Gray", "Chief Justice", "Tenth Court of Appeals"],
+    [11, "John Bailey", "Chief Justice", "Eleventh Court of Appeals"],
+    [12, "Jim Worthen", "Chief Justice", "Twelfth Court of Appeals"],
+    [13, "Gina Benavides", "Chief Justice", "Thirteenth Court of Appeals"],
+    [14, "Tracy Christopher", "Chief Justice", "Fourteenth Court of Appeals"],
+    [14, "Kevin Jewell", "Justice (Place 2)", "Fourteenth Court of Appeals"],
+    [14, "Randy Wilson", "Justice (Place 3)", "Fourteenth Court of Appeals"],
+    [14, "Charles Spain", "Justice (Place 4)", "Fourteenth Court of Appeals"],
+    [14, "Frances Bourliot", "Justice (Place 5)", "Fourteenth Court of Appeals"],
   ];
-
-  // Deduplicate fifth court - keep Goldstein as more likely current
-  const appellateClean = appellateOfficials.filter(
-    ([d, name]) => !(d === 5 && name.includes("Busby"))
-  );
-
-  // Existing Fort Bend appellate justices from user's DB
-  const extraAppellate = [
-    [14, "Kevin Jewell", "Justice (Place 2), Fourteenth Court of Appeals"],
-    [14, "Charles Spain", "Justice (Place 4), Fourteenth Court of Appeals"],
-    [14, "Frances Bourliot", "Justice (Place 5), Fourteenth Court of Appeals"],
-    [14, "Randy Wilson", "Justice (Place 3), Fourteenth Court of Appeals"],
-  ];
-
-  const allAppellate = [...appellateClean, ...extraAppellate];
 
   const officialInserts = [];
-  for (const [name, title] of statewide) {
+  for (const [name, title, agency] of statewide) {
     officialInserts.push(
-      `  (${sqlString(name)}, ${sqlString(title)}, 'Statewide', 'TX', NULL, NULL)`
+      `  (${sqlString(name)}, ${sqlString(title)}, ${sqlString(
+        agency
+      )}, 'Statewide', 'TX', NULL, NULL)`
     );
   }
-  for (const [district, name, title] of allAppellate) {
+  for (const [district, name, title, agency] of appellateOfficials) {
     officialInserts.push(
-      `  (${sqlString(name)}, ${sqlString(title)}, 'Appellate', 'TX', ${district}, NULL)`
+      `  (${sqlString(name)}, ${sqlString(title)}, ${sqlString(
+        agency
+      )}, 'Appellate', 'TX', ${district}, NULL)`
     );
   }
 
@@ -378,7 +383,7 @@ where state_code = 'TX'
 
 -- ===== C) Insert Statewide + Appellate =====
 insert into public.state_officials (
-  full_name, title, level, state_code, district_number, county_name
+  full_name, title, court_or_agency, level, state_code, district_number, county_name
 )
 values
 ${officialInserts.join(",\n")};
