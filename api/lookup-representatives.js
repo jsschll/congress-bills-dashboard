@@ -353,6 +353,191 @@ function mapStateLegislator(legislator, state, district, chamberHint) {
   };
 }
 
+function looksLikePlaceQuery(query = "") {
+  const text = String(query || "").trim();
+  if (!text) return false;
+  // Street addresses usually include a leading house number.
+  if (/^\d+\s+\S/.test(text)) return false;
+  // Bare ZIP / ZIP+4 — treat as place-like broad lookup.
+  if (/^\d{5}(?:-\d{4})?$/.test(text)) return true;
+  // "City, ST" or plain city name.
+  if (/^[A-Za-z][A-Za-z.'\-\s]+(?:,\s*[A-Za-z]{2})?$/.test(text)) return true;
+  return !/\d/.test(text);
+}
+
+function isPlaceGeocodeResult(result) {
+  if (!result) return false;
+  const accuracy = String(result.accuracy_type || "").toLowerCase();
+  if (["place", "city", "county", "state"].includes(accuracy)) return true;
+  const components = result.address_components || {};
+  const hasStreet =
+    Boolean(components.number || components.street || components.formatted_street) ||
+    /^\d+\s+\S/.test(String(result.formatted_address || ""));
+  return !hasStreet && Boolean(components.city || components.place);
+}
+
+function placeDisplayLabel(components = {}, fallback = "") {
+  const city = String(components.city || components.place || "").trim();
+  const state = String(components.state || "").toUpperCase();
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  // Strip ZIP from Geocodio place fallbacks like "San Diego, CA 92101".
+  const cleaned = String(fallback || "")
+    .replace(/\s+\d{5}(?:-\d{4})?\s*$/, "")
+    .trim();
+  return cleaned || fallback || null;
+}
+
+function extractStateLegDistrictsFromFields(fields = {}) {
+  const stateLeg = fields.state_legislative_districts || {};
+  const stateBuckets = [
+    { key: "senate", chamber: "state_senate" },
+    { key: "house", chamber: "state_house" },
+    { key: "upper", chamber: "state_senate" },
+    { key: "lower", chamber: "state_house" },
+  ];
+  const stateSenateDistricts = [];
+  const stateHouseDistricts = [];
+
+  for (const bucket of stateBuckets) {
+    const entries = stateLeg[bucket.key];
+    const list = Array.isArray(entries) ? entries : entries ? [entries] : [];
+    for (const entry of list) {
+      const districtKey = String(entry.district_number || entry.name || "").trim();
+      if (!districtKey) continue;
+      if (bucket.chamber === "state_senate") {
+        if (!stateSenateDistricts.includes(districtKey)) {
+          stateSenateDistricts.push(districtKey);
+        }
+      } else if (!stateHouseDistricts.includes(districtKey)) {
+        stateHouseDistricts.push(districtKey);
+      }
+    }
+  }
+  return { stateSenateDistricts, stateHouseDistricts };
+}
+
+function samplePointsInBbox(bbox, maxPoints = 49) {
+  let [south, north, west, east] = bbox.map(Number);
+  if (![south, north, west, east].every((n) => Number.isFinite(n))) return [];
+  if (north <= south || east <= west) return [];
+
+  // Pad slightly so edge districts that clip the city boundary are included.
+  const latPad = Math.max(0.01, (north - south) * 0.08);
+  const lngPad = Math.max(0.01, (east - west) * 0.08);
+  south -= latPad;
+  north += latPad;
+  west -= lngPad;
+  east += lngPad;
+
+  // Adaptive grid: denser for larger places, capped for Geocodio cost.
+  const latSpan = Math.max(0.01, north - south);
+  const lngSpan = Math.max(0.01, east - west);
+  const target = Math.min(maxPoints, Math.max(25, Math.round(latSpan * lngSpan * 1100)));
+  const cols = Math.max(5, Math.round(Math.sqrt(target * (lngSpan / latSpan))));
+  const rows = Math.max(5, Math.round(target / cols));
+  const points = [];
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      const lat = south + ((r + 0.5) / rows) * (north - south);
+      const lng = west + ((c + 0.5) / cols) * (east - west);
+      points.push({ lat, lng });
+    }
+  }
+  return points;
+}
+
+function samplePointsAroundCentroid(lat, lng, maxPoints = 25) {
+  if (lat == null || lng == null) return [];
+  // Rings at ~3/7/12/18 km — enough to cover large US cities like San Diego.
+  const ringsKm = [0, 3, 7, 12, 18];
+  const points = [{ lat, lng }];
+  for (const km of ringsKm.slice(1)) {
+    const dLat = km / 111;
+    const dLng = km / (111 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+    const steps = km <= 7 ? 8 : 12;
+    for (let i = 0; i < steps; i += 1) {
+      const angle = (2 * Math.PI * i) / steps;
+      points.push({
+        lat: lat + dLat * Math.sin(angle),
+        lng: lng + dLng * Math.cos(angle),
+      });
+      if (points.length >= maxPoints) return points;
+    }
+  }
+  return points.slice(0, maxPoints);
+}
+
+async function fetchPlaceBoundingBox(query, stateHint = "") {
+  const q = [String(query || "").trim(), stateHint ? String(stateHint).trim() : ""]
+    .filter(Boolean)
+    .join(", ");
+  if (!q) return null;
+  const url =
+    `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=0` +
+    `&q=${encodeURIComponent(q)}`;
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "congress-bills-dashboard/1.0 (city legislative district expansion)",
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) return null;
+  const payload = await response.json();
+  const hit = Array.isArray(payload) ? payload[0] : null;
+  const bbox = hit?.boundingbox;
+  if (!Array.isArray(bbox) || bbox.length < 4) return null;
+  // Nominatim: [south, north, west, east]
+  return bbox.map(Number);
+}
+
+async function batchReverseStateLegDistricts(points, apiKey) {
+  if (!points?.length || !apiKey) {
+    return { stateSenateDistricts: [], stateHouseDistricts: [] };
+  }
+  const coords = points.map((p) => `${p.lat},${p.lng}`);
+  const url =
+    `${GEOCODIO_BASE}/reverse?fields=stateleg&skipGeocoding=1` +
+    `&api_key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(coords),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error || payload.message || "Geocodio batch reverse failed"
+    );
+  }
+
+  const senate = [];
+  const house = [];
+  const rows = Array.isArray(payload.results)
+    ? payload.results
+    : Array.isArray(payload)
+      ? payload
+      : [];
+
+  for (const row of rows) {
+    const results =
+      row?.response?.results ||
+      row?.results ||
+      (row?.fields ? [row] : []);
+    for (const result of results) {
+      const extracted = extractStateLegDistrictsFromFields(result.fields || {});
+      for (const d of extracted.stateSenateDistricts) {
+        if (!senate.includes(d)) senate.push(d);
+      }
+      for (const d of extracted.stateHouseDistricts) {
+        if (!house.includes(d)) house.push(d);
+      }
+    }
+  }
+
+  return { stateSenateDistricts: senate, stateHouseDistricts: house };
+}
+
 function extractGeocodioPoliticians(geocodeResult) {
   const result = geocodeResult?.results?.[0];
   if (!result) {
@@ -363,6 +548,9 @@ function extractGeocodioPoliticians(geocodeResult) {
       lat: null,
       lng: null,
       politicians: [],
+      stateSenateDistricts: [],
+      stateHouseDistricts: [],
+      placeMode: false,
     };
   }
 
@@ -371,7 +559,10 @@ function extractGeocodioPoliticians(geocodeResult) {
   const county = String(components.county || components.county_name || "")
     .replace(/\s+county$/i, "")
     .trim();
-  const formatted = result.formatted_address || null;
+  const placeMode = isPlaceGeocodeResult(result);
+  const formatted = placeMode
+    ? placeDisplayLabel(components, result.formatted_address)
+    : result.formatted_address || null;
   const fields = result.fields || {};
   const politicians = [];
   const seen = new Set();
@@ -398,24 +589,14 @@ function extractGeocodioPoliticians(geocodeResult) {
     { key: "upper", chamber: "state_senate" },
     { key: "lower", chamber: "state_house" },
   ];
-  const stateSenateDistricts = [];
-  const stateHouseDistricts = [];
+  const { stateSenateDistricts, stateHouseDistricts } =
+    extractStateLegDistrictsFromFields(fields);
 
   for (const bucket of stateBuckets) {
     const entries = stateLeg[bucket.key];
     const list = Array.isArray(entries) ? entries : entries ? [entries] : [];
     for (const entry of list) {
       const districtNumber = entry.district_number || entry.name || "";
-      const districtKey = String(districtNumber || "").trim();
-      if (districtKey) {
-        if (bucket.chamber === "state_senate") {
-          if (!stateSenateDistricts.includes(districtKey)) {
-            stateSenateDistricts.push(districtKey);
-          }
-        } else if (!stateHouseDistricts.includes(districtKey)) {
-          stateHouseDistricts.push(districtKey);
-        }
-      }
       for (const legislator of entry.current_legislators || []) {
         const mapped = mapStateLegislator(
           legislator,
@@ -474,6 +655,8 @@ function extractGeocodioPoliticians(geocodeResult) {
     politicians,
     stateSenateDistricts,
     stateHouseDistricts,
+    placeMode,
+    accuracyType: result.accuracy_type || "",
   };
 }
 
@@ -914,6 +1097,54 @@ function mapOpenStatesPerson(person, stateHint) {
   };
 }
 
+async function expandPlaceLegislativeDistricts(base, query, apiKey) {
+  if (!base?.placeMode && !looksLikePlaceQuery(query)) {
+    return base;
+  }
+
+  let points = [];
+  try {
+    const bbox = await fetchPlaceBoundingBox(query, base.state);
+    if (bbox) points = samplePointsInBbox(bbox, 49);
+  } catch (_) {
+    // Fall through to centroid rings.
+  }
+  if (!points.length) {
+    points = samplePointsAroundCentroid(base.lat, base.lng, 25);
+  }
+  if (!points.length) return { ...base, placeMode: true };
+
+  try {
+    const expanded = await batchReverseStateLegDistricts(points, apiKey);
+    const stateSenateDistricts = [
+      ...new Set([
+        ...(base.stateSenateDistricts || []),
+        ...(expanded.stateSenateDistricts || []),
+      ]),
+    ];
+    const stateHouseDistricts = [
+      ...new Set([
+        ...(base.stateHouseDistricts || []),
+        ...(expanded.stateHouseDistricts || []),
+      ]),
+    ];
+    return {
+      ...base,
+      placeMode: true,
+      stateSenateDistricts,
+      stateHouseDistricts,
+      samplePointCount: points.length,
+    };
+  } catch (error) {
+    // Keep the single-point districts if expansion fails.
+    return {
+      ...base,
+      placeMode: true,
+      expansionError: error.message || String(error),
+    };
+  }
+}
+
 async function fetchGeocodio(query, apiKey) {
   const url = `${GEOCODIO_BASE}/geocode?q=${encodeURIComponent(
     query
@@ -923,7 +1154,17 @@ async function fetchGeocodio(query, apiKey) {
   if (!response.ok) {
     throw new Error(payload.error || payload.message || "Geocodio lookup failed");
   }
-  return extractGeocodioPoliticians(payload);
+  const base = extractGeocodioPoliticians(payload);
+  const shouldExpand =
+    base.placeMode ||
+    looksLikePlaceQuery(query) ||
+    String(base.accuracyType || "").toLowerCase() === "place";
+  if (!shouldExpand) return base;
+  return expandPlaceLegislativeDistricts(
+    { ...base, placeMode: true },
+    query,
+    apiKey
+  );
 }
 
 async function fetchGoogleCivic(query, apiKey) {
@@ -1415,6 +1656,8 @@ module.exports = async function handler(req, res) {
   let lat = null;
   let lng = null;
   let geography = emptyGeography();
+  let placeMode = false;
+  let samplePointCount = 0;
 
   try {
     // 1) Geocode whenever possible — also supplies federal/state (+ school district names).
@@ -1427,6 +1670,8 @@ module.exports = async function handler(req, res) {
         county = geo.county || county;
         lat = geo.lat;
         lng = geo.lng;
+        placeMode = Boolean(geo.placeMode);
+        samplePointCount = geo.samplePointCount || 0;
         politicianLists.push(geo.politicians);
         geography = mergeGeography(geography, {
           state: geo.state,
@@ -1434,6 +1679,12 @@ module.exports = async function handler(req, res) {
           stateSenateDistricts: geo.stateSenateDistricts || [],
           stateHouseDistricts: geo.stateHouseDistricts || [],
         });
+        if (geo.expansionError) {
+          sourceErrors.push({
+            source: "geocodio-place-expand",
+            error: geo.expansionError,
+          });
+        }
       } catch (error) {
         sourceErrors.push({ source: "geocodio", error: error.message });
       }
@@ -1498,18 +1749,25 @@ module.exports = async function handler(req, res) {
 
     geography = mergeGeography(geography, { state, county });
 
+    const senateCount = geography.stateSenateDistricts?.length || 0;
+    const houseCount = geography.stateHouseDistricts?.length || 0;
+    const coverageNote = placeMode
+      ? `City/place search: sampled ${samplePointCount || "multiple"} points across the place and matched ${senateCount} state senate and ${houseCount} state house/assembly districts. Statewide executives always load for the state. Use a street address for your exact single district.`
+      : "Federal/state legislators come from Geocodio (+ Open States when configured). City, county, school board, and judges require Cicero or a working Google Civic key. State / appellate / county benches load from state_officials via county_district_mapping.";
+
     return json(res, 200, {
       ok: true,
       query: q,
       address,
       state: geography.state || state,
       county: geography.county || county,
+      placeMode,
+      samplePointCount,
       geography,
       politicians,
       sourcesTried,
       sourceErrors,
-      coverageNote:
-        "Federal/state legislators come from Geocodio (+ Open States when configured). City, county, school board, and judges require Cicero or a working Google Civic key. State / appellate / county benches load from state_officials via county_district_mapping.",
+      coverageNote,
     });
   } catch (error) {
     console.error(error);

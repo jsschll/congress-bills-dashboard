@@ -2084,7 +2084,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         list,
         "Legislature / Representatives",
         stateSplit.legislature,
-        "No state legislators found for this address.",
+        "No state legislators found for this address. Try a city name for citywide coverage, or a street address for your exact district.",
         cardOptions,
         level
       );
@@ -2411,12 +2411,36 @@ function mountAddressResultsPage({
       const localCount = uniquePeople.length;
       const nationalCount = nationalOfficials.length;
       const judgeCount = stateJudges.length;
+      const legislatureCount = stateJudges.filter(
+        (person) => person.metadata?.court_group === "legislative"
+      ).length;
+      const executiveCount = stateJudges.filter(
+        (person) =>
+          person.metadata?.court_group === "executive" ||
+          person.metadata?.court_group === "leadership"
+      ).length;
+      const placeMode = Boolean(lookupResult.ok && lookupResult.data.placeMode);
+      const senateDistrictCount =
+        geography.stateSenateDistricts?.length || 0;
+      const houseDistrictCount =
+        geography.stateHouseDistricts?.length || 0;
       const summaryParts = [
         nationalCount
           ? `${nationalCount} nationwide (Cabinet, agencies, Court)`
           : null,
-        judgeCount ? `${judgeCount} state court` : null,
-        localCount ? `${localCount} for this address` : null,
+        executiveCount ? `${executiveCount} statewide executives` : null,
+        legislatureCount
+          ? `${legislatureCount} state legislators`
+          : null,
+        placeMode && (senateDistrictCount || houseDistrictCount)
+          ? `citywide districts: ${senateDistrictCount} senate / ${houseDistrictCount} house`
+          : null,
+        !executiveCount && !legislatureCount && judgeCount
+          ? `${judgeCount} state officials`
+          : null,
+        localCount
+          ? `${localCount} for this ${placeMode ? "city" : "address"}`
+          : null,
         geography.county ? `${geography.county} County` : null,
         levelCounts.length ? levelCounts.join(" · ") : null,
       ].filter(Boolean);
