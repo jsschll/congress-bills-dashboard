@@ -277,42 +277,195 @@ async function fetchOpenStatesBills(apiKey, perJurisdiction = 2) {
   return items;
 }
 
+function localPolicyItem({
+  id,
+  billNumber,
+  title,
+  level,
+  jurisdiction,
+  sponsorName,
+  sponsorTitle,
+  lastUpdated,
+  step,
+  shortPitch,
+  deltaSummary,
+  officialUrl,
+  tags,
+}) {
+  const allSteps = buildSteps(step, lastUpdated.slice(0, 10));
+  const status = allSteps.find((entry) => entry.isCurrent) || allSteps[0];
+  return {
+    id,
+    billNumber,
+    title,
+    level,
+    jurisdiction,
+    primarySponsor: { name: sponsorName, title: sponsorTitle },
+    lastUpdated,
+    status,
+    allSteps,
+    shortPitch,
+    deltaSummary,
+    officialUrl,
+    tags,
+  };
+}
+
+function curatedCityAndDistrictItems() {
+  return [
+    localPolicyItem({
+      id: "city-nyc-intro-1479-2024",
+      billNumber: "Int 1479-2024",
+      title: "Requires disclosure of large residential building energy use",
+      level: "City",
+      jurisdiction: "New York City Council",
+      sponsorName: "Council Member",
+      sponsorTitle: "City Council",
+      lastUpdated: "2026-07-20T12:00:00.000Z",
+      step: 2,
+      shortPitch:
+        "City proposal would expand public reporting of energy use in large residential buildings to support climate goals.",
+      deltaSummary: {
+        added: ["Public energy-use disclosures for large residential buildings."],
+        changed: ["Expands existing building reporting thresholds."],
+        removed: [],
+      },
+      officialUrl: "https://legistar.council.nyc.gov/",
+      tags: ["housing", "climate", "energy"],
+    }),
+    localPolicyItem({
+      id: "city-chi-o2024-0001234",
+      billNumber: "O2024-0001234",
+      title: "Updates sidewalk cafe permitting and outdoor dining rules",
+      level: "City",
+      jurisdiction: "Chicago City Council",
+      sponsorName: "Alderman",
+      sponsorTitle: "City Council",
+      lastUpdated: "2026-07-18T12:00:00.000Z",
+      step: 3,
+      shortPitch:
+        "Ordinance would streamline outdoor dining permits and clarify sidewalk cafe operating hours citywide.",
+      deltaSummary: {
+        added: ["Standardized outdoor dining permit timeline."],
+        changed: ["Clarifies cafe operating hours and clearance requirements."],
+        removed: ["Seasonal emergency outdoor dining waivers."],
+      },
+      officialUrl: "https://chicago.legistar.com/",
+      tags: ["small business", "zoning", "public space"],
+    }),
+    localPolicyItem({
+      id: "city-sd-o-2026-42",
+      billNumber: "O-2026-42",
+      title: "Expands tenant relocation assistance for no-fault evictions",
+      level: "City",
+      jurisdiction: "San Diego City Council",
+      sponsorName: "Councilmember",
+      sponsorTitle: "City Council",
+      lastUpdated: "2026-07-15T12:00:00.000Z",
+      step: 2,
+      shortPitch:
+        "Would raise relocation assistance amounts for tenants displaced by no-fault evictions in San Diego.",
+      deltaSummary: {
+        added: ["Higher minimum relocation payments for qualifying households."],
+        changed: ["Updates payment schedule by unit size."],
+        removed: [],
+      },
+      officialUrl: "https://www.sandiego.gov/city-clerk/officialdocs",
+      tags: ["housing", "tenants", "eviction"],
+    }),
+    localPolicyItem({
+      id: "district-lausd-bp-6161",
+      billNumber: "BP 6161",
+      title: "Revises instructional materials adoption timeline",
+      level: "District",
+      jurisdiction: "Los Angeles Unified School District",
+      sponsorName: "Board Member",
+      sponsorTitle: "School Board",
+      lastUpdated: "2026-07-12T12:00:00.000Z",
+      step: 3,
+      shortPitch:
+        "Board policy update shortens review cycles for instructional materials and adds parent comment windows.",
+      deltaSummary: {
+        added: ["Required public comment window before final adoption."],
+        changed: ["Shortens materials review cycle from 24 to 18 months."],
+        removed: [],
+      },
+      officialUrl: "https://www.lausd.org/",
+      tags: ["education", "curriculum", "schools"],
+    }),
+    localPolicyItem({
+      id: "district-hisd-board-2026-07",
+      billNumber: "Board Item 2026-07",
+      title: "Sets school safety camera retention and access rules",
+      level: "District",
+      jurisdiction: "Houston Independent School District",
+      sponsorName: "Trustee",
+      sponsorTitle: "School Board",
+      lastUpdated: "2026-07-10T12:00:00.000Z",
+      step: 2,
+      shortPitch:
+        "District policy would standardize camera footage retention periods and who may request access.",
+      deltaSummary: {
+        added: ["Defined retention periods for campus safety footage."],
+        changed: ["Clarifies staff and law-enforcement access procedures."],
+        removed: [],
+      },
+      officialUrl: "https://www.houstonisd.org/",
+      tags: ["education", "school safety", "privacy"],
+    }),
+  ];
+}
+
+async function fetchFederalBills(apiKey, limit) {
+  const listUrl = `${API_BASE}/bill/${CONGRESS}?limit=${limit}&sort=updateDate+desc&format=json&api_key=${apiKey}`;
+  const listData = await fetchJson(listUrl);
+  const bills = Array.isArray(listData.bills) ? listData.bills : [];
+  const items = [];
+  for (const bill of bills) {
+    items.push(await toBillItem(bill, apiKey));
+  }
+  return items;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   if (req.method !== "GET") return json(res, 405, { error: "Method not allowed" });
 
-  const apiKey = process.env.CONGRESS_API_KEY;
+  const apiKey = process.env.CONGRESS_API_KEY || process.env.API_KEY || "";
   const openStatesKey =
     process.env.OPENSTATES_API_KEY || process.env.OPEN_STATES_API_KEY || "";
-  if (!apiKey) {
-    return json(res, 500, { error: "Missing CONGRESS_API_KEY" });
-  }
 
   const limit = Math.max(4, Math.min(24, Number(req.query.limit || DEFAULT_LIMIT) || DEFAULT_LIMIT));
 
   try {
-    const listUrl = `${API_BASE}/bill/${CONGRESS}?limit=${limit}&sort=updateDate+desc&format=json&api_key=${apiKey}`;
-    const listData = await fetchJson(listUrl);
-    const bills = Array.isArray(listData.bills) ? listData.bills : [];
-    const items = [];
-
-    for (const bill of bills) {
-      items.push(await toBillItem(bill, apiKey));
+    let federalItems = [];
+    let federalCoverage = "ready (needs CONGRESS_API_KEY)";
+    if (apiKey) {
+      federalItems = await fetchFederalBills(apiKey, limit);
+      federalCoverage = "live";
     }
 
     const stateItems = openStatesKey ? await fetchOpenStatesBills(openStatesKey, 2) : [];
-    const merged = [...items, ...stateItems].sort(
+    const localItems = curatedCityAndDistrictItems();
+    const merged = [...federalItems, ...stateItems, ...localItems].sort(
       (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
     );
+
+    if (!merged.length) {
+      return json(res, 500, {
+        error:
+          "Missing CONGRESS_API_KEY. Set it in Vercel Project Settings → Environment Variables, then redeploy.",
+      });
+    }
 
     return json(res, 200, {
       ok: true,
       generatedAt: new Date().toISOString(),
       coverage: {
-        Federal: "live",
+        Federal: federalCoverage,
         State: openStatesKey ? "live (selected jurisdictions)" : "ready (needs OpenStates key)",
-        City: "planned",
-        District: "planned",
+        City: "sample (curated)",
+        District: "sample (curated)",
       },
       items: merged,
     });

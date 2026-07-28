@@ -40,6 +40,11 @@
   color: #3730a3;
 }
 
+.policy-feed-coverage__badge.is-live {
+  background: #ecfdf5;
+  color: #047857;
+}
+
 .policy-feed-coverage__badge.is-planned {
   background: #f3f4f6;
   color: #4b5563;
