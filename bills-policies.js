@@ -57,6 +57,17 @@ function renderCoverageBadges(coverage = {}) {
   );
 }
 
+function coverageSummaryText(coverage = {}) {
+  const state = String(coverage.State || "").toLowerCase();
+  if (state.includes("live")) {
+    return "Federal and state bill feeds are live. City and District coverage are scaffolded and ready for source integrations.";
+  }
+  if (state.includes("ready")) {
+    return "Federal feed is live. State coverage is wired and will turn on once OPENSTATES_API_KEY is configured. City and District are scaffolded next.";
+  }
+  return "Federal feed is live. State, City, and District coverage are scaffolded and ready for source integrations.";
+}
+
 function sponsorKey(item) {
   return String(item?.primarySponsor?.name || "").toLowerCase().trim();
 }
@@ -281,10 +292,7 @@ async function loadBillsPoliciesPage() {
   allItems = payload.items || [];
   myItems = allItems.filter(matchesMyFeed);
   renderCoverageBadges(payload.coverage || {});
-  setPolicyFeedStatus(
-    "Federal feed is live now. State, City, and District coverage are scaffolded and ready for source integrations.",
-    "success"
-  );
+  setPolicyFeedStatus(coverageSummaryText(payload.coverage || {}), "success");
   renderActiveTab();
 }
 

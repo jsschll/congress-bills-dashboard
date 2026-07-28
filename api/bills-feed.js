@@ -1,6 +1,15 @@
 const API_BASE = "https://api.congress.gov/v3";
+const OPENSTATES_BASE = "https://v3.openstates.org";
 const CONGRESS = 119;
 const DEFAULT_LIMIT = 16;
+const PRIORITY_STATE_JURISDICTIONS = [
+  "California",
+  "Texas",
+  "Florida",
+  "New York",
+  "Illinois",
+  "Washington",
+];
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -111,6 +120,25 @@ function deltaSummaryFromText(text = "") {
   return delta;
 }
 
+function inferStateStatus(actionText = "", title = "") {
+  const text = `${actionText} ${title}`.toLowerCase();
+  if (text.includes("signed") || text.includes("chaptered") || text.includes("became law")) {
+    return 4;
+  }
+  if (text.includes("passed") || text.includes("adopted") || text.includes("enrolled")) {
+    return 3;
+  }
+  if (
+    text.includes("committee") ||
+    text.includes("referred") ||
+    text.includes("hearing") ||
+    text.includes("reading")
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
 async function fetchBillSummary(congress, type, number, apiKey) {
   try {
     const url = `${API_BASE}/bill/${congress}/${type}/${number}/summaries?format=json&api_key=${apiKey}`;
@@ -191,11 +219,71 @@ async function toBillItem(bill, apiKey) {
   };
 }
 
+async function fetchOpenStatesBills(apiKey, perJurisdiction = 2) {
+  const items = [];
+  for (const jurisdiction of PRIORITY_STATE_JURISDICTIONS) {
+    const params = new URLSearchParams({
+      jurisdiction,
+      sort: "updated_desc",
+      per_page: String(perJurisdiction),
+    });
+    params.append("include", "sponsorships");
+    params.append("include", "abstracts");
+    params.append("include", "actions");
+
+    try {
+      const data = await fetchJson(
+        `${OPENSTATES_BASE}/bills?${params.toString()}&apikey=${encodeURIComponent(apiKey)}`
+      );
+      for (const bill of data.results || []) {
+        const actionText = bill.latest_action_description || bill.actions?.[bill.actions.length - 1]?.description || "Updated";
+        const currentStep = inferStateStatus(actionText, bill.title);
+        const allSteps = buildSteps(currentStep, bill.latest_action_date || bill.updated_at || "");
+        const status = allSteps.find((step) => step.isCurrent) || allSteps[0];
+        const summaryText =
+          bill.abstracts?.[bill.abstracts.length - 1]?.abstract ||
+          bill.extras?.summary ||
+          "";
+        const sponsor =
+          bill.sponsorships?.find((entry) => entry.primary || entry.classification === "primary") ||
+          bill.sponsorships?.[0] ||
+          {};
+        items.push({
+          id: `state-${bill.id}`.toLowerCase(),
+          billNumber: bill.identifier || "State bill",
+          title: bill.title || "Untitled state bill",
+          level: "State",
+          jurisdiction: `${bill.jurisdiction?.name || jurisdiction} Legislature`,
+          primarySponsor: {
+            name: sponsor.name || "Sponsor unavailable",
+            title: "State legislator",
+          },
+          lastUpdated: bill.updated_at || new Date().toISOString(),
+          status,
+          allSteps,
+          shortPitch:
+            toSentences(stripHtml(summaryText), 2) ||
+            toSentences(stripHtml(actionText), 1) ||
+            "Recent state legislative activity.",
+          deltaSummary: deltaSummaryFromText(summaryText || actionText),
+          officialUrl: bill.openstates_url || "",
+          tags: Array.isArray(bill.subject) ? bill.subject.slice(0, 6) : [],
+        });
+      }
+    } catch (error) {
+      console.error(`OpenStates ${jurisdiction} feed failed:`, error.message || error);
+    }
+  }
+  return items;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   if (req.method !== "GET") return json(res, 405, { error: "Method not allowed" });
 
   const apiKey = process.env.CONGRESS_API_KEY;
+  const openStatesKey =
+    process.env.OPENSTATES_API_KEY || process.env.OPEN_STATES_API_KEY || "";
   if (!apiKey) {
     return json(res, 500, { error: "Missing CONGRESS_API_KEY" });
   }
@@ -212,16 +300,21 @@ module.exports = async function handler(req, res) {
       items.push(await toBillItem(bill, apiKey));
     }
 
+    const stateItems = openStatesKey ? await fetchOpenStatesBills(openStatesKey, 2) : [];
+    const merged = [...items, ...stateItems].sort(
+      (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+    );
+
     return json(res, 200, {
       ok: true,
       generatedAt: new Date().toISOString(),
       coverage: {
         Federal: "live",
-        State: "planned",
+        State: openStatesKey ? "live (selected jurisdictions)" : "ready (needs OpenStates key)",
         City: "planned",
         District: "planned",
       },
-      items,
+      items: merged,
     });
   } catch (error) {
     console.error(error);
