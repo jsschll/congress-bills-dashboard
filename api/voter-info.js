@@ -129,6 +129,13 @@ function isNationwideFederalElection(election = {}) {
   );
 }
 
+function isStateLevelElection(election = {}) {
+  const ocd = String(election.ocdDivisionId || "").toLowerCase();
+  const level = String(election.level || inferElectionLevel(election)).toLowerCase();
+  if (ocd.includes("/state:")) return true;
+  return level === "state" || level === "local";
+}
+
 const STATE_NAMES = {
   AL: "Alabama",
   AK: "Alaska",
@@ -207,16 +214,44 @@ function stateCodeFromAddress(address = "") {
   return "";
 }
 
-function fallbackElections() {
-  return [
+function upcomingStateCalendar(stateCode = "") {
+  const code = normalizeStateCode(stateCode);
+  if (!code) return [];
+  const stateName = STATE_NAMES[code] || code;
+  const today = new Date().toISOString().slice(0, 10);
+  const items = [
+    {
+      id: `calendar-${code.toLowerCase()}-primary-2026`,
+      name: `${stateName} Primary Election`,
+      electionDay: "2026-03-03",
+      ocdDivisionId: `ocd-division/country:us/state:${code.toLowerCase()}`,
+      level: "State",
+      source: "calendar",
+    },
+    {
+      id: `calendar-${code.toLowerCase()}-general-2026`,
+      name: `${stateName} General Election`,
+      electionDay: "2026-11-03",
+      ocdDivisionId: `ocd-division/country:us/state:${code.toLowerCase()}`,
+      level: "State",
+      source: "calendar",
+    },
+  ];
+  return items.filter((item) => item.electionDay >= today);
+}
+
+function fallbackElections(stateCode = "") {
+  const federal = [
     {
       id: "fallback-2026-midterm",
       name: "2026 U.S. Midterm Election (federal)",
       electionDay: "2026-11-03",
       level: "Federal",
       source: "fallback",
+      ocdDivisionId: "ocd-division/country:us",
     },
   ];
+  return [...upcomingStateCalendar(stateCode), ...federal];
 }
 
 async function fetchJson(url) {
@@ -280,15 +315,17 @@ module.exports = async function handler(req, res) {
   };
 
   if (!apiKey) {
+    const stateCode = stateCodeFromAddress(address);
+    registrationLinks.stateSite = STATE_ELECTION_SITES[stateCode] || "";
     return json(res, 200, {
       ok: true,
       coverage: "fallback",
       message:
-        "Live polling locations need a Civic API connection. Showing federal election dates and official voter registration links for now.",
+        "Live polling locations need a Civic API connection. Showing upcoming state and federal election dates plus official voter registration links.",
       address,
       normalizedAddress: address,
-      stateCode: "",
-      elections: fallbackElections(),
+      stateCode,
+      elections: fallbackElections(stateCode),
       voterInfo: null,
       registrationLinks,
       admin: null,
@@ -333,52 +370,65 @@ module.exports = async function handler(req, res) {
       normalizeStateCode(normalized.state) || stateCodeFromAddress(address);
     registrationLinks.stateSite = STATE_ELECTION_SITES[stateCode] || "";
 
-    const otherElections = (voterData?.otherElections || [])
-      .map((item) => ({
+    // voterinfo results are already scoped to this address — always keep them.
+    const addressElections = [
+      voterData?.election
+        ? {
+            id: String(voterData.election.id),
+            name: voterData.election.name || "Election",
+            electionDay: voterData.election.electionDay || "",
+            ocdDivisionId: voterData.election.ocdDivisionId || "",
+            level: inferElectionLevel(voterData.election),
+            source: "google-civic",
+          }
+        : null,
+      ...(voterData?.otherElections || []).map((item) => ({
         id: String(item.id),
         name: item.name || "Election",
         electionDay: item.electionDay || "",
         ocdDivisionId: item.ocdDivisionId || "",
         level: inferElectionLevel(item),
         source: "google-civic",
-      }))
-      .filter((item) => electionMatchesState(item, stateCode));
+      })),
+    ].filter(Boolean);
 
-    const primaryElection = voterData?.election
-      ? {
-          id: String(voterData.election.id),
-          name: voterData.election.name || "Election",
-          electionDay: voterData.election.electionDay || "",
-          ocdDivisionId: voterData.election.ocdDivisionId || "",
-          level: inferElectionLevel(voterData.election),
-          source: "google-civic",
-        }
-      : null;
-
-    const primaryAllowed =
-      primaryElection && electionMatchesState(primaryElection, stateCode)
-        ? primaryElection
-        : null;
+    const catalogForState = elections.filter((item) =>
+      electionMatchesState(item, stateCode)
+    );
 
     const mergedElections = [];
     const seen = new Set();
-    for (const item of [
-      primaryAllowed,
-      ...otherElections,
-      ...elections.filter((item) => electionMatchesState(item, stateCode)),
-    ].filter(Boolean)) {
+    for (const item of [...addressElections, ...catalogForState]) {
       if (seen.has(item.id)) continue;
       seen.add(item.id);
       mergedElections.push(item);
     }
 
-    if (!mergedElections.length) {
-      mergedElections.push(...fallbackElections());
+    // If Civic has no state/local elections for this state yet, add calendar dates.
+    const hasStateElection = mergedElections.some((item) =>
+      isStateLevelElection(item)
+    );
+    if (!hasStateElection && stateCode) {
+      for (const item of upcomingStateCalendar(stateCode)) {
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        mergedElections.push(item);
+      }
     }
+
+    if (!mergedElections.length) {
+      mergedElections.push(...fallbackElections(stateCode));
+    }
+
+    mergedElections.sort((a, b) =>
+      String(a.electionDay).localeCompare(String(b.electionDay))
+    );
+
+    const primaryElection = addressElections[0] || null;
 
     const voterInfo = voterData
       ? {
-          election: primaryAllowed,
+          election: primaryElection,
           pollingLocations: (voterData.pollingLocations || [])
             .slice(0, 5)
             .map(formatPlace),
@@ -394,7 +444,7 @@ module.exports = async function handler(req, res) {
 
     return json(res, 200, {
       ok: true,
-      coverage: voterData ? "live" : "partial",
+      coverage: voterData ? "live" : hasStateElection ? "partial" : "calendar",
       message: voterError || null,
       address,
       normalizedAddress: formatAddress(normalized) || address,

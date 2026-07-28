@@ -772,8 +772,10 @@ function renderElectionCenter(payload) {
       ? "Live election data for your address."
       : payload.coverage === "partial"
         ? "Some election data is available; polling details may be limited right now."
-        : payload.message ||
-          "Showing general election dates and official voter registration links.";
+        : payload.coverage === "calendar"
+          ? "Showing upcoming state and federal election dates for your location."
+          : payload.message ||
+            "Showing general election dates and official voter registration links.";
 
   electionsContainer.innerHTML = `
     <div class="profile-elections__meta">
