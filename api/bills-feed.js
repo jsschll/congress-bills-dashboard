@@ -11,6 +11,86 @@ const PRIORITY_STATE_JURISDICTIONS = [
   "Washington",
 ];
 
+const STATE_CODE_TO_NAME = {
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
+  CA: "California",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  DC: "District of Columbia",
+  FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
+  WY: "Wyoming",
+};
+
+const STATE_NAME_TO_CODE = Object.fromEntries(
+  Object.entries(STATE_CODE_TO_NAME).map(([code, name]) => [name.toLowerCase(), code])
+);
+
+function normalizeStateCode(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.length === 2) return raw.toUpperCase();
+  return STATE_NAME_TO_CODE[raw.toLowerCase()] || "";
+}
+
+function jurisdictionNameForStateCode(code) {
+  return STATE_CODE_TO_NAME[normalizeStateCode(code)] || "";
+}
+
+function stateCodeFromJurisdiction(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const direct = normalizeStateCode(raw);
+  if (direct) return direct;
+  const lower = raw.toLowerCase();
+  for (const [name, code] of Object.entries(STATE_NAME_TO_CODE)) {
+    if (lower.includes(name)) return code;
+  }
+  return "";
+}
 function json(res, status, body) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
@@ -202,6 +282,8 @@ async function toBillItem(bill, apiKey) {
     title: bill.title || "Untitled bill",
     level: "Federal",
     jurisdiction: "U.S. Congress",
+    stateCode: "",
+    cityName: "",
     primarySponsor: {
       name: sponsor.fullName || sponsor.name || "Sponsor unavailable",
       title: sponsorTitle(sponsor),
@@ -219,9 +301,9 @@ async function toBillItem(bill, apiKey) {
   };
 }
 
-async function fetchOpenStatesBills(apiKey, perJurisdiction = 2) {
+async function fetchOpenStatesBillsForJurisdictions(apiKey, jurisdictions, perJurisdiction = 2) {
   const items = [];
-  for (const jurisdiction of PRIORITY_STATE_JURISDICTIONS) {
+  for (const jurisdiction of jurisdictions) {
     const params = new URLSearchParams({
       jurisdiction,
       sort: "updated_desc",
@@ -248,12 +330,17 @@ async function fetchOpenStatesBills(apiKey, perJurisdiction = 2) {
           bill.sponsorships?.find((entry) => entry.primary || entry.classification === "primary") ||
           bill.sponsorships?.[0] ||
           {};
+        const stateCode =
+          stateCodeFromJurisdiction(bill.jurisdiction?.name || jurisdiction) ||
+          normalizeStateCode(jurisdiction);
         items.push({
           id: `state-${bill.id}`.toLowerCase(),
           billNumber: bill.identifier || "State bill",
           title: bill.title || "Untitled state bill",
           level: "State",
           jurisdiction: `${bill.jurisdiction?.name || jurisdiction} Legislature`,
+          stateCode,
+          cityName: "",
           primarySponsor: {
             name: sponsor.name || "Sponsor unavailable",
             title: "State legislator",
@@ -283,6 +370,8 @@ function localPolicyItem({
   title,
   level,
   jurisdiction,
+  stateCode,
+  cityName,
   sponsorName,
   sponsorTitle,
   lastUpdated,
@@ -300,6 +389,8 @@ function localPolicyItem({
     title,
     level,
     jurisdiction,
+    stateCode: normalizeStateCode(stateCode),
+    cityName: cityName || "",
     primarySponsor: { name: sponsorName, title: sponsorTitle },
     lastUpdated,
     status,
@@ -319,6 +410,8 @@ function curatedCityAndDistrictItems() {
       title: "Requires disclosure of large residential building energy use",
       level: "City",
       jurisdiction: "New York City Council",
+      stateCode: "NY",
+      cityName: "New York",
       sponsorName: "Council Member",
       sponsorTitle: "City Council",
       lastUpdated: "2026-07-20T12:00:00.000Z",
@@ -339,6 +432,8 @@ function curatedCityAndDistrictItems() {
       title: "Updates sidewalk cafe permitting and outdoor dining rules",
       level: "City",
       jurisdiction: "Chicago City Council",
+      stateCode: "IL",
+      cityName: "Chicago",
       sponsorName: "Alderman",
       sponsorTitle: "City Council",
       lastUpdated: "2026-07-18T12:00:00.000Z",
@@ -359,6 +454,8 @@ function curatedCityAndDistrictItems() {
       title: "Expands tenant relocation assistance for no-fault evictions",
       level: "City",
       jurisdiction: "San Diego City Council",
+      stateCode: "CA",
+      cityName: "San Diego",
       sponsorName: "Councilmember",
       sponsorTitle: "City Council",
       lastUpdated: "2026-07-15T12:00:00.000Z",
@@ -379,6 +476,8 @@ function curatedCityAndDistrictItems() {
       title: "Revises instructional materials adoption timeline",
       level: "District",
       jurisdiction: "Los Angeles Unified School District",
+      stateCode: "CA",
+      cityName: "Los Angeles",
       sponsorName: "Board Member",
       sponsorTitle: "School Board",
       lastUpdated: "2026-07-12T12:00:00.000Z",
@@ -399,6 +498,8 @@ function curatedCityAndDistrictItems() {
       title: "Sets school safety camera retention and access rules",
       level: "District",
       jurisdiction: "Houston Independent School District",
+      stateCode: "TX",
+      cityName: "Houston",
       sponsorName: "Trustee",
       sponsorTitle: "School Board",
       lastUpdated: "2026-07-10T12:00:00.000Z",
@@ -436,6 +537,7 @@ module.exports = async function handler(req, res) {
     process.env.OPENSTATES_API_KEY || process.env.OPEN_STATES_API_KEY || "";
 
   const limit = Math.max(4, Math.min(24, Number(req.query.limit || DEFAULT_LIMIT) || DEFAULT_LIMIT));
+  const stateFilter = normalizeStateCode(req.query.state);
 
   try {
     let federalItems = [];
@@ -445,8 +547,20 @@ module.exports = async function handler(req, res) {
       federalCoverage = "live";
     }
 
-    const stateItems = openStatesKey ? await fetchOpenStatesBills(openStatesKey, 2) : [];
-    const localItems = curatedCityAndDistrictItems();
+    let jurisdictions = PRIORITY_STATE_JURISDICTIONS;
+    if (stateFilter) {
+      const name = jurisdictionNameForStateCode(stateFilter);
+      jurisdictions = name ? [name] : [];
+    }
+
+    const stateItems = openStatesKey
+      ? await fetchOpenStatesBillsForJurisdictions(openStatesKey, jurisdictions, 2)
+      : [];
+    let localItems = curatedCityAndDistrictItems();
+    if (stateFilter) {
+      localItems = localItems.filter((item) => item.stateCode === stateFilter);
+    }
+
     const merged = [...federalItems, ...stateItems, ...localItems].sort(
       (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
     );
@@ -461,9 +575,14 @@ module.exports = async function handler(req, res) {
     return json(res, 200, {
       ok: true,
       generatedAt: new Date().toISOString(),
+      stateFilter: stateFilter || null,
       coverage: {
         Federal: federalCoverage,
-        State: openStatesKey ? "live (selected jurisdictions)" : "ready (needs OpenStates key)",
+        State: openStatesKey
+          ? stateFilter
+            ? `live (${jurisdictionNameForStateCode(stateFilter) || stateFilter})`
+            : "live (selected jurisdictions)"
+          : "ready (needs OpenStates key)",
         City: "sample (curated)",
         District: "sample (curated)",
       },

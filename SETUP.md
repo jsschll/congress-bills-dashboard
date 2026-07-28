@@ -11,6 +11,8 @@
    - Redirect URLs: include `https://YOUR_DOMAIN/auth.html` and `https://YOUR_DOMAIN/auth.html?verified=1`
 4. SQL Editor: run [`supabase/schema.sql`](supabase/schema.sql)
    - If you already ran an older schema, also run [`supabase/migration-username-auth.sql`](supabase/migration-username-auth.sql)
+   - For Bills location filters, also run [`supabase/migration-profile-home-address.sql`](supabase/migration-profile-home-address.sql) (adds `profiles.home_address`)
+   - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
 5. Project Settings → API: copy Project URL and the **anon / publishable** key
 
 ## 2. Local config

@@ -40,6 +40,33 @@
         </button>
       </section>
 
+      <section class="policy-feed-filters" aria-label="Filter bills">
+        <label class="policy-feed-filters__field">
+          <span>State</span>
+          <select id="policy-state-filter" name="state">
+            <option value="">All states</option>
+          </select>
+        </label>
+        <label class="policy-feed-filters__check">
+          <input id="policy-location-toggle" type="checkbox" />
+          <span>Affects my location</span>
+        </label>
+        <form id="policy-location-form" class="policy-feed-filters__location" hidden>
+          <label class="policy-feed-filters__field policy-feed-filters__field--grow">
+            <span>Address or ZIP</span>
+            <input
+              id="policy-location-input"
+              type="text"
+              name="location"
+              autocomplete="street-address"
+              placeholder="Street address or ZIP code"
+            />
+          </label>
+          <button class="refresh-btn" type="submit">Apply</button>
+        </form>
+        <p id="policy-filter-status" class="policy-feed-filters__status" hidden></p>
+      </section>
+
       <section class="policy-feed-summary">
         <div id="policy-feed-coverage" class="policy-feed-coverage"></div>
         <p id="policy-feed-status" class="status" hidden></p>
@@ -58,6 +85,6 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js"></script>
-    <script src="bills-policies.js?v=20260728f" defer></script>
+    <script src="bills-policies.js?v=20260728g" defer></script>
   </body>
 </html>

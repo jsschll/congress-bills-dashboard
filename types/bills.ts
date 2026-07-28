@@ -21,6 +21,10 @@ export interface BillItem {
   title: string;
   level: GovernmentLevel;
   jurisdiction: string;
+  /** Two-letter state code when applicable (not set for federal). */
+  stateCode?: string;
+  /** City name for city/district items when known. */
+  cityName?: string;
   primarySponsor: {
     name: string;
     title: string;

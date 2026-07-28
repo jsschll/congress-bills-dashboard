@@ -4,8 +4,76 @@ const policyFeedList = document.getElementById("policy-feed-list");
 const policyFeedEmpty = document.getElementById("policy-feed-empty");
 const tabAllFeed = document.getElementById("tab-all-feed");
 const tabMyFeed = document.getElementById("tab-my-feed");
+const stateFilterSelect = document.getElementById("policy-state-filter");
+const locationToggle = document.getElementById("policy-location-toggle");
+const locationForm = document.getElementById("policy-location-form");
+const locationInput = document.getElementById("policy-location-input");
+const filterStatus = document.getElementById("policy-filter-status");
+
+const STORAGE_KEYS = {
+  state: "policyFeed.stateFilter",
+  locationOn: "policyFeed.locationOn",
+  address: "policyFeed.locationAddress",
+};
+
+const US_STATES = [
+  ["AL", "Alabama"],
+  ["AK", "Alaska"],
+  ["AZ", "Arizona"],
+  ["AR", "Arkansas"],
+  ["CA", "California"],
+  ["CO", "Colorado"],
+  ["CT", "Connecticut"],
+  ["DE", "Delaware"],
+  ["DC", "District of Columbia"],
+  ["FL", "Florida"],
+  ["GA", "Georgia"],
+  ["HI", "Hawaii"],
+  ["ID", "Idaho"],
+  ["IL", "Illinois"],
+  ["IN", "Indiana"],
+  ["IA", "Iowa"],
+  ["KS", "Kansas"],
+  ["KY", "Kentucky"],
+  ["LA", "Louisiana"],
+  ["ME", "Maine"],
+  ["MD", "Maryland"],
+  ["MA", "Massachusetts"],
+  ["MI", "Michigan"],
+  ["MN", "Minnesota"],
+  ["MS", "Mississippi"],
+  ["MO", "Missouri"],
+  ["MT", "Montana"],
+  ["NE", "Nebraska"],
+  ["NV", "Nevada"],
+  ["NH", "New Hampshire"],
+  ["NJ", "New Jersey"],
+  ["NM", "New Mexico"],
+  ["NY", "New York"],
+  ["NC", "North Carolina"],
+  ["ND", "North Dakota"],
+  ["OH", "Ohio"],
+  ["OK", "Oklahoma"],
+  ["OR", "Oregon"],
+  ["PA", "Pennsylvania"],
+  ["RI", "Rhode Island"],
+  ["SC", "South Carolina"],
+  ["SD", "South Dakota"],
+  ["TN", "Tennessee"],
+  ["TX", "Texas"],
+  ["UT", "Utah"],
+  ["VT", "Vermont"],
+  ["VA", "Virginia"],
+  ["WA", "Washington"],
+  ["WV", "West Virginia"],
+  ["WI", "Wisconsin"],
+  ["WY", "Wyoming"],
+];
+
+const STATE_NAME_BY_CODE = Object.fromEntries(US_STATES);
 
 let activeTab = "all";
+let rawItems = [];
 let allItems = [];
 let myItems = [];
 let followedBillIds = new Set();
@@ -14,6 +82,12 @@ let feedPreferences = {
   billIds: [],
   politicianIds: [],
   districts: [],
+};
+let filterState = {
+  stateCode: "",
+  locationOn: false,
+  addressQuery: "",
+  resolved: null,
 };
 
 function setPolicyFeedStatus(message, type = "loading") {
@@ -78,6 +152,9 @@ function coverageSummaryText(coverage = {}) {
 const BILLS_FEED_PATH = "/api/bills-feed";
 const BILLS_FEED_FALLBACK =
   "https://congress-bills-dashboard.vercel.app/api/bills-feed";
+const LOOKUP_API_PATH = "/api/lookup-representatives";
+const LOOKUP_API_FALLBACK =
+  "https://congress-bills-dashboard.vercel.app/api/lookup-representatives";
 const CONGRESS_API_BASE = "https://api.congress.gov/v3";
 const CONGRESS = 119;
 
@@ -105,6 +182,109 @@ function clientDeltaFromText(text = "") {
   const summary = String(text || "").trim();
   if (!summary) return { added: [], changed: [], removed: [] };
   return { added: [summary], changed: [], removed: [] };
+}
+
+function normalizeCityName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\bcity of\b/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function populateStateOptions() {
+  if (!stateFilterSelect) return;
+  const fragment = document.createDocumentFragment();
+  for (const [code, name] of US_STATES) {
+    const option = document.createElement("option");
+    option.value = code;
+    option.textContent = name;
+    fragment.appendChild(option);
+  }
+  stateFilterSelect.appendChild(fragment);
+}
+
+function readStoredFilters() {
+  try {
+    filterState.stateCode = String(localStorage.getItem(STORAGE_KEYS.state) || "").toUpperCase();
+    filterState.locationOn = localStorage.getItem(STORAGE_KEYS.locationOn) === "1";
+    filterState.addressQuery = String(localStorage.getItem(STORAGE_KEYS.address) || "");
+  } catch {
+    // Ignore storage failures (private mode, etc.).
+  }
+}
+
+function persistFilters() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.state, filterState.stateCode || "");
+    localStorage.setItem(STORAGE_KEYS.locationOn, filterState.locationOn ? "1" : "0");
+    localStorage.setItem(STORAGE_KEYS.address, filterState.addressQuery || "");
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function syncFilterControls() {
+  if (stateFilterSelect) stateFilterSelect.value = filterState.stateCode || "";
+  if (locationToggle) locationToggle.checked = Boolean(filterState.locationOn);
+  if (locationInput) locationInput.value = filterState.addressQuery || "";
+  if (locationForm) {
+    locationForm.hidden = !filterState.locationOn;
+  }
+  updateFilterStatusLine();
+}
+
+function updateFilterStatusLine() {
+  if (!filterStatus) return;
+  const parts = [];
+  if (filterState.stateCode) {
+    parts.push(STATE_NAME_BY_CODE[filterState.stateCode] || filterState.stateCode);
+  }
+  if (filterState.locationOn && filterState.resolved) {
+    const city = filterState.resolved.city;
+    const state = filterState.resolved.state;
+    parts.push(city && state ? `${city}, ${state}` : city || state || "location set");
+  } else if (filterState.locationOn && filterState.addressQuery) {
+    parts.push(`looking up ${filterState.addressQuery}`);
+  }
+
+  if (!parts.length) {
+    filterStatus.hidden = true;
+    filterStatus.textContent = "";
+    return;
+  }
+
+  filterStatus.hidden = false;
+  filterStatus.textContent = `Filtering: ${parts.join(" · ")}`;
+}
+
+async function loadSavedHomeAddress() {
+  const client = getSupabase();
+  const user = await getUser();
+  if (!client || !user) return "";
+
+  const { data, error } = await client
+    .from("profiles")
+    .select("home_address")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (error) {
+    console.warn("Could not load home_address:", error.message);
+    return "";
+  }
+  return String(data?.home_address || "").trim();
+}
+
+async function saveHomeAddress(address) {
+  const client = getSupabase();
+  const user = await getUser();
+  if (!client || !user) return;
+  const { error } = await client
+    .from("profiles")
+    .update({ home_address: address })
+    .eq("id", user.id);
+  if (error) console.warn("Could not save home_address:", error.message);
 }
 
 async function fetchClientFederalFeed(limit = 12) {
@@ -135,6 +315,8 @@ async function fetchClientFederalFeed(limit = 12) {
       title: bill.title || "Untitled bill",
       level: "Federal",
       jurisdiction: "U.S. Congress",
+      stateCode: "",
+      cityName: "",
       primarySponsor: { name: "Sponsor unavailable", title: "Member of Congress" },
       lastUpdated: actionDate
         ? new Date(`${actionDate}T12:00:00`).toISOString()
@@ -149,7 +331,10 @@ async function fetchClientFederalFeed(limit = 12) {
   });
 }
 
-async function fetchBillsFeedPayload(limit = 16) {
+async function fetchBillsFeedPayload(limit = 16, stateCode = "") {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (stateCode) query.set("state", stateCode);
+
   const endpoints = [BILLS_FEED_PATH];
   if (
     typeof location !== "undefined" &&
@@ -162,7 +347,7 @@ async function fetchBillsFeedPayload(limit = 16) {
   let lastError = null;
   for (const endpoint of endpoints) {
     try {
-      const response = await fetch(`${endpoint}?limit=${limit}`);
+      const response = await fetch(`${endpoint}?${query.toString()}`);
       const payload = await response.json().catch(() => ({}));
       if (response.ok && Array.isArray(payload.items)) {
         return payload;
@@ -186,6 +371,90 @@ async function fetchBillsFeedPayload(limit = 16) {
     items: clientItems,
     warning: lastError?.message || null,
   };
+}
+
+async function lookupGeography(query) {
+  const q = String(query || "").trim();
+  if (!q) throw new Error("Enter an address or ZIP code.");
+
+  const endpoints = [LOOKUP_API_PATH];
+  if (
+    typeof location !== "undefined" &&
+    location.origin &&
+    !location.origin.includes("vercel.app")
+  ) {
+    endpoints.push(LOOKUP_API_FALLBACK);
+  }
+
+  let lastError = null;
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`);
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        return {
+          state: String(data.geography?.state || "").toUpperCase(),
+          city: String(data.geography?.city || "").trim(),
+          county: String(data.geography?.county || "").trim(),
+          label: data.formattedAddress || q,
+        };
+      }
+      lastError = new Error(data.error || `Lookup failed (${response.status})`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Could not resolve location.");
+}
+
+function matchesStateFilter(item, stateCode) {
+  if (!stateCode) return true;
+  if (item.level === "Federal") return true;
+  return String(item.stateCode || "").toUpperCase() === stateCode;
+}
+
+function matchesLocationFilter(item, resolved, stateCode) {
+  if (!resolved) return true;
+  if (item.level === "Federal") return true;
+
+  const itemState = String(item.stateCode || "").toUpperCase();
+  const resolvedState = String(resolved.state || stateCode || "").toUpperCase();
+  if (resolvedState && itemState && itemState !== resolvedState) return false;
+
+  if (item.level === "State") {
+    return !resolvedState || itemState === resolvedState;
+  }
+
+  // City / District: narrow to matching city when we have one.
+  const resolvedCity = normalizeCityName(resolved.city);
+  if (!resolvedCity) {
+    return !resolvedState || itemState === resolvedState;
+  }
+
+  const itemCity = normalizeCityName(item.cityName);
+  const jurisdiction = normalizeCityName(item.jurisdiction);
+  if (itemCity && (itemCity === resolvedCity || itemCity.includes(resolvedCity) || resolvedCity.includes(itemCity))) {
+    return true;
+  }
+  if (jurisdiction.includes(resolvedCity)) return true;
+  return false;
+}
+
+function applyGeoFilters(items) {
+  const stateCode = filterState.stateCode || "";
+  return items.filter((item) => {
+    if (!matchesStateFilter(item, stateCode)) return false;
+    if (filterState.locationOn) {
+      return matchesLocationFilter(item, filterState.resolved, stateCode);
+    }
+    return true;
+  });
+}
+
+function recomputeVisibleItems() {
+  const filtered = applyGeoFilters(rawItems);
+  allItems = filtered;
+  myItems = filtered.filter(matchesMyFeed);
 }
 
 function sponsorKey(item) {
@@ -313,7 +582,7 @@ async function toggleFollowBill(item) {
   }
 
   feedPreferences.billIds = [...followedBillIds];
-  myItems = allItems.filter(matchesMyFeed);
+  recomputeVisibleItems();
   renderActiveTab();
 }
 
@@ -408,13 +677,20 @@ function setActiveTab(tabName) {
 function renderActiveTab() {
   const items = activeTab === "all" ? allItems : myItems;
   policyFeedList.replaceChildren();
+  updateFilterStatusLine();
 
   if (!items.length) {
     policyFeedEmpty.hidden = false;
-    policyFeedEmpty.innerHTML =
-      activeTab === "mine"
-        ? `<h2>No personalized matches yet</h2><p>Follow topics, politicians, or bill cards to build your feed.</p>`
+    const filteredOut = rawItems.length > 0;
+    if (activeTab === "mine") {
+      policyFeedEmpty.innerHTML = filteredOut
+        ? `<h2>No matches for these filters</h2><p>Try another state, clear location filtering, or follow more bills.</p>`
+        : `<h2>No personalized matches yet</h2><p>Follow topics, politicians, or bill cards to build your feed.</p>`;
+    } else {
+      policyFeedEmpty.innerHTML = filteredOut
+        ? `<h2>No matches for these filters</h2><p>Try another state or clear “Affects my location.”</p>`
         : `<h2>No bill updates available</h2><p>Check back shortly for new legislative activity.</p>`;
+    }
     return;
   }
 
@@ -422,15 +698,70 @@ function renderActiveTab() {
   policyFeedList.append(...items.map(renderBillCard));
 }
 
+async function resolveLocationIfNeeded() {
+  if (!filterState.locationOn) {
+    filterState.resolved = null;
+    return;
+  }
+
+  let query = filterState.addressQuery.trim();
+  if (!query) {
+    query = await loadSavedHomeAddress();
+    if (query) {
+      filterState.addressQuery = query;
+      if (locationInput) locationInput.value = query;
+    }
+  }
+
+  if (!query) {
+    filterState.resolved = null;
+    return;
+  }
+
+  const resolved = await lookupGeography(query);
+  filterState.resolved = resolved;
+  if (resolved.state) {
+    filterState.stateCode = resolved.state;
+    if (stateFilterSelect) stateFilterSelect.value = resolved.state;
+  }
+  persistFilters();
+  updateFilterStatusLine();
+}
+
 async function loadBillsPoliciesPage() {
   setPolicyFeedStatus("Loading bills, laws & policies…", "loading");
-  const [payload] = await Promise.all([fetchBillsFeedPayload(16), loadFeedPreferences()]);
+  await resolveLocationIfNeeded();
 
-  allItems = payload.items || [];
-  myItems = allItems.filter(matchesMyFeed);
+  const [payload] = await Promise.all([
+    fetchBillsFeedPayload(16, filterState.stateCode),
+    loadFeedPreferences(),
+  ]);
+
+  rawItems = payload.items || [];
+  recomputeVisibleItems();
   renderCoverageBadges(payload.coverage || {});
   setPolicyFeedStatus(coverageSummaryText(payload.coverage || {}), "success");
   renderActiveTab();
+}
+
+async function refreshWithFilters({ resolveLocation = false } = {}) {
+  persistFilters();
+  syncFilterControls();
+  setPolicyFeedStatus("Updating feed…", "loading");
+  try {
+    if (resolveLocation || (filterState.locationOn && !filterState.resolved)) {
+      await resolveLocationIfNeeded();
+    }
+    const payload = await fetchBillsFeedPayload(16, filterState.stateCode);
+    rawItems = payload.items || [];
+    recomputeVisibleItems();
+    renderCoverageBadges(payload.coverage || {});
+    setPolicyFeedStatus(coverageSummaryText(payload.coverage || {}), "success");
+    renderActiveTab();
+  } catch (error) {
+    console.error(error);
+    setPolicyFeedStatus(error.message || "Could not update filters.", "error");
+  }
 }
 
 tabAllFeed?.addEventListener("click", () => {
@@ -451,8 +782,49 @@ tabMyFeed?.addEventListener("click", async () => {
   renderActiveTab();
 });
 
+stateFilterSelect?.addEventListener("change", async () => {
+  filterState.stateCode = String(stateFilterSelect.value || "").toUpperCase();
+  await refreshWithFilters();
+});
+
+locationToggle?.addEventListener("change", async () => {
+  filterState.locationOn = Boolean(locationToggle.checked);
+  if (!filterState.locationOn) {
+    filterState.resolved = null;
+  }
+  syncFilterControls();
+  await refreshWithFilters({ resolveLocation: filterState.locationOn });
+});
+
+locationForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  filterState.locationOn = true;
+  filterState.addressQuery = String(locationInput?.value || "").trim();
+  if (locationToggle) locationToggle.checked = true;
+  if (!filterState.addressQuery) {
+    setPolicyFeedStatus("Enter an address or ZIP to filter by location.", "error");
+    return;
+  }
+  await saveHomeAddress(filterState.addressQuery);
+  await refreshWithFilters({ resolveLocation: true });
+});
+
 (async function initBillsPoliciesPage() {
   await bootNav("bills-policies");
+  populateStateOptions();
+  readStoredFilters();
+
+  try {
+    const saved = await loadSavedHomeAddress();
+    if (saved && !filterState.addressQuery) {
+      filterState.addressQuery = saved;
+    }
+  } catch (error) {
+    console.warn(error);
+  }
+
+  syncFilterControls();
+
   try {
     await loadBillsPoliciesPage();
   } catch (error) {
