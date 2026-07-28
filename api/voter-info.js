@@ -97,18 +97,114 @@ function formatPlace(place = {}) {
 
 function inferElectionLevel(election = {}) {
   const text = `${election.name || ""} ${election.ocdDivisionId || ""}`.toLowerCase();
-  if (text.includes("country:us") || text.includes("federal") || text.includes("general")) {
-    if (text.includes("primary") && !text.includes("country:us")) return "State";
-    if (text.includes("country:us") || /\b(congress|presidential|midterm)\b/.test(text)) {
-      return "Federal";
-    }
-  }
   if (text.includes("city") || text.includes("municipal") || text.includes("mayor")) {
     return "Local";
   }
   if (text.includes("county")) return "Local";
+  const ocd = String(election.ocdDivisionId || "").toLowerCase();
+  if (ocd.includes("/state:") && !/country:us$/.test(ocd.replace(/\/$/, ""))) {
+    return "State";
+  }
+  if (
+    text.includes("federal") ||
+    text.includes("congress") ||
+    text.includes("presidential") ||
+    text.includes("midterm") ||
+    (ocd.includes("country:us") && !ocd.includes("/state:"))
+  ) {
+    return "Federal";
+  }
   if (text.includes("state:")) return "State";
   return "State";
+}
+
+function isNationwideFederalElection(election = {}) {
+  const ocd = String(election.ocdDivisionId || "").toLowerCase();
+  const name = String(election.name || "").toLowerCase();
+  if (ocd.includes("/state:")) return false;
+  if (ocd.includes("country:us") && !ocd.includes("/state:")) return true;
+  return (
+    /\b(federal|u\.?s\.?|national|congress|presidential|midterm)\b/.test(name) &&
+    !/\b(primary|county|city|municipal)\b/.test(name)
+  );
+}
+
+const STATE_NAMES = {
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
+  CA: "California",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  DC: "District of Columbia",
+  FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
+  WY: "Wyoming",
+};
+
+function electionMatchesState(election = {}, stateCode = "") {
+  const code = normalizeStateCode(stateCode);
+  if (!code) return isNationwideFederalElection(election);
+
+  const ocd = String(election.ocdDivisionId || "").toLowerCase();
+  const name = String(election.name || "").toLowerCase();
+  const stateName = String(STATE_NAMES[code] || "").toLowerCase();
+
+  if (ocd.includes(`state:${code.toLowerCase()}`)) return true;
+  if (isNationwideFederalElection(election)) return true;
+
+  if (stateName && name.includes(stateName)) return true;
+  return false;
+}
+
+function stateCodeFromAddress(address = "") {
+  const text = String(address || "");
+  const zipState = text.match(/\b([A-Za-z]{2})\s+\d{5}(?:-\d{4})?\b/);
+  if (zipState) return normalizeStateCode(zipState[1]);
+  const commaState = text.match(/,\s*([A-Za-z]{2})\b/);
+  if (commaState) return normalizeStateCode(commaState[1]);
+  return "";
 }
 
 function fallbackElections() {
@@ -233,17 +329,20 @@ module.exports = async function handler(req, res) {
     }
 
     const normalized = voterData?.normalizedInput || {};
-    const stateCode = normalizeStateCode(normalized.state);
+    const stateCode =
+      normalizeStateCode(normalized.state) || stateCodeFromAddress(address);
     registrationLinks.stateSite = STATE_ELECTION_SITES[stateCode] || "";
 
-    const otherElections = (voterData?.otherElections || []).map((item) => ({
-      id: String(item.id),
-      name: item.name || "Election",
-      electionDay: item.electionDay || "",
-      ocdDivisionId: item.ocdDivisionId || "",
-      level: inferElectionLevel(item),
-      source: "google-civic",
-    }));
+    const otherElections = (voterData?.otherElections || [])
+      .map((item) => ({
+        id: String(item.id),
+        name: item.name || "Election",
+        electionDay: item.electionDay || "",
+        ocdDivisionId: item.ocdDivisionId || "",
+        level: inferElectionLevel(item),
+        source: "google-civic",
+      }))
+      .filter((item) => electionMatchesState(item, stateCode));
 
     const primaryElection = voterData?.election
       ? {
@@ -256,19 +355,17 @@ module.exports = async function handler(req, res) {
         }
       : null;
 
+    const primaryAllowed =
+      primaryElection && electionMatchesState(primaryElection, stateCode)
+        ? primaryElection
+        : null;
+
     const mergedElections = [];
     const seen = new Set();
     for (const item of [
-      primaryElection,
+      primaryAllowed,
       ...otherElections,
-      ...elections.filter((item) => {
-        if (!stateCode) return true;
-        const ocd = String(item.ocdDivisionId || "").toLowerCase();
-        return (
-          ocd.includes("country:us") ||
-          ocd.includes(`state:${stateCode.toLowerCase()}`)
-        );
-      }),
+      ...elections.filter((item) => electionMatchesState(item, stateCode)),
     ].filter(Boolean)) {
       if (seen.has(item.id)) continue;
       seen.add(item.id);
@@ -281,7 +378,7 @@ module.exports = async function handler(req, res) {
 
     const voterInfo = voterData
       ? {
-          election: primaryElection,
+          election: primaryAllowed,
           pollingLocations: (voterData.pollingLocations || [])
             .slice(0, 5)
             .map(formatPlace),
