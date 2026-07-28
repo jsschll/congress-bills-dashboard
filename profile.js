@@ -310,7 +310,7 @@ function fillBillSelects() {
       option.value = bill.id;
       option.textContent = `${bill.bill_number || bill.id} — ${
         bill.title || "Untitled"
-      }`.slice(0, 120);
+      }`.slice(0, 72);
       select.append(option);
     }
     if ([...select.options].some((opt) => opt.value === current)) {
@@ -336,7 +336,8 @@ function fillPoliticianSelect() {
       person.state,
     ]
       .filter(Boolean)
-      .join(" · ");
+      .join(" · ")
+      .slice(0, 72);
     contactPoliticianSelect.append(option);
   }
   if ([...contactPoliticianSelect.options].some((opt) => opt.value === current)) {
