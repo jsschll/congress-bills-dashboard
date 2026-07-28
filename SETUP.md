@@ -13,6 +13,7 @@
    - If you already ran an older schema, also run [`supabase/migration-username-auth.sql`](supabase/migration-username-auth.sql)
    - For Bills location filters, also run [`supabase/migration-profile-home-address.sql`](supabase/migration-profile-home-address.sql) (adds `profiles.home_address`)
    - For civic profile preferences, also run [`supabase/migration-profile-civic-prefs.sql`](supabase/migration-profile-civic-prefs.sql)
+   - For the civic action tracker, also run [`supabase/migration-civic-actions.sql`](supabase/migration-civic-actions.sql)
    - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
 5. Project Settings → API: copy Project URL and the **anon / publishable** key
 
@@ -51,7 +52,8 @@ Cron runs `/api/watch-bills` once daily at midnight UTC (`vercel.json`).
 3. Set street address or ZIP, impact-scale preference, and notification preferences
 4. Representation cards resolve from the same lookup API as Politicians
 5. Following lists topics, politicians, and bills with unfollow controls
-6. Civic action tracker and election center are scaffolded for a later pass
+6. Civic action tracker: private bill notes + representative contact log ([`supabase/migration-civic-actions.sql`](supabase/migration-civic-actions.sql))
+7. Election center is scaffolded for a later pass
 
 ## 5. Auth flow
 1. Sign up with username, email, and password

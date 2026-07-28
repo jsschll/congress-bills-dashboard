@@ -16,6 +16,24 @@ const followedPoliticiansList = document.getElementById(
   "profile-followed-politicians"
 );
 const followedBillsList = document.getElementById("profile-followed-bills");
+const noteForm = document.getElementById("profile-note-form");
+const contactForm = document.getElementById("profile-contact-form");
+const noteBillSelect = document.getElementById("note-bill-select");
+const noteBillLabel = document.getElementById("note-bill-label");
+const noteTitle = document.getElementById("note-title");
+const noteBody = document.getElementById("note-body");
+const noteDate = document.getElementById("note-date");
+const contactPoliticianSelect = document.getElementById(
+  "contact-politician-select"
+);
+const contactPoliticianName = document.getElementById(
+  "contact-politician-name"
+);
+const contactBillSelect = document.getElementById("contact-bill-select");
+const contactMethod = document.getElementById("contact-method");
+const contactBody = document.getElementById("contact-body");
+const contactDate = document.getElementById("contact-date");
+const actionsLog = document.getElementById("profile-actions-log");
 
 const PROFILE_SELECT =
   "username, email, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood";
@@ -31,6 +49,19 @@ let profile = {
   notify_digest: "weekly",
   notify_neighborhood: false,
 };
+let followedBillOptions = [];
+let followedPoliticianOptions = [];
+let civicActions = [];
+let civicActionFilter = "all";
+
+function todayInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function setDefaultActionDates() {
+  if (noteDate && !noteDate.value) noteDate.value = todayInputValue();
+  if (contactDate && !contactDate.value) contactDate.value = todayInputValue();
+}
 
 function setProfileStatus(message, type = "loading") {
   profileStatus.hidden = !message;
@@ -236,6 +267,8 @@ async function loadFollows() {
   const bills = (billsRes.data || [])
     .map((row) => ({ followId: row.id, ...(row.bill || {}) }))
     .filter((row) => row.id);
+  followedBillOptions = bills;
+  fillBillSelects();
   if (!bills.length) {
     emptyFollowMessage(followedBillsList, "No followed bills yet.");
   } else {
@@ -257,6 +290,156 @@ async function loadFollows() {
       followedBillsList.append(li);
     }
   }
+
+  // also capture politicians for contact dropdown
+  followedPoliticianOptions = politicians;
+  fillPoliticianSelect();
+}
+
+function fillBillSelects() {
+  for (const select of [noteBillSelect, contactBillSelect]) {
+    if (!select) continue;
+    const current = select.value;
+    select.replaceChildren();
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "No bill selected";
+    select.append(blank);
+    for (const bill of followedBillOptions) {
+      const option = document.createElement("option");
+      option.value = bill.id;
+      option.textContent = `${bill.bill_number || bill.id} — ${
+        bill.title || "Untitled"
+      }`.slice(0, 120);
+      select.append(option);
+    }
+    if ([...select.options].some((opt) => opt.value === current)) {
+      select.value = current;
+    }
+  }
+}
+
+function fillPoliticianSelect() {
+  if (!contactPoliticianSelect) return;
+  const current = contactPoliticianSelect.value;
+  contactPoliticianSelect.replaceChildren();
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "Choose from followed…";
+  contactPoliticianSelect.append(blank);
+  for (const person of followedPoliticianOptions) {
+    const option = document.createElement("option");
+    option.value = person.id;
+    option.textContent = [
+      person.name,
+      person.office_title || person.chamber,
+      person.state,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    contactPoliticianSelect.append(option);
+  }
+  if ([...contactPoliticianSelect.options].some((opt) => opt.value === current)) {
+    contactPoliticianSelect.value = current;
+  }
+}
+
+function selectedBillMeta(selectEl) {
+  const id = String(selectEl?.value || "");
+  if (!id) return { bill_id: null, bill_label: null };
+  const bill = followedBillOptions.find((item) => item.id === id);
+  return {
+    bill_id: id,
+    bill_label: bill
+      ? `${bill.bill_number || id}${bill.title ? ` — ${bill.title}` : ""}`
+      : id,
+  };
+}
+
+function contactMethodLabel(value) {
+  switch (value) {
+    case "email":
+      return "Email";
+    case "call":
+      return "Phone call";
+    case "meeting":
+      return "Meeting";
+    default:
+      return "Other";
+  }
+}
+
+function renderCivicActions() {
+  if (!actionsLog) return;
+  actionsLog.replaceChildren();
+  const items = civicActions.filter(
+    (item) => civicActionFilter === "all" || item.kind === civicActionFilter
+  );
+  if (!items.length) {
+    actionsLog.innerHTML = `<li class="profile-follow-list__empty">No ${
+      civicActionFilter === "all" ? "actions" : civicActionFilter + "s"
+    } yet.</li>`;
+    return;
+  }
+
+  for (const item of items) {
+    const li = document.createElement("li");
+    li.className = `profile-action-item profile-action-item--${item.kind}`;
+    const kindLabel = item.kind === "note" ? "Note" : "Contact";
+    const meta = [
+      kindLabel,
+      item.action_date,
+      item.kind === "contact" ? contactMethodLabel(item.contact_method) : null,
+      item.politician_name,
+      item.bill_label,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    li.innerHTML = `
+      <div>
+        <strong>${escapeProfileHtml(item.title || kindLabel)}</strong>
+        <span>${escapeProfileHtml(meta)}</span>
+        <p>${escapeProfileHtml(item.body)}</p>
+      </div>
+      <button type="button" data-delete-action="${escapeProfileHtml(
+        item.id
+      )}">Delete</button>
+    `;
+    actionsLog.append(li);
+  }
+}
+
+async function loadCivicActions() {
+  const client = getSupabase();
+  const { data, error } = await client
+    .from("civic_actions")
+    .select(
+      "id, kind, title, body, bill_id, bill_label, politician_id, politician_name, contact_method, action_date, created_at"
+    )
+    .eq("user_id", currentUser.id)
+    .order("action_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  civicActions = data || [];
+  renderCivicActions();
+}
+
+async function createCivicAction(payload) {
+  const client = getSupabase();
+  const { error } = await client.from("civic_actions").insert({
+    user_id: currentUser.id,
+    ...payload,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  await loadCivicActions();
+}
+
+async function deleteCivicAction(id) {
+  const client = getSupabase();
+  const { error } = await client.from("civic_actions").delete().eq("id", id);
+  if (error) throw error;
+  await loadCivicActions();
 }
 
 async function unfollowTopic(id) {
@@ -475,6 +658,104 @@ document.getElementById("profile-follows")?.addEventListener("click", async (eve
   }
 });
 
+noteForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = String(noteBody?.value || "").trim();
+  if (!body) {
+    setProfileStatus("Write a note before saving.", "error");
+    return;
+  }
+  const billMeta = selectedBillMeta(noteBillSelect);
+  const manualLabel = String(noteBillLabel?.value || "").trim();
+  setProfileStatus("Saving note…", "loading");
+  try {
+    await createCivicAction({
+      kind: "note",
+      title: String(noteTitle?.value || "").trim() || null,
+      body,
+      bill_id: billMeta.bill_id,
+      bill_label: billMeta.bill_label || manualLabel || null,
+      politician_id: null,
+      politician_name: null,
+      contact_method: null,
+      action_date: noteDate?.value || todayInputValue(),
+    });
+    noteForm.reset();
+    setDefaultActionDates();
+    fillBillSelects();
+    setProfileStatus("Note saved.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(error.message || "Could not save note.", "error");
+  }
+});
+
+contactForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = String(contactBody?.value || "").trim();
+  const selectedId = String(contactPoliticianSelect?.value || "");
+  const selectedPerson = followedPoliticianOptions.find(
+    (person) => person.id === selectedId
+  );
+  const politicianName =
+    selectedPerson?.name || String(contactPoliticianName?.value || "").trim();
+  if (!body) {
+    setProfileStatus("Describe the contact before saving.", "error");
+    return;
+  }
+  if (!politicianName) {
+    setProfileStatus("Choose or enter a representative.", "error");
+    return;
+  }
+  const billMeta = selectedBillMeta(contactBillSelect);
+  setProfileStatus("Saving contact log…", "loading");
+  try {
+    await createCivicAction({
+      kind: "contact",
+      title: `Contacted ${politicianName}`,
+      body,
+      bill_id: billMeta.bill_id,
+      bill_label: billMeta.bill_label,
+      politician_id: selectedPerson?.id || null,
+      politician_name: politicianName,
+      contact_method: contactMethod?.value || "other",
+      action_date: contactDate?.value || todayInputValue(),
+    });
+    contactForm.reset();
+    setDefaultActionDates();
+    fillBillSelects();
+    fillPoliticianSelect();
+    setProfileStatus("Contact logged.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(error.message || "Could not log contact.", "error");
+  }
+});
+
+document
+  .querySelector(".profile-actions-filters")
+  ?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-filter]");
+    if (!button) return;
+    civicActionFilter = button.dataset.filter || "all";
+    document
+      .querySelectorAll(".profile-actions-filter")
+      .forEach((el) => el.classList.toggle("is-active", el === button));
+    renderCivicActions();
+  });
+
+actionsLog?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-delete-action]");
+  if (!button) return;
+  try {
+    await deleteCivicAction(button.dataset.deleteAction);
+    setProfileStatus("Action deleted.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(error.message || "Could not delete action.", "error");
+  }
+});
+
 (async function initProfilePage() {
   await bootNav("profile");
   currentUser = await getUser();
@@ -483,11 +764,21 @@ document.getElementById("profile-follows")?.addEventListener("click", async (eve
     return;
   }
 
+  setDefaultActionDates();
   setProfileStatus("Loading profile…", "loading");
   try {
     profile = await loadProfileRow(currentUser.id);
     fillFormsFromProfile();
-    await Promise.all([loadFollows(), loadRepresentation()]);
+    await Promise.all([
+      loadFollows(),
+      loadRepresentation(),
+      loadCivicActions().catch((error) => {
+        console.warn(error);
+        if (actionsLog) {
+          actionsLog.innerHTML = `<li class="profile-follow-list__empty">Run migration-civic-actions.sql in Supabase to enable the action tracker.</li>`;
+        }
+      }),
+    ]);
     setProfileStatus("", "success");
   } catch (error) {
     console.error(error);

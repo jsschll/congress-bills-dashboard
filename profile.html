@@ -178,14 +178,120 @@
         </div>
       </section>
 
-      <section class="profile-grid">
-        <section class="profile-panel profile-panel--soon" aria-labelledby="profile-actions-title">
-          <div class="profile-panel__header">
-            <h2 id="profile-actions-title">Civic action tracker</h2>
-            <p>Private notes and contact logs for bills and offices.</p>
+      <section class="profile-panel profile-panel--wide" aria-labelledby="profile-actions-title">
+        <div class="profile-panel__header">
+          <h2 id="profile-actions-title">Civic action tracker</h2>
+          <p>
+            Private notes on bills and a log of outreach to representatives.
+            Only you can see these.
+          </p>
+        </div>
+
+        <div class="profile-actions-forms">
+          <form id="profile-note-form" class="profile-form profile-action-form">
+            <h3>Saved note</h3>
+            <label class="profile-form__field">
+              <span>Related bill (optional)</span>
+              <select id="note-bill-select">
+                <option value="">No bill selected</option>
+              </select>
+            </label>
+            <label class="profile-form__field">
+              <span>Or bill label</span>
+              <input
+                id="note-bill-label"
+                type="text"
+                placeholder="e.g. HR 1234 · small business tax"
+              />
+            </label>
+            <label class="profile-form__field">
+              <span>Note title (optional)</span>
+              <input id="note-title" type="text" placeholder="Why this matters to me" />
+            </label>
+            <label class="profile-form__field">
+              <span>Note</span>
+              <textarea
+                id="note-body"
+                rows="4"
+                required
+                placeholder="Check how this affects my small business tax rate"
+              ></textarea>
+            </label>
+            <label class="profile-form__field">
+              <span>Date</span>
+              <input id="note-date" type="date" required />
+            </label>
+            <button class="refresh-btn" type="submit">Save note</button>
+          </form>
+
+          <form id="profile-contact-form" class="profile-form profile-action-form">
+            <h3>Contact log</h3>
+            <label class="profile-form__field">
+              <span>Representative</span>
+              <select id="contact-politician-select">
+                <option value="">Choose from followed…</option>
+              </select>
+            </label>
+            <label class="profile-form__field">
+              <span>Or name</span>
+              <input
+                id="contact-politician-name"
+                type="text"
+                placeholder="Office or representative name"
+              />
+            </label>
+            <label class="profile-form__field">
+              <span>About bill (optional)</span>
+              <select id="contact-bill-select">
+                <option value="">No bill selected</option>
+              </select>
+            </label>
+            <label class="profile-form__field">
+              <span>Contact method</span>
+              <select id="contact-method" required>
+                <option value="email">Email</option>
+                <option value="call">Phone call</option>
+                <option value="meeting">Meeting / town hall</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label class="profile-form__field">
+              <span>What you did</span>
+              <textarea
+                id="contact-body"
+                rows="4"
+                required
+                placeholder="Called the district office about housing assistance funding"
+              ></textarea>
+            </label>
+            <label class="profile-form__field">
+              <span>Date</span>
+              <input id="contact-date" type="date" required />
+            </label>
+            <button class="refresh-btn" type="submit">Log contact</button>
+          </form>
+        </div>
+
+        <div class="profile-actions-log-wrap">
+          <div class="profile-actions-log__header">
+            <h3>Your log</h3>
+            <div class="profile-actions-filters" role="group" aria-label="Filter actions">
+              <button type="button" class="profile-actions-filter is-active" data-filter="all">
+                All
+              </button>
+              <button type="button" class="profile-actions-filter" data-filter="note">
+                Notes
+              </button>
+              <button type="button" class="profile-actions-filter" data-filter="contact">
+                Contacts
+              </button>
+            </div>
           </div>
-          <p class="profile-soon">Coming next — save notes and log outreach.</p>
-        </section>
+          <ul id="profile-actions-log" class="profile-actions-log" aria-live="polite"></ul>
+        </div>
+      </section>
+
+      <section class="profile-grid">
         <section class="profile-panel profile-panel--soon" aria-labelledby="profile-elections-title">
           <div class="profile-panel__header">
             <h2 id="profile-elections-title">Election &amp; voting center</h2>
@@ -200,6 +306,6 @@
     <script src="shared.js"></script>
     <script src="nav.js"></script>
     <script src="politicians-shared.js?v=20260728e"></script>
-    <script src="profile.js?v=20260728a" defer></script>
+    <script src="profile.js?v=20260728b" defer></script>
   </body>
 </html>
