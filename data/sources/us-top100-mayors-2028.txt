@@ -1,0 +1,102 @@
+| 100 Largest Cities By Population | Rank | City | Population (2020) | Mayor | Took office | Term ends | Government type | Mayoral election in 2026? |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | New York, New York | 8,804,190 | Zohran Mamdani | 2026 | 2030 | Strong mayor | No |
+| 2 | Los Angeles, California | 3,898,747 | Karen Bass | 2022 | 2026 | Strong mayor | Yes |
+| 3 | Chicago, Illinois | 2,746,388 | Brandon Johnson | 2023 | 2027 | Strong mayor | No |
+| 4 | Houston, Texas | 2,304,580 | John Whitmire | 2024 | 2028 | Strong mayor | No |
+| 5 | Phoenix, Arizona | 1,608,139 | Kate Gallego | 2019 | 2029 | Council-manager | No |
+| 6 | Philadelphia, Pennsylvania | 1,603,797 | Cherelle Parker | 2024 | 2028 | Strong mayor | No |
+| 7 | San Antonio, Texas | 1,434,625 | Gina Ortiz Jones | 2025 | 2027 | Council-manager | No |
+| 8 | San Diego, California | 1,386,932 | Todd Gloria | 2020 | 2028 | Strong mayor | No |
+| 9 | Dallas, Texas | 1,304,379 | Eric Johnson | 2019 | 2027 | Council-manager | No |
+| 10 | San Jose, California | 1,013,240 | Matt Mahan | 2023 | 2029 | Council-manager | No |
+| 11 | Austin, Texas | 961,855 | Kirk Watson | 2023 | 2029 | Council-manager | No |
+| 12 | Jacksonville, Florida | 949,611 | Donna Deegan | 2023 | 2027 | Strong mayor | No |
+| 13 | Fort Worth, Texas | 918,915 | Mattie Parker | 2021 | 2027 | Council-manager | No |
+| 14 | Columbus, Ohio | 905,748 | Andrew J. Ginther | 2015 | 2027 | Strong mayor | No |
+| 15 | Indianapolis, Indiana | 897,041 | Joseph Hogsett | 2016 | 2028 | Strong mayor | No |
+| 16 | Charlotte, North Carolina | 874,579 | Vi Lyles | 2017 | 2027 | Council-manager | No |
+| 17 | San Francisco, California | 873,965 | Daniel Lurie | 2025 | 2029 | Strong mayor | No |
+| 18 | Seattle, Washington | 737,015 | Katie Wilson | 2026 | 2030 | Strong mayor | No |
+| 19 | Denver, Colorado | 715,522 | Michael Johnston | 2023 | 2027 | Strong mayor | No |
+| 20 | Nashville, Tennessee | 715,884 | Freddie O'Connell | 2023 | 2027 | Strong mayor | No |
+| 21 | Oklahoma City, Oklahoma | 681,054 | David Holt | 2018 | 2026 | Council-manager | Yes |
+| 22 | El Paso, Texas | 678,815 | Renard Johnson(Unknown) | 2025 | 2029 | Council-manager | No |
+| 23 | Boston, Massachusetts | 675,647 | Michelle Wu | 2021 | 2030 | Strong mayor | No |
+| 24 | Portland, Oregon | 652,503 | Keith Wilson | 2025 | 2029 | Hybrid | No |
+| 25 | Las Vegas, Nevada | 641,903 | Shelley Berkley | 2024 | 2028 | Council-manager | No |
+| 26 | Detroit, Michigan | 639,111 | Mary Sheffield | 2026 | 2030 | Strong mayor | No |
+| 27 | Memphis, Tennessee | 633,104 | Paul Young | 2024 | 2028 | Strong mayor | No |
+| 28 | Louisville, Kentucky | 633,045 | Craig Greenberg | 2023 | 2027 | Strong mayor | Yes |
+| 29 | Baltimore, Maryland | 585,708 | Brandon M. Scott | 2024 | 2028 | Strong mayor | No |
+| 30 | Milwaukee, Wisconsin | 577,222 | Cavalier Johnson | 2021 | 2028 | Strong mayor | No |
+| 31 | Albuquerque, New Mexico | 564,559 | Tim Keller | 2017 | 2029 | Strong mayor | No |
+| 32 | Tucson, Arizona | 542,629 | Regina Romero | 2019 | 2027 | Council-manager | No |
+| 33 | Fresno, California | 542,107 | Jerry Dyer | 2025 | 2029 | Hybrid | No |
+| 34 | Sacramento, California | 524,943 | Kevin McCarty | 2024 | 2028 | Council-manager | No |
+| 35 | Kansas City, Missouri | 508,090 | Quinton Lucas | 2019 | 2027 | Council-manager | No |
+| 36 | Mesa, Arizona | 504,258 | Mark Freeman | 2025 | 2029 | Council-manager | No |
+| 37 | Atlanta, Georgia | 498,715 | Andre Dickens | 2022 | 2030 | Strong mayor | No |
+| 38 | Omaha, Nebraska | 486,051 | John Ewing Jr. | 2025 | 2029 | Strong mayor | No |
+| 39 | Colorado Springs, Colorado | 478,961 | Yemi Mobolade | 2023 | 2027 | Strong mayor | No |
+| 40 | Raleigh, North Carolina | 467,665 | Janet Cowell | 2024 | 2026 | Council-manager | Yes |
+| 41 | Long Beach, California | 466,742 | Rex Richardson | 2022 | 2026 | Council-manager | Yes |
+| 42 | Virginia Beach, Virginia | 459,470 | Bob Dyer | 2018 | 2028 | Council-manager | No |
+| 43 | Miami, Florida | 442,241 | Eileen Higgins | 2025 | 2029 | Hybrid | No |
+| 44 | Oakland, California | 440,646 | Barbara Lee | 2025 | 2027 | Hybrid | Yes |
+| 45 | Minneapolis, Minnesota | 429,954 | Jacob Frey | 2022 | 2030 | Strong mayor | No |
+| 46 | Tulsa, Oklahoma | 413,066 | Monroe Nichols | 2024 | 2028 | Strong mayor | No |
+| 47 | Bakersfield, California | 403,455 | Karen Goh | 2017 | 2029 | Council-manager | No |
+| 48 | Wichita, Kansas | 397,532 | Lily Wu | 2024 | 2028 | Council-manager | No |
+| 49 | Arlington, Texas | 394,266 | Jim Ross | 2021 | 2026 | Council-manager | Yes |
+| 50 | Aurora, Colorado | 386,261 | Mike Coffman | 2019 | 2027 | Council-manager | No |
+| 51 | Tampa, Florida | 384,959 | Jane Castor | 2019 | 2027 | Strong mayor | No |
+| 52 | New Orleans, Louisiana | 383,997 | Helena Moreno | 2026 | 2030 | Strong mayor | No |
+| 53 | Cleveland, Ohio | 372,624 | Justin Bibb | 2022 | 2030 | Strong mayor | No |
+| 54 | Honolulu, Hawaii | 350,964 | Rick Blangiardi | 2021 | 2028 | Strong mayor | No |
+| 55 | Anaheim, California | 346,824 | Ashleigh Aitken | 2022 | 2026 | Council-manager | Yes |
+| 56 | Lexington, Kentucky | 322,570 | Linda Gorton | 2019 | 2027 | Strong mayor | Yes |
+| 57 | Stockton, California | 320,804 | Christina Fugazi | 2025 | 2029 | Council-manager | No |
+| 58 | Corpus Christi, Texas | 317,863 | Paulette Guajardo(Nonpartisan) | 2025 | 2027 | Council-manager | Yes |
+| 59 | Henderson, Nevada | 317,610 | Michelle Romero | 2023 | 2027 | Council-manager | Yes |
+| 60 | Riverside, California | 314,998 | Patricia Lock Dawson(Nonpartisan) | 2020 | 2028 | Council-manager | No |
+| 61 | Newark, New Jersey | 311,549 | Ras J. Baraka | 2014 | 2026 | Strong mayor | Yes |
+| 62 | St. Paul, Minnesota | 311,527 | Kaohly Her | 2026 | 2030 | Strong mayor | No |
+| 63 | Santa Ana, California | 310,227 | Valerie Amezcua | 2022 | 2026 | Council-manager | Yes |
+| 64 | Cincinnati, Ohio | 309,317 | Aftab Pureval | 2022 | 2030 | Hybrid | No |
+| 65 | Irvine, California | 307,670 | Larry Agran | 2024 | 2026 | Council-manager | Yes |
+| 66 | Orlando, Florida | 307,573 | Buddy Dyer | 2003 | 2028 | Strong mayor | No |
+| 67 | Pittsburgh, Pennsylvania | 302,971 | Corey O'Connor | 2026 | 2030 | Strong mayor | No |
+| 68 | St. Louis, Missouri | 301,578 | Cara Spencer | 2025 | 2029 | Strong mayor | No |
+| 69 | Greensboro, North Carolina | 299,035 | Marikay Abuzuaiter | 2025 | 2029 | Council-manager | No |
+| 70 | Jersey City, New Jersey | 292,449 | James Solomon | 2026 | 2029 | Strong mayor | No |
+| 71 | Anchorage, Alaska | 291,247 | Suzanne LaFrance(Nonpartisan) | 2024 | 2027 | Hybrid | No |
+| 72 | Lincoln, Nebraska | 291,082 | Leirion Gaylor Baird | 2019 | 2027 | Strong mayor | No |
+| 73 | Plano, Texas | 285,494 | John Muns | 2021 | 2029 | Council-manager | No |
+| 74 | Durham, North Carolina | 283,506 | Leonardo Williams | 2023 | 2027 | Council-manager | No |
+| 75 | Buffalo, New York | 278,349 | Sean Ryan | 2026 | 2030 | Strong mayor | No |
+| 76 | Chandler, Arizona | 275,987 | Kevin Hartke | 2019 | 2027 | Council-manager | Yes |
+| 77 | Chula Vista, California | 275,487 | John McCann | 2022 | 2026 | Council-manager | Yes |
+| 78 | Toledo, Ohio | 270,871 | Wade Kapszukiewicz | 2022 | 2026 | Strong mayor | No |
+| 79 | Madison, Wisconsin | 269,840 | Satya Rhodes-Conway | 2019 | 2027 | Strong mayor | No |
+| 80 | Gilbert, Arizona | 267,918 | Scott Anderson | 2025 | 2029 | Hybrid | No |
+| 81 | Reno, Nevada | 264,165 | Hillary Schieve(Nonpartisan) | 2014 | 2026 | Council-manager | Yes |
+| 82 | Fort Wayne, Indiana | 263,886 | Sharon Tucker | 2024 | 2027 | Strong mayor | No |
+| 83 | North Las Vegas, Nevada | 262,527 | Pamela Goynes-Brown | 2022 | 2026 | Council-manager | Yes |
+| 84 | St. Petersburg, Florida | 258,308 | Kenneth Welch | 2022 | 2027 | Strong mayor | Yes |
+| 85 | Lubbock, Texas | 257,141 | Mark McBrayer | 2024 | 2026 | Council-manager | Yes |
+| 86 | Irving, Texas | 256,684 | Rick Stopfer | 2017 | 2026 | Council-manager | Yes |
+| 87 | Laredo, Texas | 255,205 | Victor Treviño(Unknown) | 2022 | 2026 | Council-manager | Yes |
+| 88 | Winston-Salem, North Carolina | 249,545 | Allen Joines | 2001 | 2028 | Council-manager | No |
+| 89 | Chesapeake, Virginia | 249,422 | Richard West | 2008 | 2028 | Council-manager | No |
+| 90 | Glendale, Arizona | 248,325 | Jerry Weiers | 2013 | 2028 | Council-manager | No |
+| 91 | Garland, Texas | 246,018 | Dylan Hedrick(Nonpartisan) | 2025 | 2027 | Council-manager | No |
+| 92 | Scottsdale, Arizona | 241,361 | Lisa Borowsky | 2025 | 2029 | Council-manager | No |
+| 93 | Norfolk, Virginia | 238,005 | Kenneth Alexander | 2016 | 2029 | Council-manager | No |
+| 94 | Boise, Idaho | 235,684 | Lauren McLean | 2020 | 2028 | Strong mayor | No |
+| 95 | Fremont, California | 230,504 | Raj Salwan | 2024 | 2028 | Council-manager | No |
+| 96 | Spokane, Washington | 228,989 | Lisa Brown | 2024 | 2028 | Strong mayor | No |
+| 97 | Santa Clarita, California | 228,673 | Laurene Weste [1] | 2025 | 2026 | Council-manager | No |
+| 98 | Baton Rouge, Louisiana | 227,470 | Emile "Sid" Edwards | 2025 | 2028 | Strong mayor | No |
+| 99 | Richmond, Virginia | 226,610 | Danny Avula | 2025 | 2029 | Strong mayor | No |
+| 100 | Hialeah, Florida | 223,109 | Bryan Calvo | 2026 | 2030 | Strong mayor | No |

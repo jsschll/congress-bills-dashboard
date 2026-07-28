@@ -5,6 +5,8 @@
 1. [`../supabase/migration-selection-method-and-legislative.sql`](../supabase/migration-selection-method-and-legislative.sql) — adds `party`, `photo_url`, `selection_method`, `appointed_by`, and `Legislative` level  
 2. [`../supabase/seed-state-executives.sql`](../supabase/seed-state-executives.sql) — 50-state Executive Branch  
 3. [`../supabase/seed-state-legislators/`](../supabase/seed-state-legislators/) — run `01` … `05` in order (~7,359 senators / representatives / assembly members)
+4. [`../supabase/migration-local-officials.sql`](../supabase/migration-local-officials.sql) — creates `local_officials` for mayors / future municipal officials
+5. [`../supabase/seed-local-mayors-top100.sql`](../supabase/seed-local-mayors-top100.sql) — top 100 U.S. cities mayor seed
 
 Confirm:
 
@@ -79,6 +81,43 @@ What it loads:
 - **Appellate** chief justices for Courts of Appeals 1–14 (+ some 14th Court justices)
 
 What it does **not** wipe: your existing **District** / **County/Magistrate** rows (e.g. Fort Bend). Prefer running the **Executive Branch** seed separately (above) for governors/AGs.
+
+---
+
+## Top 100 U.S. cities — Mayors
+
+Files:
+- [`../supabase/migration-local-officials.sql`](../supabase/migration-local-officials.sql)
+- [`../supabase/seed-local-mayors-top100.sql`](../supabase/seed-local-mayors-top100.sql)
+- [`./us-top-cities-top100.json`](./us-top-cities-top100.json)
+- [`./local-mayors-top100.json`](./local-mayors-top100.json)
+- [`./local-mayors-top100-coverage.md`](./local-mayors-top100-coverage.md)
+
+What it loads:
+- A dedicated `local_officials` table for municipal records
+- Mayor rows for the **top 100 U.S. cities by 2025 population**
+- Provenance, website URL, government type, and term-year metadata where available
+
+Regenerate:
+```powershell
+node scripts/generate-local-mayors-seed.js
+```
+
+UI:
+- City/place searches can now prefer a seeded mayor from `local_officials`
+- Mayor records render under **City / Municipal** on the results page
+
+Confirm:
+```sql
+select count(*) from public.local_officials where title = 'Mayor';
+-- expect 100
+
+select state_code, city_name, full_name
+from public.local_officials
+where title = 'Mayor'
+order by state_code, city_name
+limit 20;
+```
 
 ---
 

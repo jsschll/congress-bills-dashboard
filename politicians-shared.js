@@ -533,6 +533,13 @@ function normalizeCountyName(value) {
     .trim();
 }
 
+function normalizeCityName(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+city$/i, "")
+    .trim();
+}
+
 function normalizeDistrictToken(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
@@ -940,6 +947,100 @@ async function fetchStateOfficialsForAddress({
     return dedupePoliticiansInGroup(rows.map(mapStateOfficialRow));
   } catch (error) {
     console.error("fetchStateOfficialsForAddress failed:", error);
+    return [];
+  }
+}
+
+function mapLocalOfficialRow(row) {
+  const title = readableOfficeTitle(row.title || "Mayor");
+  const selectionMethod = String(row.selection_method || "")
+    .trim()
+    .toLowerCase();
+  const appointedBy = String(row.appointed_by || "").trim();
+
+  return {
+    external_key: `local-official:${row.id}`,
+    bioguide_id: null,
+    level: "city",
+    chamber: title.toLowerCase().includes("mayor") ? "mayor" : "city_council",
+    name: row.full_name || "Unknown",
+    party: normalizePartyLabel(row.party || ""),
+    state: String(row.state_code || "").toUpperCase(),
+    district: "",
+    photo_url: row.photo_url || "",
+    website_url: row.website_url || "",
+    phone: "",
+    source: "local_officials",
+    office_title: title,
+    metadata: {
+      office_title: title,
+      city: normalizeCityName(row.city_name),
+      county: normalizeCountyName(row.county_name),
+      local_official_id: row.id,
+      party: normalizePartyLabel(row.party || ""),
+      selection_method: selectionMethod || "",
+      appointed_by: appointedBy || "",
+      source_name: row.source_name || "",
+      source_ref: row.source_ref || "",
+      government_type: row.government_type || "",
+      coverage_status: row.coverage_status || "",
+    },
+    levels: ["city"],
+    offices: [
+      {
+        level: "city",
+        chamber: title.toLowerCase().includes("mayor") ? "mayor" : "city_council",
+        office_title: title,
+        district: "",
+        source: "local_officials",
+        external_key: `local-official:${row.id}`,
+      },
+    ],
+  };
+}
+
+async function fetchLocalOfficialsForGeography({
+  state_code,
+  city_name,
+} = {}) {
+  const stateCode = normalizeStateCode(state_code);
+  const cityName = normalizeCityName(city_name);
+  if (!stateCode || !cityName) return [];
+
+  try {
+    if (typeof injectSupabaseScript === "function") {
+      await injectSupabaseScript().catch(() => {});
+    }
+    const client = getSupabase();
+    if (!client) return [];
+
+    const candidates = [
+      cityName,
+      cityName.replace(/\s+urban county$/i, ""),
+      cityName.replace(/\s+city$/i, ""),
+      cityName.replace(/^boise city$/i, "Boise"),
+    ]
+      .map((value) => normalizeCityName(value))
+      .filter(Boolean);
+
+    for (const candidate of [...new Set(candidates)]) {
+      const { data, error } = await client
+        .from("local_officials")
+        .select("*")
+        .eq("state_code", stateCode)
+        .ilike("city_name", candidate)
+        .eq("level", "City");
+      if (error) {
+        console.error("local_officials query error:", error);
+        return [];
+      }
+      if (data?.length) {
+        return dedupePoliticiansInGroup(data.map(mapLocalOfficialRow));
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error("fetchLocalOfficialsForGeography failed:", error);
     return [];
   }
 }
@@ -1470,6 +1571,9 @@ function renderPoliticianCard(
     courtName && courtName !== officeTitle ? courtName : null,
     politician.state,
     formatDistrictMeta(viewForLabel.district, viewForLabel),
+    politician.metadata?.city
+      ? politician.metadata.city
+      : null,
     politician.metadata?.county
       ? `${politician.metadata.county} County`
       : null,
@@ -1758,6 +1862,9 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   const stateJudges = Array.isArray(cardOptions.stateJudges)
     ? cardOptions.stateJudges
     : [];
+  const localOfficials = Array.isArray(cardOptions.localOfficials)
+    ? cardOptions.localOfficials
+    : [];
   const geography = cardOptions.geography || {};
   const byLevel = groupPoliticiansByLevel(politicians);
   const forceFederal = nationalOfficials.length > 0;
@@ -1873,6 +1980,12 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     const group = (byLevel.get(level) || []).filter(
       (politician) => politician.source !== "national_officials"
     );
+    const dbLocalGroup =
+      level === "city"
+        ? dedupePoliticiansInGroup(
+            localOfficials.filter((person) => person.source === "local_officials")
+          )
+        : [];
 
     const cabinet = level === "federal"
       ? dedupePoliticiansInGroup(
@@ -2126,6 +2239,48 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         cardOptions,
         level
       );
+    } else if (level === "city") {
+      const coveredNames = new Set(
+        dbLocalGroup.map((person) => normalizePersonName(person.name))
+      );
+      const civicMayors = dedupePoliticiansInGroup(
+        group.filter((person) => {
+          if (person.source === "local_officials") return false;
+          if (coveredNames.has(normalizePersonName(person.name))) return false;
+          const title = String(
+            person.office_title || person.metadata?.office_title || person.chamber || ""
+          ).toLowerCase();
+          return person.chamber === "mayor" || title.includes("mayor");
+        })
+      );
+      appendStateCategorySection(
+        list,
+        "Mayor",
+        dedupePoliticiansInGroup([...dbLocalGroup, ...civicMayors]),
+        geography.city
+          ? `No mayor record is seeded yet for ${geography.city}.`
+          : "No mayor found for this city.",
+        cardOptions,
+        level
+      );
+      const otherCity = dedupePoliticiansInGroup(
+        group.filter((person) => {
+          if (person.source === "local_officials") return false;
+          const title = String(
+            person.office_title || person.metadata?.office_title || person.chamber || ""
+          ).toLowerCase();
+          return !(person.chamber === "mayor" || title.includes("mayor"));
+        })
+      );
+      if (otherCity.length) {
+        appendPoliticianSubgroup(
+          list,
+          "Other city / municipal officials",
+          otherCity,
+          cardOptions,
+          level
+        );
+      }
     } else {
       list.append(
         ...dedupePoliticiansInGroup(group).map((politician) =>
@@ -2355,6 +2510,11 @@ function mountAddressResultsPage({
                 lookupResult.data.state ||
                 ""
             ),
+            city: normalizeCityName(
+              lookupResult.data.geography?.city ||
+                lookupResult.data.city ||
+                ""
+            ),
             county: normalizeCountyName(
               lookupResult.data.geography?.county ||
                 lookupResult.data.county ||
@@ -2377,6 +2537,10 @@ function mountAddressResultsPage({
         county_name: geography.county,
         state_senate_districts: geography.stateSenateDistricts,
         state_house_districts: geography.stateHouseDistricts,
+      });
+      const localOfficials = await fetchLocalOfficialsForGeography({
+        state_code: geography.state,
+        city_name: geography.city,
       });
       const stateJudges = stateOfficials;
 
@@ -2464,6 +2628,7 @@ function mountAddressResultsPage({
         user,
         nationalOfficials,
         stateJudges,
+        localOfficials,
         geography,
       });
 

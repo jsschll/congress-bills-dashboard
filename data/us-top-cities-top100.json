@@ -1,0 +1,802 @@
+[
+  {
+    "rank": 1,
+    "city_name": "New York",
+    "state_code": "NY",
+    "population_2025": 8584629,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 2,
+    "city_name": "Los Angeles",
+    "state_code": "CA",
+    "population_2025": 3869089,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 3,
+    "city_name": "Chicago",
+    "state_code": "IL",
+    "population_2025": 2731585,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 4,
+    "city_name": "Houston",
+    "state_code": "TX",
+    "population_2025": 2397315,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 5,
+    "city_name": "Phoenix",
+    "state_code": "AZ",
+    "population_2025": 1665481,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 6,
+    "city_name": "Philadelphia",
+    "state_code": "PA",
+    "population_2025": 1574281,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 7,
+    "city_name": "San Antonio",
+    "state_code": "TX",
+    "population_2025": 1548422,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 8,
+    "city_name": "San Diego",
+    "state_code": "CA",
+    "population_2025": 1406106,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 9,
+    "city_name": "Dallas",
+    "state_code": "TX",
+    "population_2025": 1329491,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 10,
+    "city_name": "Fort Worth",
+    "state_code": "TX",
+    "population_2025": 1028117,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 11,
+    "city_name": "Jacksonville",
+    "state_code": "FL",
+    "population_2025": 1017689,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 12,
+    "city_name": "Austin",
+    "state_code": "TX",
+    "population_2025": 1002632,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 13,
+    "city_name": "San Jose",
+    "state_code": "CA",
+    "population_2025": 989814,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 14,
+    "city_name": "Charlotte",
+    "state_code": "NC",
+    "population_2025": 964784,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 15,
+    "city_name": "Columbus",
+    "state_code": "OH",
+    "population_2025": 938396,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 16,
+    "city_name": "Indianapolis",
+    "state_code": "IN",
+    "population_2025": 910638,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 17,
+    "city_name": "San Francisco",
+    "state_code": "CA",
+    "population_2025": 826079,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 18,
+    "city_name": "Louisville",
+    "state_code": "KY",
+    "population_2025": 795222,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 19,
+    "city_name": "Seattle",
+    "state_code": "WA",
+    "population_2025": 784777,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 20,
+    "city_name": "Nashville",
+    "state_code": "TN",
+    "population_2025": 745904,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 21,
+    "city_name": "Denver",
+    "state_code": "CO",
+    "population_2025": 740613,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 22,
+    "city_name": "Oklahoma City",
+    "state_code": "OK",
+    "population_2025": 719849,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 23,
+    "city_name": "Washington, D.C.",
+    "state_code": "DC",
+    "population_2025": 693645,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 24,
+    "city_name": "El Paso",
+    "state_code": "TX",
+    "population_2025": 683012,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 25,
+    "city_name": "Las Vegas",
+    "state_code": "NV",
+    "population_2025": 679817,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 26,
+    "city_name": "Boston",
+    "state_code": "MA",
+    "population_2025": 672973,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 27,
+    "city_name": "Detroit",
+    "state_code": "MI",
+    "population_2025": 649095,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 28,
+    "city_name": "Portland",
+    "state_code": "OR",
+    "population_2025": 635109,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 29,
+    "city_name": "Memphis",
+    "state_code": "TN",
+    "population_2025": 609647,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 30,
+    "city_name": "Baltimore",
+    "state_code": "MD",
+    "population_2025": 569997,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 31,
+    "city_name": "Milwaukee",
+    "state_code": "WI",
+    "population_2025": 562407,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 32,
+    "city_name": "Albuquerque",
+    "state_code": "NM",
+    "population_2025": 556588,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 33,
+    "city_name": "Fresno",
+    "state_code": "CA",
+    "population_2025": 555549,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 34,
+    "city_name": "Tucson",
+    "state_code": "AZ",
+    "population_2025": 548371,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 35,
+    "city_name": "Sacramento",
+    "state_code": "CA",
+    "population_2025": 536449,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 36,
+    "city_name": "Atlanta",
+    "state_code": "GA",
+    "population_2025": 529110,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 37,
+    "city_name": "Kansas City",
+    "state_code": "MO",
+    "population_2025": 521220,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 38,
+    "city_name": "Mesa",
+    "state_code": "AZ",
+    "population_2025": 513656,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 39,
+    "city_name": "Raleigh",
+    "state_code": "NC",
+    "population_2025": 506306,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 40,
+    "city_name": "Colorado Springs",
+    "state_code": "CO",
+    "population_2025": 494743,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 41,
+    "city_name": "Miami",
+    "state_code": "FL",
+    "population_2025": 489812,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 42,
+    "city_name": "Omaha",
+    "state_code": "NE",
+    "population_2025": 488797,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 43,
+    "city_name": "Virginia Beach",
+    "state_code": "VA",
+    "population_2025": 453737,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 44,
+    "city_name": "Long Beach",
+    "state_code": "CA",
+    "population_2025": 450469,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 45,
+    "city_name": "Oakland",
+    "state_code": "CA",
+    "population_2025": 440838,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 46,
+    "city_name": "Minneapolis",
+    "state_code": "MN",
+    "population_2025": 430324,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 47,
+    "city_name": "Bakersfield",
+    "state_code": "CA",
+    "population_2025": 422165,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 48,
+    "city_name": "Tulsa",
+    "state_code": "OK",
+    "population_2025": 416209,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 49,
+    "city_name": "Tampa",
+    "state_code": "FL",
+    "population_2025": 413554,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 50,
+    "city_name": "Aurora",
+    "state_code": "CO",
+    "population_2025": 410053,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 51,
+    "city_name": "Arlington",
+    "state_code": "TX",
+    "population_2025": 402134,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 52,
+    "city_name": "Wichita",
+    "state_code": "KS",
+    "population_2025": 400987,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 53,
+    "city_name": "Cleveland",
+    "state_code": "OH",
+    "population_2025": 363608,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 54,
+    "city_name": "New Orleans",
+    "state_code": "LA",
+    "population_2025": 362154,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 55,
+    "city_name": "Henderson",
+    "state_code": "NV",
+    "population_2025": 353289,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 56,
+    "city_name": "Honolulu",
+    "state_code": "HI",
+    "population_2025": 341868,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 57,
+    "city_name": "Anaheim",
+    "state_code": "CA",
+    "population_2025": 341008,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 58,
+    "city_name": "Orlando",
+    "state_code": "FL",
+    "population_2025": 333888,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 59,
+    "city_name": "Lexington",
+    "state_code": "KY",
+    "population_2025": 329751,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 60,
+    "city_name": "Stockton",
+    "state_code": "CA",
+    "population_2025": 324597,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 61,
+    "city_name": "Newark",
+    "state_code": "NJ",
+    "population_2025": 323808,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 62,
+    "city_name": "Riverside",
+    "state_code": "CA",
+    "population_2025": 323057,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 63,
+    "city_name": "Irvine",
+    "state_code": "CA",
+    "population_2025": 318764,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 64,
+    "city_name": "Corpus Christi",
+    "state_code": "TX",
+    "population_2025": 317247,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 65,
+    "city_name": "Santa Ana",
+    "state_code": "CA",
+    "population_2025": 315586,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 66,
+    "city_name": "Cincinnati",
+    "state_code": "OH",
+    "population_2025": 314367,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 67,
+    "city_name": "Greensboro",
+    "state_code": "NC",
+    "population_2025": 308667,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 68,
+    "city_name": "Pittsburgh",
+    "state_code": "PA",
+    "population_2025": 307632,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 69,
+    "city_name": "St. Paul",
+    "state_code": "MN",
+    "population_2025": 306684,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 70,
+    "city_name": "Durham",
+    "state_code": "NC",
+    "population_2025": 305561,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 71,
+    "city_name": "Jersey City",
+    "state_code": "NJ",
+    "population_2025": 302013,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 72,
+    "city_name": "Lincoln",
+    "state_code": "NE",
+    "population_2025": 301522,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 73,
+    "city_name": "North Las Vegas",
+    "state_code": "NV",
+    "population_2025": 296653,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 74,
+    "city_name": "Plano",
+    "state_code": "TX",
+    "population_2025": 293028,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 75,
+    "city_name": "Gilbert",
+    "state_code": "AZ",
+    "population_2025": 287285,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 76,
+    "city_name": "Anchorage",
+    "state_code": "AK",
+    "population_2025": 287155,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 77,
+    "city_name": "Madison",
+    "state_code": "WI",
+    "population_2025": 286233,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 78,
+    "city_name": "Reno",
+    "state_code": "NV",
+    "population_2025": 283621,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 79,
+    "city_name": "Chandler",
+    "state_code": "AZ",
+    "population_2025": 278748,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 80,
+    "city_name": "St. Louis",
+    "state_code": "MO",
+    "population_2025": 278144,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 81,
+    "city_name": "Chula Vista",
+    "state_code": "CA",
+    "population_2025": 275533,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 82,
+    "city_name": "Fort Wayne",
+    "state_code": "IN",
+    "population_2025": 275203,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 83,
+    "city_name": "Buffalo",
+    "state_code": "NY",
+    "population_2025": 274613,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 84,
+    "city_name": "Lubbock",
+    "state_code": "TX",
+    "population_2025": 273071,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 85,
+    "city_name": "Laredo",
+    "state_code": "TX",
+    "population_2025": 269515,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 86,
+    "city_name": "Port St. Lucie",
+    "state_code": "FL",
+    "population_2025": 268062,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 87,
+    "city_name": "St. Petersburg",
+    "state_code": "FL",
+    "population_2025": 264033,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 88,
+    "city_name": "Toledo",
+    "state_code": "OH",
+    "population_2025": 263423,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 89,
+    "city_name": "Glendale",
+    "state_code": "AZ",
+    "population_2025": 260572,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 90,
+    "city_name": "Winston-Salem",
+    "state_code": "NC",
+    "population_2025": 257271,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 91,
+    "city_name": "Irving",
+    "state_code": "TX",
+    "population_2025": 257076,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 92,
+    "city_name": "Chesapeake",
+    "state_code": "VA",
+    "population_2025": 255332,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 93,
+    "city_name": "Garland",
+    "state_code": "TX",
+    "population_2025": 249625,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 94,
+    "city_name": "Scottsdale",
+    "state_code": "AZ",
+    "population_2025": 243006,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 95,
+    "city_name": "Boise",
+    "state_code": "ID",
+    "population_2025": 238429,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 96,
+    "city_name": "Richmond",
+    "state_code": "VA",
+    "population_2025": 237257,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 97,
+    "city_name": "Frisco",
+    "state_code": "TX",
+    "population_2025": 236955,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 98,
+    "city_name": "Cape Coral",
+    "state_code": "FL",
+    "population_2025": 236264,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 99,
+    "city_name": "McKinney",
+    "state_code": "TX",
+    "population_2025": 236001,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  },
+  {
+    "rank": 100,
+    "city_name": "Huntsville",
+    "state_code": "AL",
+    "population_2025": 233627,
+    "source_name": "Every City in the USA / U.S. Census Vintage 2025",
+    "source_ref": "https://www.everycityintheusa.com/cities/by-population/"
+  }
+]

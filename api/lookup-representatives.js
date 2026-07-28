@@ -556,6 +556,7 @@ function extractGeocodioPoliticians(geocodeResult) {
 
   const components = result.address_components || {};
   const state = (components.state || "").toUpperCase();
+  const city = String(components.city || components.place || "").trim();
   const county = String(components.county || components.county_name || "")
     .replace(/\s+county$/i, "")
     .trim();
@@ -649,6 +650,7 @@ function extractGeocodioPoliticians(geocodeResult) {
   return {
     address: formatted,
     state,
+    city,
     county,
     lat,
     lng,
@@ -1304,6 +1306,7 @@ function parseJudicialDistrictMeta(label = "") {
 function emptyGeography(state = "", county = "") {
   return {
     state: String(state || "").toUpperCase(),
+    city: "",
     county: String(county || "").replace(/\s+county$/i, "").trim(),
     appellateDistricts: [],
     trialDistricts: [],
@@ -1318,6 +1321,7 @@ function mergeGeography(...parts) {
   for (const part of parts) {
     if (!part) continue;
     if (part.state) merged.state = String(part.state).toUpperCase();
+    if (part.city) merged.city = String(part.city).trim();
     if (part.county) {
       merged.county = String(part.county).replace(/\s+county$/i, "").trim();
     }
@@ -1652,6 +1656,7 @@ module.exports = async function handler(req, res) {
   const politicianLists = [];
   let address = null;
   let state = "";
+  let city = "";
   let county = "";
   let lat = null;
   let lng = null;
@@ -1667,6 +1672,7 @@ module.exports = async function handler(req, res) {
         const geo = await fetchGeocodio(q, geocodioKey);
         address = geo.address || address;
         state = geo.state || state;
+        city = geo.city || city;
         county = geo.county || county;
         lat = geo.lat;
         lng = geo.lng;
@@ -1675,6 +1681,7 @@ module.exports = async function handler(req, res) {
         politicianLists.push(geo.politicians);
         geography = mergeGeography(geography, {
           state: geo.state,
+          city: geo.city,
           county: geo.county,
           stateSenateDistricts: geo.stateSenateDistricts || [],
           stateHouseDistricts: geo.stateHouseDistricts || [],
@@ -1711,6 +1718,7 @@ module.exports = async function handler(req, res) {
         politicianLists.push(cicero.politicians);
         geography = mergeGeography(geography, cicero.geography, {
           state,
+          city,
           county,
         });
         if (cicero.typeErrors?.length) {
@@ -1743,11 +1751,11 @@ module.exports = async function handler(req, res) {
           "No representatives found. Try a full street address. For city, county, and school board coverage, set CICERO_API_KEY (Google Civic Representatives was turned down in 2025).",
         sourcesTried,
         sourceErrors,
-        geography: mergeGeography(geography, { state, county }),
+        geography: mergeGeography(geography, { state, city, county }),
       });
     }
 
-    geography = mergeGeography(geography, { state, county });
+    geography = mergeGeography(geography, { state, city, county });
 
     const senateCount = geography.stateSenateDistricts?.length || 0;
     const houseCount = geography.stateHouseDistricts?.length || 0;
@@ -1760,6 +1768,7 @@ module.exports = async function handler(req, res) {
       query: q,
       address,
       state: geography.state || state,
+      city: geography.city || city,
       county: geography.county || county,
       placeMode,
       samplePointCount,
