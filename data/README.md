@@ -1,37 +1,58 @@
 # Judge / official data — published to cloud Supabase
 
-## All 50 states — Executive Branch (start here)
+## Run order (SQL Editor)
+
+1. [`../supabase/migration-selection-method-and-legislative.sql`](../supabase/migration-selection-method-and-legislative.sql) — adds `party`, `photo_url`, `selection_method`, `appointed_by`, and `Legislative` level  
+2. [`../supabase/seed-state-executives.sql`](../supabase/seed-state-executives.sql) — 50-state Executive Branch  
+3. [`../supabase/seed-state-legislators/`](../supabase/seed-state-legislators/) — run `01` … `05` in order (~7,359 senators / representatives / assembly members)
+
+Confirm:
+
+```sql
+select court_or_agency, selection_method, count(*)
+from state_officials
+group by 1, 2
+order by 1, 2;
+
+select count(*) from state_officials where court_or_agency = 'Legislative Branch';
+-- expect ~7350+
+```
+
+---
+
+## All 50 states — Executive Branch
 
 File: [`../supabase/seed-state-executives.sql`](../supabase/seed-state-executives.sql)
 
-Seeds **Governor, Lieutenant Governor, Attorney General, Secretary of State, and Treasurer** (or treasury equivalent) for every state, with **name, title, party, photo**.
-
-1. Open Supabase → **SQL Editor** → New query  
-2. Open that `.sql` file → **Select All → Copy**  
-3. Paste into Supabase → **Run**  
-4. Confirm:
-
-```sql
-select count(*) from state_officials where court_or_agency = 'Executive Branch';
--- expect ~240+
-
-select state_code, title, full_name, party
-from state_officials
-where court_or_agency = 'Executive Branch' and state_code = 'TX'
-order by title;
-```
+Seeds **Governor, Lieutenant Governor, Attorney General, Secretary of State, and Treasurer** (or treasury equivalent) for every state, with **name, title, party, photo**, plus **Elected** or **Appointed by …**.
 
 UI: State tab → **Executive Branch**.
 
 Notes:
 - A few states have no Lt. Governor (AZ, ME, NH, OR, WY) or no Treasurer (AK, HI).
-- Some offices are appointed; still included when they exist.
-- Photos come from Wikipedia when a free portrait is available.
+- Appointed officers show `Appointed by Governor` (or Legislature / etc.) on the card.
 
-Regenerate from source (optional):
+Regenerate (optional):
 ```powershell
 node scripts/generate-state-executives-seed.js
 node scripts/json-to-state-executives-sql.js
+```
+
+---
+
+## All 50 states — Legislature / Representatives
+
+Folder: [`../supabase/seed-state-legislators/`](../supabase/seed-state-legislators/)
+
+Source: [Open States](https://data.openstates.org/people/current/) current legislator CSVs.
+
+Each row includes title, name, photo, party, district, and `selection_method = elected`.
+
+UI: State tab → **Legislature / Representatives** (filtered to the address’s senate + house/assembly districts via Geocodio).
+
+Regenerate:
+```powershell
+node scripts/generate-state-legislators-seed.js
 ```
 
 ---

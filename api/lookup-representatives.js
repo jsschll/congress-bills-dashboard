@@ -398,12 +398,24 @@ function extractGeocodioPoliticians(geocodeResult) {
     { key: "upper", chamber: "state_senate" },
     { key: "lower", chamber: "state_house" },
   ];
+  const stateSenateDistricts = [];
+  const stateHouseDistricts = [];
 
   for (const bucket of stateBuckets) {
     const entries = stateLeg[bucket.key];
     const list = Array.isArray(entries) ? entries : entries ? [entries] : [];
     for (const entry of list) {
       const districtNumber = entry.district_number || entry.name || "";
+      const districtKey = String(districtNumber || "").trim();
+      if (districtKey) {
+        if (bucket.chamber === "state_senate") {
+          if (!stateSenateDistricts.includes(districtKey)) {
+            stateSenateDistricts.push(districtKey);
+          }
+        } else if (!stateHouseDistricts.includes(districtKey)) {
+          stateHouseDistricts.push(districtKey);
+        }
+      }
       for (const legislator of entry.current_legislators || []) {
         const mapped = mapStateLegislator(
           legislator,
@@ -453,7 +465,16 @@ function extractGeocodioPoliticians(geocodeResult) {
     });
   }
 
-  return { address: formatted, state, county, lat, lng, politicians };
+  return {
+    address: formatted,
+    state,
+    county,
+    lat,
+    lng,
+    politicians,
+    stateSenateDistricts,
+    stateHouseDistricts,
+  };
 }
 
 function mapGoogleCivicLevel(levels = [], roles = [], officeName = "") {
@@ -1046,6 +1067,8 @@ function emptyGeography(state = "", county = "") {
     appellateDistricts: [],
     trialDistricts: [],
     judicialDistrictLabels: [],
+    stateSenateDistricts: [],
+    stateHouseDistricts: [],
   };
 }
 
@@ -1073,6 +1096,18 @@ function mergeGeography(...parts) {
       const key = String(value).trim();
       if (key && !merged.judicialDistrictLabels.includes(key)) {
         merged.judicialDistrictLabels.push(key);
+      }
+    }
+    for (const value of part.stateSenateDistricts || []) {
+      const key = String(value).trim();
+      if (key && !merged.stateSenateDistricts.includes(key)) {
+        merged.stateSenateDistricts.push(key);
+      }
+    }
+    for (const value of part.stateHouseDistricts || []) {
+      const key = String(value).trim();
+      if (key && !merged.stateHouseDistricts.includes(key)) {
+        merged.stateHouseDistricts.push(key);
       }
     }
   }
@@ -1396,6 +1431,8 @@ module.exports = async function handler(req, res) {
         geography = mergeGeography(geography, {
           state: geo.state,
           county: geo.county,
+          stateSenateDistricts: geo.stateSenateDistricts || [],
+          stateHouseDistricts: geo.stateHouseDistricts || [],
         });
       } catch (error) {
         sourceErrors.push({ source: "geocodio", error: error.message });

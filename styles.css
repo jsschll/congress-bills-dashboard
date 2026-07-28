@@ -1170,6 +1170,17 @@ body {
   text-transform: uppercase;
 }
 
+.politician-card__selection {
+  justify-self: start;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: #f0f2f4;
+  color: #3d4a57;
+}
+
 .party--dem {
   background: #e8f0fb;
   color: #1e4d8c;

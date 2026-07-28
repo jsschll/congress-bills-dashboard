@@ -700,6 +700,18 @@ function mapStateOfficialRow(row) {
   } else if (levelKey === "appellate") {
     courtGroup = "appellate";
     chamber = "state_appeals";
+  } else if (levelKey === "legislative") {
+    courtGroup = "legislative";
+    if (titleLower.includes("senator") || agencyLower.includes("senate")) {
+      chamber = "state_senate";
+    } else if (
+      titleLower.includes("assembly") ||
+      agencyLower.includes("assembly")
+    ) {
+      chamber = "state_house";
+    } else {
+      chamber = "state_house";
+    }
   } else if (levelKey === "district") {
     courtGroup = "district";
     chamber = "state_district";
@@ -710,6 +722,10 @@ function mapStateOfficialRow(row) {
   }
 
   const district = String(row.district_number || row.county_name || "");
+  const selectionMethod = String(row.selection_method || "")
+    .trim()
+    .toLowerCase();
+  const appointedBy = String(row.appointed_by || "").trim();
 
   return {
     external_key: `state-official:${row.id}`,
@@ -735,6 +751,8 @@ function mapStateOfficialRow(row) {
       district_number: row.district_number != null ? String(row.district_number) : "",
       state_official_id: row.id,
       party: normalizePartyLabel(row.party || ""),
+      selection_method: selectionMethod || "",
+      appointed_by: appointedBy || "",
     },
     levels: ["state"],
     offices: [
@@ -759,6 +777,8 @@ function mapStateOfficialRow(row) {
 async function fetchStateOfficialsForAddress({
   state_code,
   county_name,
+  state_senate_districts = [],
+  state_house_districts = [],
 } = {}) {
   const stateCode = normalizeStateCode(state_code);
   const countyName = normalizeCountyName(county_name);
@@ -817,8 +837,11 @@ async function fetchStateOfficialsForAddress({
     const judicialNumbers = parseDistrictNumberList(
       mapping?.judicial_district_numbers
     );
+    const senateDistricts = parseDistrictNumberList(state_senate_districts);
+    const houseDistricts = parseDistrictNumberList(state_house_districts);
+    const legislativeDistricts = [...new Set([...senateDistricts, ...houseDistricts])];
 
-    // Fetch by level, then filter Appellate/District client-side so "1" matches "1st".
+    // Fetch by level, then filter Appellate/District/Legislative client-side.
     const queries = [
       client
         .from("state_officials")
@@ -846,12 +869,30 @@ async function fetchStateOfficialsForAddress({
             .eq("state_code", stateCode)
             .in("level", ["County/Magistrate", "County"])
         : Promise.resolve({ data: [], error: null }),
+      legislativeDistricts.length
+        ? client
+            .from("state_officials")
+            .select("*")
+            .eq("state_code", stateCode)
+            .eq("level", "Legislative")
+        : Promise.resolve({ data: [], error: null }),
     ];
 
-    const [statewideRes, appellateRes, districtRes, countyRes] =
-      await Promise.all(queries);
+    const [
+      statewideRes,
+      appellateRes,
+      districtRes,
+      countyRes,
+      legislativeRes,
+    ] = await Promise.all(queries);
 
-    for (const result of [statewideRes, appellateRes, districtRes, countyRes]) {
+    for (const result of [
+      statewideRes,
+      appellateRes,
+      districtRes,
+      countyRes,
+      legislativeRes,
+    ]) {
       if (result.error) console.error("state_officials query error:", result.error);
     }
 
@@ -868,12 +909,20 @@ async function fetchStateOfficialsForAddress({
         countyName.toLowerCase()
       );
     });
+    const legislativeRows = (legislativeRes.data || []).filter((row) => {
+      const title = String(row.title || "").toLowerCase();
+      const isSenate =
+        title.includes("senator") || title.includes("senate");
+      const pool = isSenate ? senateDistricts : houseDistricts.length ? houseDistricts : legislativeDistricts;
+      return districtNumbersMatch(row.district_number, pool);
+    });
 
     const rows = [
       ...(statewideRes.data || []),
       ...appellateRows,
       ...districtRows,
       ...countyRows,
+      ...legislativeRows,
     ];
 
     console.info(
@@ -882,6 +931,8 @@ async function fetchStateOfficialsForAddress({
         mapping,
         appellateNumbers,
         judicialNumbers,
+        senateDistricts,
+        houseDistricts,
       }
     );
 
@@ -979,10 +1030,24 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
   const countyCourts = dedupePoliticiansInGroup(
     dbOfficials.filter((person) => person.metadata?.court_group === "county")
   );
+  const dbLegislators = dedupePoliticiansInGroup(
+    dbOfficials.filter(
+      (person) => sameState(person) && person.metadata?.court_group === "legislative"
+    )
+  ).sort((a, b) => {
+    const rank = (p) =>
+      String(p.chamber || "").includes("senate")
+        ? 1
+        : String(p.office_title || "").toLowerCase().includes("senator")
+          ? 1
+          : 2;
+    return rank(a) - rank(b) || a.name.localeCompare(b.name);
+  });
 
   const coveredNames = new Set(
     [
       ...executives,
+      ...dbLegislators,
       ...statewideCourts,
       ...appellateCourts,
       ...districtCourts,
@@ -1009,7 +1074,22 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     );
   };
 
-  // Address-lookup / Civic people — keep out of judicial sections.
+  const isCivicLegislator = (person) => {
+    const chamber = String(person.chamber || "");
+    const title = String(
+      person.office_title || person.metadata?.office_title || ""
+    ).toLowerCase();
+    return (
+      chamber === "state_senate" ||
+      chamber === "state_house" ||
+      title.includes("state senator") ||
+      title.includes("state representative") ||
+      title.includes("assembly member") ||
+      title.includes("assemblymember")
+    );
+  };
+
+  // Address-lookup / Civic people — keep out of judicial + executive sections.
   const civicPeople = group.filter((person) => {
     if (
       person.source === "state_officials" ||
@@ -1021,6 +1101,7 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
     if (isStateExecutiveOfficeTitle(person.office_title || person.chamber)) {
       return false;
     }
+    if (isCivicLegislator(person)) return false;
     return !coveredNames.has(normalizePersonName(person.name));
   });
 
@@ -1047,8 +1128,26 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
       executiveRank(a) - executiveRank(b) || a.name.localeCompare(b.name)
   );
 
-  // Civic legislators from address lookup (House/Senate) only.
-  const legislature = dedupePoliticiansInGroup(civicPeople);
+  // Civic legislators only as fallback when Supabase has no district match.
+  const civicLegislators = dedupePoliticiansInGroup(
+    group.filter((person) => {
+      if (
+        person.source === "state_officials" ||
+        person.source === "state_judges"
+      ) {
+        return false;
+      }
+      if (coveredNames.has(normalizePersonName(person.name))) return false;
+      return isCivicLegislator(person);
+    })
+  );
+  const legislature = dedupePoliticiansInGroup([
+    ...dbLegislators,
+    ...civicLegislators,
+  ]);
+
+  // Other civic state people (rare leftovers).
+  const otherCivic = dedupePoliticiansInGroup(civicPeople);
 
   const hasLocalGeography = Boolean(normalizeCountyName(geography.county));
   const stateCode = normalizeStateCode(geography.state);
@@ -1056,7 +1155,7 @@ function splitStateOfficials(group = [], stateOfficials = [], geography = {}) {
 
   return {
     executives: executivesWithCivic,
-    legislature,
+    legislature: dedupePoliticiansInGroup([...legislature, ...otherCivic]),
     statewideCourts,
     appellateCourts,
     districtCourts,
@@ -1397,6 +1496,22 @@ function renderPoliticianCard(
   party.className = `politician-card__party ${partyClass(politician.party)}`;
   party.textContent = politician.party || "Independent/Other";
   extras.append(party);
+
+  const selectionMethod = String(
+    politician.metadata?.selection_method || ""
+  ).toLowerCase();
+  const appointedBy = String(politician.metadata?.appointed_by || "").trim();
+  if (selectionMethod === "elected" || selectionMethod === "appointed") {
+    const selection = document.createElement("span");
+    selection.className = "politician-card__selection";
+    selection.textContent =
+      selectionMethod === "appointed"
+        ? appointedBy
+          ? `Appointed by ${appointedBy}`
+          : "Appointed"
+        : "Elected";
+    extras.append(selection);
+  }
 
   const otherLevels = levels.filter((level) => level !== activeLevel);
   if (otherLevels.length) {
@@ -1979,17 +2094,17 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       );
       appendStateCategorySection(
         list,
-        `Statewide High Courts — Judges & Justices (${stateName})`,
-        stateSplit.statewideCourts,
-        `Statewide judicial records for ${stateName} are currently being populated`,
+        "Legislature / Representatives",
+        stateSplit.legislature,
+        "No state legislators found for this address.",
         cardOptions,
         level
       );
       appendStateCategorySection(
         list,
-        "State Legislature / Representatives",
-        stateSplit.legislature,
-        "No state legislators found for this address.",
+        `Statewide High Courts — Judges & Justices (${stateName})`,
+        stateSplit.statewideCourts,
+        `Statewide judicial records for ${stateName} are currently being populated`,
         cardOptions,
         level
       );
@@ -2262,12 +2377,18 @@ function mountAddressResultsPage({
             trialDistricts: lookupResult.data.geography?.trialDistricts || [],
             judicialDistrictLabels:
               lookupResult.data.geography?.judicialDistrictLabels || [],
+            stateSenateDistricts:
+              lookupResult.data.geography?.stateSenateDistricts || [],
+            stateHouseDistricts:
+              lookupResult.data.geography?.stateHouseDistricts || [],
           }
         : {};
 
       const stateOfficials = await fetchStateOfficialsForAddress({
         state_code: geography.state,
         county_name: geography.county,
+        state_senate_districts: geography.stateSenateDistricts,
+        state_house_districts: geography.stateHouseDistricts,
       });
       const stateJudges = stateOfficials;
 

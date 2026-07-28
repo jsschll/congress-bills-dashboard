@@ -1,0 +1,10 @@
+-- Prefer these small per-state files if the big 02–05 batches won't open.
+-- Folder: by-state/
+--
+-- If you already ran 01-AL-to-GA.sql, you still need HI → WY from by-state/.
+-- Open each file, Select All → Copy → Supabase SQL Editor → Run.
+--
+-- Confirm when done:
+-- select count(*) from state_officials where court_or_agency = 'Legislative Branch';
+-- select state_code, count(*) from state_officials
+--   where court_or_agency = 'Legislative Branch' group by 1 order by 1;
