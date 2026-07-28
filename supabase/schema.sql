@@ -8,11 +8,21 @@ create table if not exists public.profiles (
   phone text,
   username text unique,
   home_address text,
+  location_precision text default 'street' check (location_precision in ('street', 'zip')),
+  impact_scale text default 'state' check (impact_scale in ('hyperlocal', 'state', 'national')),
+  notify_critical boolean default true,
+  notify_digest text default 'weekly' check (notify_digest in ('off', 'daily', 'weekly')),
+  notify_neighborhood boolean default false,
   created_at timestamptz not null default now()
 );
 
 alter table public.profiles add column if not exists username text;
 alter table public.profiles add column if not exists home_address text;
+alter table public.profiles add column if not exists location_precision text;
+alter table public.profiles add column if not exists impact_scale text;
+alter table public.profiles add column if not exists notify_critical boolean;
+alter table public.profiles add column if not exists notify_digest text;
+alter table public.profiles add column if not exists notify_neighborhood boolean;
 create unique index if not exists profiles_username_lower_idx
   on public.profiles (lower(username))
   where username is not null;

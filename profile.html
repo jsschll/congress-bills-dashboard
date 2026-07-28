@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profile · Congress Bills</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
+
+    <main class="page page--profile">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Your civic profile</p>
+          <h1 id="profile-heading">Profile</h1>
+          <p class="subtitle">
+            Set your location, see who represents you, and manage what you
+            follow.
+          </p>
+        </div>
+      </header>
+
+      <p id="profile-status" class="status" hidden></p>
+
+      <section class="profile-grid">
+        <section class="profile-panel" aria-labelledby="profile-address-title">
+          <div class="profile-panel__header">
+            <h2 id="profile-address-title">Your location</h2>
+            <p>
+              Used to find representatives and legislation that affect your
+              area.
+            </p>
+          </div>
+
+          <aside class="profile-privacy" aria-label="Address privacy">
+            <strong>Address privacy</strong>
+            <p>
+              Your exact address is used only to determine your voting districts
+              and is never shared or sold.
+            </p>
+          </aside>
+
+          <form id="profile-address-form" class="profile-form">
+            <fieldset class="profile-precision">
+              <legend>Location precision</legend>
+              <label>
+                <input
+                  type="radio"
+                  name="location_precision"
+                  value="street"
+                  checked
+                />
+                Exact street address
+              </label>
+              <label>
+                <input type="radio" name="location_precision" value="zip" />
+                ZIP code only
+              </label>
+              <p id="profile-precision-note" class="profile-form__note">
+                Street address gives the most accurate city council and district
+                matches.
+              </p>
+            </fieldset>
+
+            <label class="profile-form__field">
+              <span id="profile-address-label">Street address</span>
+              <input
+                id="profile-address-input"
+                name="home_address"
+                type="text"
+                autocomplete="street-address"
+                placeholder="123 Main St, City, ST"
+                required
+              />
+            </label>
+
+            <button class="refresh-btn" type="submit">Save location</button>
+          </form>
+        </section>
+
+        <section class="profile-panel" aria-labelledby="profile-impact-title">
+          <div class="profile-panel__header">
+            <h2 id="profile-impact-title">Impact scale</h2>
+            <p>Choose which level of government should lead your feeds.</p>
+          </div>
+          <form id="profile-impact-form" class="profile-form">
+            <label class="profile-choice">
+              <input type="radio" name="impact_scale" value="hyperlocal" />
+              <span>
+                <strong>Hyper-local first</strong>
+                City council, zoning, county issues
+              </span>
+            </label>
+            <label class="profile-choice">
+              <input type="radio" name="impact_scale" value="state" checked />
+              <span>
+                <strong>State-level focus</strong>
+                State laws, education, infrastructure
+              </span>
+            </label>
+            <label class="profile-choice">
+              <input type="radio" name="impact_scale" value="national" />
+              <span>
+                <strong>National focus</strong>
+                Federal bills and macro policy
+              </span>
+            </label>
+            <button class="refresh-btn" type="submit">Save preference</button>
+          </form>
+        </section>
+
+        <section class="profile-panel" aria-labelledby="profile-notify-title">
+          <div class="profile-panel__header">
+            <h2 id="profile-notify-title">Notification controls</h2>
+            <p>Choose what should interrupt you — and what can wait.</p>
+          </div>
+          <form id="profile-notify-form" class="profile-form">
+            <label class="profile-choice">
+              <input id="notify-critical" type="checkbox" checked />
+              <span>
+                <strong>Critical action alerts</strong>
+                When a tracked bill reaches a final floor vote
+              </span>
+            </label>
+            <label class="profile-form__field">
+              <span>Digest email</span>
+              <select id="notify-digest" name="notify_digest">
+                <option value="off">Off</option>
+                <option value="daily">Daily</option>
+                <option value="weekly" selected>Weekly</option>
+              </select>
+            </label>
+            <label class="profile-choice">
+              <input id="notify-neighborhood" type="checkbox" />
+              <span>
+                <strong>Neighborhood alerts</strong>
+                New municipal ordinances near your location
+              </span>
+            </label>
+            <p class="profile-form__note">
+              Preferences are saved now. Email/push delivery wires up next.
+            </p>
+            <button class="refresh-btn" type="submit">Save notifications</button>
+          </form>
+        </section>
+      </section>
+
+      <section class="profile-panel profile-panel--wide" aria-labelledby="profile-reps-title">
+        <div class="profile-panel__header">
+          <h2 id="profile-reps-title">Your representation</h2>
+          <p id="profile-reps-subtitle">
+            Save a location above to map your federal, state, and local
+            officials.
+          </p>
+        </div>
+        <div id="profile-reps" class="profile-reps" aria-live="polite"></div>
+      </section>
+
+      <section class="profile-panel profile-panel--wide" aria-labelledby="profile-follows-title">
+        <div class="profile-panel__header">
+          <h2 id="profile-follows-title">Following</h2>
+          <p>Topics, politicians, and bills you are tracking.</p>
+        </div>
+        <div class="profile-follows" id="profile-follows">
+          <div>
+            <h3>Topics</h3>
+            <ul id="profile-followed-topics" class="profile-follow-list"></ul>
+          </div>
+          <div>
+            <h3>Politicians</h3>
+            <ul id="profile-followed-politicians" class="profile-follow-list"></ul>
+          </div>
+          <div>
+            <h3>Bills</h3>
+            <ul id="profile-followed-bills" class="profile-follow-list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="profile-grid">
+        <section class="profile-panel profile-panel--soon" aria-labelledby="profile-actions-title">
+          <div class="profile-panel__header">
+            <h2 id="profile-actions-title">Civic action tracker</h2>
+            <p>Private notes and contact logs for bills and offices.</p>
+          </div>
+          <p class="profile-soon">Coming next — save notes and log outreach.</p>
+        </section>
+        <section class="profile-panel profile-panel--soon" aria-labelledby="profile-elections-title">
+          <div class="profile-panel__header">
+            <h2 id="profile-elections-title">Election &amp; voting center</h2>
+            <p>Deadlines, registration, and polling place for your address.</p>
+          </div>
+          <p class="profile-soon">Coming next — election dates and voting info.</p>
+        </section>
+      </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js"></script>
+    <script src="politicians-shared.js?v=20260728e"></script>
+    <script src="profile.js?v=20260728a" defer></script>
+  </body>
+</html>

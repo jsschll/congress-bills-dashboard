@@ -82,6 +82,7 @@ function createNavShell(activePage = "home") {
         <a class="app-nav__link ${activePage === "feed" ? "is-active" : ""}" href="feed.html">Feed</a>
         <a class="app-nav__link ${activePage === "topics" ? "is-active" : ""}" href="topics.html">Topics</a>
         <a class="app-nav__link ${activePage === "politicians" ? "is-active" : ""}" href="politicians.html">Politicians</a>
+        <a class="app-nav__link ${activePage === "profile" ? "is-active" : ""}" href="profile.html">Profile</a>
       </div>
       <div class="app-nav__actions" id="app-nav-actions"></div>
     </div>
@@ -209,9 +210,11 @@ async function renderAppNav(activePage = "home") {
   bellWrap.append(bellBtn, panel);
 
   const userLabel = await getProfileLabel(user);
-  const label = document.createElement("span");
-  label.className = "app-nav__email";
+  const label = document.createElement("a");
+  label.className = "app-nav__email app-nav__email--link";
+  label.href = "profile.html";
   label.textContent = userLabel;
+  label.title = "Open profile";
 
   const outBtn = document.createElement("button");
   outBtn.type = "button";
