@@ -23,6 +23,7 @@ alter table public.profiles add column if not exists impact_scale text;
 alter table public.profiles add column if not exists notify_critical boolean;
 alter table public.profiles add column if not exists notify_digest text;
 alter table public.profiles add column if not exists notify_neighborhood boolean;
+alter table public.profiles add column if not exists voter_registration_status text;
 create unique index if not exists profiles_username_lower_idx
   on public.profiles (lower(username))
   where username is not null;

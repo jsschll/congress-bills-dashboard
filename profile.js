@@ -34,9 +34,16 @@ const contactMethod = document.getElementById("contact-method");
 const contactBody = document.getElementById("contact-body");
 const contactDate = document.getElementById("contact-date");
 const actionsLog = document.getElementById("profile-actions-log");
+const electionsContainer = document.getElementById("profile-elections");
+const registrationForm = document.getElementById("profile-registration-form");
+const ballotCuesList = document.getElementById("profile-ballot-cues");
+
+const VOTER_INFO_PATH = "/api/voter-info";
+const VOTER_INFO_FALLBACK =
+  "https://congress-bills-dashboard.vercel.app/api/voter-info";
 
 const PROFILE_SELECT =
-  "username, email, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood";
+  "username, email, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status";
 
 let currentUser = null;
 let profile = {
@@ -48,6 +55,7 @@ let profile = {
   notify_critical: true,
   notify_digest: "weekly",
   notify_neighborhood: false,
+  voter_registration_status: "",
 };
 let followedBillOptions = [];
 let followedPoliticianOptions = [];
@@ -130,6 +138,12 @@ function fillFormsFromProfile() {
   if (notifyNeighborhood) {
     notifyNeighborhood.checked = Boolean(profile.notify_neighborhood);
   }
+
+  const registration = profile.voter_registration_status || "";
+  const registrationInput = registrationForm?.querySelector(
+    `input[name="voter_registration_status"][value="${registration}"]`
+  );
+  if (registrationInput) registrationInput.checked = true;
 }
 
 async function loadProfileRow(userId) {
@@ -157,6 +171,7 @@ async function loadProfileRow(userId) {
       notify_critical: true,
       notify_digest: "weekly",
       notify_neighborhood: false,
+      voter_registration_status: "",
     };
   }
 
@@ -169,6 +184,7 @@ async function loadProfileRow(userId) {
     notify_critical: data?.notify_critical !== false,
     notify_digest: data?.notify_digest || "weekly",
     notify_neighborhood: Boolean(data?.notify_neighborhood),
+    voter_registration_status: data?.voter_registration_status || "",
   };
 }
 
@@ -443,6 +459,289 @@ async function deleteCivicAction(id) {
   await loadCivicActions();
 }
 
+function formatElectionDay(value) {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+    }).format(new Date(`${value}T12:00:00`));
+  } catch {
+    return value;
+  }
+}
+
+function placeCardHtml(place) {
+  return `
+    <article class="profile-election-place">
+      <strong>${escapeProfileHtml(place.name || "Location")}</strong>
+      <span>${escapeProfileHtml(place.address || "")}</span>
+      ${
+        place.hours
+          ? `<span>Hours: ${escapeProfileHtml(place.hours)}</span>`
+          : ""
+      }
+    </article>
+  `;
+}
+
+async function fetchVoterInfo(address) {
+  const query = new URLSearchParams({ address });
+  const endpoints = [VOTER_INFO_PATH];
+  if (
+    typeof location !== "undefined" &&
+    location.origin &&
+    !location.origin.includes("vercel.app")
+  ) {
+    endpoints.push(VOTER_INFO_FALLBACK);
+  }
+
+  let lastError = null;
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(`${endpoint}?${query.toString()}`);
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) return data;
+      lastError = new Error(data.error || `Voter info failed (${response.status})`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Could not load voter information.");
+}
+
+function renderBallotCues() {
+  if (!ballotCuesList) return;
+  ballotCuesList.replaceChildren();
+  const cues = followedBillOptions.filter((bill) => {
+    const haystack = [
+      bill.title,
+      bill.bill_number,
+      bill.jurisdiction,
+      bill.level,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return /ballot|referendum|initiative|proposition|town hall|public hearing|measure\b/.test(
+      haystack
+    );
+  });
+
+  if (!cues.length) {
+    ballotCuesList.innerHTML =
+      '<li class="profile-follow-list__empty">No ballot/hearing cues in your followed bills yet.</li>';
+    return;
+  }
+
+  for (const bill of cues) {
+    const li = document.createElement("li");
+    li.className = "profile-action-item profile-action-item--note";
+    li.innerHTML = `
+      <div>
+        <strong>${escapeProfileHtml(bill.bill_number || bill.id)}</strong>
+        <span>${escapeProfileHtml(
+          [bill.level, bill.jurisdiction].filter(Boolean).join(" · ")
+        )}</span>
+        <p>${escapeProfileHtml(bill.title || "")}</p>
+      </div>
+    `;
+    ballotCuesList.append(li);
+  }
+}
+
+function renderElectionCenter(payload) {
+  if (!electionsContainer) return;
+
+  if (!payload) {
+    electionsContainer.innerHTML =
+      '<p class="profile-follow-list__empty">Save a location above to load election and voting information.</p>';
+    return;
+  }
+
+  const elections = payload.elections || [];
+  const voterInfo = payload.voterInfo;
+  const admin = payload.admin || {};
+  const links = payload.registrationLinks || {};
+
+  const electionCards = elections
+    .slice(0, 8)
+    .map(
+      (item) => `
+      <article class="profile-election-card">
+        <span class="profile-election-card__level">${escapeProfileHtml(
+          item.level || "Election"
+        )}</span>
+        <strong>${escapeProfileHtml(item.name)}</strong>
+        <span>${escapeProfileHtml(formatElectionDay(item.electionDay))}</span>
+      </article>
+    `
+    )
+    .join("");
+
+  const polling = voterInfo?.pollingLocations || [];
+  const early = voterInfo?.earlyVoteSites || [];
+  const dropOff = voterInfo?.dropOffLocations || [];
+  const contests = voterInfo?.contests || [];
+
+  electionsContainer.innerHTML = `
+    <div class="profile-elections__meta">
+      <p>
+        <strong>Looking up:</strong>
+        ${escapeProfileHtml(payload.normalizedAddress || payload.address || "")}
+      </p>
+      <p class="profile-form__note">
+        Coverage: ${escapeProfileHtml(payload.coverage || "unknown")}
+        ${
+          payload.message
+            ? ` · ${escapeProfileHtml(payload.message)}`
+            : ""
+        }
+      </p>
+    </div>
+
+    <div class="profile-elections__section">
+      <h3>Upcoming elections</h3>
+      <div class="profile-elections__grid">
+        ${
+          electionCards ||
+          '<p class="profile-follow-list__empty">No upcoming elections found for this address.</p>'
+        }
+      </div>
+    </div>
+
+    <div class="profile-elections__section">
+      <h3>Where to vote</h3>
+      ${
+        polling.length || early.length || dropOff.length
+          ? `
+            ${
+              polling.length
+                ? `<h4>Polling places</h4><div class="profile-elections__places">${polling
+                    .map(placeCardHtml)
+                    .join("")}</div>`
+                : ""
+            }
+            ${
+              early.length
+                ? `<h4>Early voting</h4><div class="profile-elections__places">${early
+                    .map(placeCardHtml)
+                    .join("")}</div>`
+                : ""
+            }
+            ${
+              dropOff.length
+                ? `<h4>Ballot drop boxes</h4><div class="profile-elections__places">${dropOff
+                    .map(placeCardHtml)
+                    .join("")}</div>`
+                : ""
+            }
+          `
+          : `<p class="profile-follow-list__empty">No polling locations are published for a live election at this address right now. Check your state election site closer to Election Day.</p>`
+      }
+    </div>
+
+    <div class="profile-elections__section">
+      <h3>Registration &amp; official links</h3>
+      <div class="profile-elections__links">
+        <a href="${escapeProfileHtml(
+          links.voteGovRegister || "https://vote.gov/register"
+        )}" target="_blank" rel="noopener noreferrer">Register / update at Vote.gov</a>
+        ${
+          links.stateSite
+            ? `<a href="${escapeProfileHtml(
+                links.stateSite
+              )}" target="_blank" rel="noopener noreferrer">State election site</a>`
+            : ""
+        }
+        ${
+          admin.electionRegistrationUrl
+            ? `<a href="${escapeProfileHtml(
+                admin.electionRegistrationUrl
+              )}" target="_blank" rel="noopener noreferrer">Local registration info</a>`
+            : ""
+        }
+        ${
+          admin.electionRegistrationConfirmationUrl
+            ? `<a href="${escapeProfileHtml(
+                admin.electionRegistrationConfirmationUrl
+              )}" target="_blank" rel="noopener noreferrer">Confirm registration</a>`
+            : ""
+        }
+        ${
+          admin.votingLocationFinderUrl
+            ? `<a href="${escapeProfileHtml(
+                admin.votingLocationFinderUrl
+              )}" target="_blank" rel="noopener noreferrer">Official polling locator</a>`
+            : ""
+        }
+        ${
+          admin.absenteeVotingInfoUrl
+            ? `<a href="${escapeProfileHtml(
+                admin.absenteeVotingInfoUrl
+              )}" target="_blank" rel="noopener noreferrer">Absentee / mail ballot info</a>`
+            : ""
+        }
+      </div>
+    </div>
+
+    ${
+      contests.length
+        ? `<div class="profile-elections__section">
+            <h3>Contests on the ballot</h3>
+            <ul class="profile-contest-list">
+              ${contests
+                .map(
+                  (contest) => `
+                <li>
+                  <strong>${escapeProfileHtml(
+                    contest.office || contest.ballotTitle || contest.type || "Contest"
+                  )}</strong>
+                  <span>${escapeProfileHtml(
+                    [
+                      contest.type,
+                      contest.candidates
+                        ?.map((c) => c.name)
+                        .filter(Boolean)
+                        .slice(0, 4)
+                        .join(", "),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  )}</span>
+                </li>
+              `
+                )
+                .join("")}
+            </ul>
+          </div>`
+        : ""
+    }
+  `;
+}
+
+async function loadElectionCenter() {
+  const address = String(profile.home_address || "").trim();
+  renderBallotCues();
+  if (!address) {
+    renderElectionCenter(null);
+    return;
+  }
+  if (electionsContainer) {
+    electionsContainer.innerHTML =
+      '<p class="status" data-type="loading">Loading election and voting information…</p>';
+  }
+  try {
+    const payload = await fetchVoterInfo(address);
+    renderElectionCenter(payload);
+  } catch (error) {
+    console.error(error);
+    if (electionsContainer) {
+      electionsContainer.innerHTML = `<p class="profile-follow-list__empty">${escapeProfileHtml(
+        error.message || "Could not load election information."
+      )}</p>`;
+    }
+  }
+}
+
 async function unfollowTopic(id) {
   const client = getSupabase();
   const { error } = await client.from("followed_topics").delete().eq("id", id);
@@ -601,7 +900,7 @@ addressForm?.addEventListener("submit", async (event) => {
       // Ignore storage failures.
     }
     setProfileStatus("Location saved.", "success");
-    await loadRepresentation();
+    await Promise.all([loadRepresentation(), loadElectionCenter()]);
   } catch (error) {
     console.error(error);
     setProfileStatus(error.message || "Could not save location.", "error");

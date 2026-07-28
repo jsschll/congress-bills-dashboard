@@ -1851,3 +1851,131 @@ body {
   cursor: pointer;
   white-space: nowrap;
 }
+
+.profile-elections {
+  display: grid;
+  gap: 1.1rem;
+  min-width: 0;
+}
+
+.profile-elections__meta p {
+  margin: 0 0 0.35rem;
+}
+
+.profile-elections__section {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.profile-elections__section h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.profile-elections__section h4 {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
+  color: #4b5563;
+}
+
+.profile-elections__grid,
+.profile-elections__places {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.65rem;
+}
+
+.profile-election-card,
+.profile-election-place {
+  border: 1px solid var(--border-color, #d0d7de);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #fafafa;
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.profile-election-card__level {
+  justify-self: start;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #047857;
+  background: #ecfdf5;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+}
+
+.profile-election-card span,
+.profile-election-place span {
+  color: #6b7280;
+  font-size: 0.86rem;
+}
+
+.profile-elections__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.profile-elections__links a {
+  display: inline-block;
+  border: 1px solid var(--border-color, #d0d7de);
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+  font-size: 0.9rem;
+}
+
+.profile-elections__links a:hover {
+  border-color: #111827;
+}
+
+.profile-registration-form {
+  border-top: 1px solid var(--border-color, #d0d7de);
+  padding-top: 1rem;
+}
+
+.profile-registration-form h3,
+.profile-elections-reminders h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.profile-registration-choices {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.profile-contest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.profile-contest-list li {
+  border: 1px solid var(--border-color, #d0d7de);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  display: grid;
+  gap: 0.2rem;
+  background: #fff;
+}
+
+.profile-contest-list span {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.profile-elections-reminders {
+  border-top: 1px solid var(--border-color, #d0d7de);
+  padding-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+}

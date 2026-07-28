@@ -14,6 +14,7 @@
    - For Bills location filters, also run [`supabase/migration-profile-home-address.sql`](supabase/migration-profile-home-address.sql) (adds `profiles.home_address`)
    - For civic profile preferences, also run [`supabase/migration-profile-civic-prefs.sql`](supabase/migration-profile-civic-prefs.sql)
    - For the civic action tracker, also run [`supabase/migration-civic-actions.sql`](supabase/migration-civic-actions.sql)
+   - For voter registration status on Profile, also run [`supabase/migration-voter-registration-status.sql`](supabase/migration-voter-registration-status.sql)
    - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
 5. Project Settings → API: copy Project URL and the **anon / publishable** key
 
@@ -31,7 +32,7 @@ Set these for Production/Preview (Project Settings → Environment Variables, th
 - `SUPABASE_SERVICE_ROLE_KEY` (server only — never expose to the browser)
 - `GEOCODIO_API_KEY` — federal + state legislators (+ school **district names**)
 - `CICERO_API_KEY` — recommended for city, county, school board, governors, AGs, mayors, and judges ([Cicero free trial](https://www.cicerodata.com/api/)). The lookup API queries NATIONAL/STATE/LOCAL/COUNTY/SCHOOL/JUDICIAL district types.
-- `GOOGLE_CIVIC_API_KEY` — optional; Google’s Representatives API was turned down in April 2025, but still tried when set
+- `GOOGLE_CIVIC_API_KEY` — optional for Politicians lookup; **required for live Election & Voting Center** polling places / contests (Representatives API was turned down in April 2025, but Elections + voterinfo still work)
 - `OPENSTATES_API_KEY` — state bill feed + optional enrichment for state / municipal officials ([Open States](https://openstates.org/accounts/login/))
 
 Cron runs `/api/watch-bills` once daily at midnight UTC (`vercel.json`).
@@ -53,7 +54,8 @@ Cron runs `/api/watch-bills` once daily at midnight UTC (`vercel.json`).
 4. Representation cards resolve from the same lookup API as Politicians
 5. Following lists topics, politicians, and bills with unfollow controls
 6. Civic action tracker: private bill notes + representative contact log ([`supabase/migration-civic-actions.sql`](supabase/migration-civic-actions.sql))
-7. Election center is scaffolded for a later pass
+7. Election & voting center: upcoming elections, polling/early-vote sites, Vote.gov + state links, self-reported registration status, and ballot/hearing cues from followed bills (`/api/voter-info`, [`supabase/migration-voter-registration-status.sql`](supabase/migration-voter-registration-status.sql))
+8. Notification delivery (email/push) still wires up later from saved prefs
 
 ## 5. Auth flow
 1. Sign up with username, email, and password
