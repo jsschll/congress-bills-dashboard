@@ -767,20 +767,21 @@ function renderElectionCenter(payload) {
   const dropOff = voterInfo?.dropOffLocations || [];
   const contests = voterInfo?.contests || [];
 
+  const coverageNote =
+    payload.coverage === "live"
+      ? "Live election data for your address."
+      : payload.coverage === "partial"
+        ? "Some election data is available; polling details may be limited right now."
+        : payload.message ||
+          "Showing general election dates and official voter registration links.";
+
   electionsContainer.innerHTML = `
     <div class="profile-elections__meta">
       <p>
         <strong>Looking up:</strong>
         ${escapeProfileHtml(payload.normalizedAddress || payload.address || "")}
       </p>
-      <p class="profile-form__note">
-        Coverage: ${escapeProfileHtml(payload.coverage || "unknown")}
-        ${
-          payload.message
-            ? ` · ${escapeProfileHtml(payload.message)}`
-            : ""
-        }
-      </p>
+      <p class="profile-form__note">${escapeProfileHtml(coverageNote)}</p>
     </div>
 
     <div class="profile-elections__section">

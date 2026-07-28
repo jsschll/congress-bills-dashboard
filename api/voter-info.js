@@ -188,7 +188,7 @@ module.exports = async function handler(req, res) {
       ok: true,
       coverage: "fallback",
       message:
-        "GOOGLE_CIVIC_API_KEY is not set. Showing federal fallback dates and Vote.gov links.",
+        "Live polling locations need a Civic API connection. Showing federal election dates and official voter registration links for now.",
       address,
       normalizedAddress: address,
       stateCode: "",
