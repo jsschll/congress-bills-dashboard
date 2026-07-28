@@ -4,6 +4,16 @@ const addressForm = document.getElementById("profile-address-form");
 const addressInput = document.getElementById("profile-address-input");
 const addressLabel = document.getElementById("profile-address-label");
 const precisionNote = document.getElementById("profile-precision-note");
+const addressSaved = document.getElementById("profile-address-saved");
+const addressSavedValue = document.getElementById("profile-address-saved-value");
+const addressSavedMeta = document.getElementById("profile-address-saved-meta");
+const addressChangeBtn = document.getElementById("profile-address-change");
+const addressCancelBtn = document.getElementById("profile-address-cancel");
+const addressSummary = document.getElementById("profile-address-summary");
+const impactSummary = document.getElementById("profile-impact-summary");
+const notifySummary = document.getElementById("profile-notify-summary");
+const followsSummary = document.getElementById("profile-follows-summary");
+const electionsSummary = document.getElementById("profile-elections-summary");
 const impactForm = document.getElementById("profile-impact-form");
 const notifyForm = document.getElementById("profile-notify-form");
 const notifyCritical = document.getElementById("notify-critical");
@@ -36,11 +46,22 @@ const contactDate = document.getElementById("contact-date");
 const actionsLog = document.getElementById("profile-actions-log");
 const electionsContainer = document.getElementById("profile-elections");
 const registrationForm = document.getElementById("profile-registration-form");
+const registrationSaved = document.getElementById("profile-registration-saved");
+const registrationSavedValue = document.getElementById(
+  "profile-registration-saved-value"
+);
+const registrationChangeBtn = document.getElementById(
+  "profile-registration-change"
+);
+const registrationCancelBtn = document.getElementById(
+  "profile-registration-cancel"
+);
 const ballotCuesList = document.getElementById("profile-ballot-cues");
 
 const VOTER_INFO_PATH = "/api/voter-info";
 const VOTER_INFO_FALLBACK =
   "https://congress-bills-dashboard.vercel.app/api/voter-info";
+const ACCORDION_STORAGE_KEY = "profileAccordionState";
 
 const PROFILE_SELECT =
   "username, email, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status";
@@ -61,6 +82,8 @@ let followedBillOptions = [];
 let followedPoliticianOptions = [];
 let civicActions = [];
 let civicActionFilter = "all";
+let editingAddress = false;
+let editingRegistration = false;
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -92,6 +115,81 @@ function requireAuthRedirect() {
   window.location.href = `auth.html?next=${next}`;
 }
 
+function impactScaleLabel(value) {
+  switch (value) {
+    case "hyperlocal":
+      return "Hyper-local first";
+    case "national":
+      return "National focus";
+    default:
+      return "State-level focus";
+  }
+}
+
+function registrationStatusLabel(value) {
+  switch (value) {
+    case "registered":
+      return "Registered at this address";
+    case "not_registered":
+      return "Not registered";
+    case "unsure":
+      return "Not sure — should double-check";
+    default:
+      return "";
+  }
+}
+
+function precisionLabel(value) {
+  return value === "zip" ? "ZIP code only" : "Exact street address";
+}
+
+function readAccordionState() {
+  try {
+    return JSON.parse(localStorage.getItem(ACCORDION_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeAccordionState(state) {
+  try {
+    localStorage.setItem(ACCORDION_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function setAccordionOpen(panel, open) {
+  const trigger = panel.querySelector(".profile-accordion__trigger");
+  const body = panel.querySelector(".profile-accordion__body");
+  if (!trigger || !body) return;
+  panel.classList.toggle("is-collapsed", !open);
+  trigger.setAttribute("aria-expanded", String(open));
+  body.hidden = !open;
+}
+
+function initAccordions() {
+  const saved = readAccordionState();
+  document.querySelectorAll("[data-accordion]").forEach((panel) => {
+    const key = panel.dataset.accordionKey || "";
+    const defaultOpen = true;
+    const open =
+      typeof saved[key] === "boolean" ? saved[key] : defaultOpen;
+    setAccordionOpen(panel, open);
+
+    const trigger = panel.querySelector(".profile-accordion__trigger");
+    trigger?.addEventListener("click", () => {
+      const nextOpen = trigger.getAttribute("aria-expanded") !== "true";
+      setAccordionOpen(panel, nextOpen);
+      if (key) {
+        const state = readAccordionState();
+        state[key] = nextOpen;
+        writeAccordionState(state);
+      }
+    });
+  });
+}
+
 function syncPrecisionUi() {
   const precision =
     addressForm?.querySelector('input[name="location_precision"]:checked')
@@ -110,6 +208,63 @@ function syncPrecisionUi() {
     precisionNote.textContent = isZip
       ? "ZIP-only is more private, but city council district matches may be less precise."
       : "Street address gives the most accurate city council and district matches.";
+  }
+}
+
+function syncAddressView() {
+  const hasAddress = Boolean(String(profile.home_address || "").trim());
+  const showForm = !hasAddress || editingAddress;
+
+  if (addressForm) addressForm.hidden = !showForm;
+  if (addressSaved) addressSaved.hidden = showForm || !hasAddress;
+  if (addressCancelBtn) addressCancelBtn.hidden = !editingAddress || !hasAddress;
+
+  if (addressSavedValue) {
+    addressSavedValue.textContent = profile.home_address || "";
+  }
+  if (addressSavedMeta) {
+    addressSavedMeta.textContent = hasAddress
+      ? precisionLabel(profile.location_precision)
+      : "";
+  }
+  if (addressSummary) {
+    addressSummary.textContent = hasAddress
+      ? profile.home_address
+      : "Add an address or ZIP";
+  }
+}
+
+function syncRegistrationView() {
+  const status = profile.voter_registration_status || "";
+  const hasStatus = Boolean(status);
+  const showForm = !hasStatus || editingRegistration;
+
+  if (registrationForm) registrationForm.hidden = !showForm;
+  if (registrationSaved) registrationSaved.hidden = showForm || !hasStatus;
+  if (registrationCancelBtn) {
+    registrationCancelBtn.hidden = !editingRegistration || !hasStatus;
+  }
+
+  if (registrationSavedValue) {
+    registrationSavedValue.textContent = registrationStatusLabel(status);
+  }
+  if (electionsSummary) {
+    electionsSummary.textContent = hasStatus
+      ? registrationStatusLabel(status)
+      : "Elections, polling, and registration";
+  }
+}
+
+function syncPreferenceSummaries() {
+  if (impactSummary) {
+    impactSummary.textContent = impactScaleLabel(profile.impact_scale);
+  }
+  if (notifySummary) {
+    const parts = [];
+    if (profile.notify_critical !== false) parts.push("Critical on");
+    parts.push(`Digest ${profile.notify_digest || "weekly"}`);
+    if (profile.notify_neighborhood) parts.push("Neighborhood on");
+    notifySummary.textContent = parts.join(" · ");
   }
 }
 
@@ -144,6 +299,12 @@ function fillFormsFromProfile() {
     `input[name="voter_registration_status"][value="${registration}"]`
   );
   if (registrationInput) registrationInput.checked = true;
+
+  editingAddress = false;
+  editingRegistration = false;
+  syncAddressView();
+  syncRegistrationView();
+  syncPreferenceSummaries();
 }
 
 async function loadProfileRow(userId) {
@@ -310,6 +471,10 @@ async function loadFollows() {
   // also capture politicians for contact dropdown
   followedPoliticianOptions = politicians;
   fillPoliticianSelect();
+
+  if (followsSummary) {
+    followsSummary.textContent = `${topics.length} topics · ${politicians.length} politicians · ${bills.length} bills`;
+  }
 }
 
 function fillBillSelects() {
@@ -878,6 +1043,39 @@ addressForm?.addEventListener("change", (event) => {
   if (event.target?.name === "location_precision") syncPrecisionUi();
 });
 
+addressChangeBtn?.addEventListener("click", () => {
+  editingAddress = true;
+  syncAddressView();
+  addressInput?.focus();
+});
+
+addressCancelBtn?.addEventListener("click", () => {
+  editingAddress = false;
+  if (addressInput) addressInput.value = profile.home_address || "";
+  const precision = profile.location_precision === "zip" ? "zip" : "street";
+  const precisionInput = addressForm?.querySelector(
+    `input[name="location_precision"][value="${precision}"]`
+  );
+  if (precisionInput) precisionInput.checked = true;
+  syncPrecisionUi();
+  syncAddressView();
+});
+
+registrationChangeBtn?.addEventListener("click", () => {
+  editingRegistration = true;
+  syncRegistrationView();
+});
+
+registrationCancelBtn?.addEventListener("click", () => {
+  editingRegistration = false;
+  const registration = profile.voter_registration_status || "";
+  const registrationInput = registrationForm?.querySelector(
+    `input[name="voter_registration_status"][value="${registration}"]`
+  );
+  if (registrationInput) registrationInput.checked = true;
+  syncRegistrationView();
+});
+
 addressForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const precision =
@@ -899,6 +1097,8 @@ addressForm?.addEventListener("submit", async (event) => {
     } catch {
       // Ignore storage failures.
     }
+    editingAddress = false;
+    syncAddressView();
     setProfileStatus("Location saved.", "success");
     await Promise.all([loadRepresentation(), loadElectionCenter()]);
   } catch (error) {
@@ -915,6 +1115,7 @@ impactForm?.addEventListener("submit", async (event) => {
   setProfileStatus("Saving impact preference…", "loading");
   try {
     await saveProfilePatch({ impact_scale: impactScale });
+    syncPreferenceSummaries();
     setProfileStatus("Impact preference saved.", "success");
   } catch (error) {
     console.error(error);
@@ -931,6 +1132,7 @@ notifyForm?.addEventListener("submit", async (event) => {
       notify_digest: notifyDigest?.value || "weekly",
       notify_neighborhood: Boolean(notifyNeighborhood?.checked),
     });
+    syncPreferenceSummaries();
     setProfileStatus("Notification preferences saved.", "success");
   } catch (error) {
     console.error(error);
@@ -1069,6 +1271,8 @@ registrationForm?.addEventListener("submit", async (event) => {
   setProfileStatus("Saving registration status…", "loading");
   try {
     await saveProfilePatch({ voter_registration_status: status });
+    editingRegistration = false;
+    syncRegistrationView();
     setProfileStatus("Registration status saved.", "success");
   } catch (error) {
     console.error(error);
@@ -1088,6 +1292,7 @@ registrationForm?.addEventListener("submit", async (event) => {
   }
 
   setDefaultActionDates();
+  initAccordions();
   setProfileStatus("Loading profile…", "loading");
   try {
     profile = await loadProfileRow(currentUser.id);
