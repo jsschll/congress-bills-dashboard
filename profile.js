@@ -165,7 +165,11 @@ function setAccordionOpen(panel, open) {
   if (!trigger || !body) return;
   panel.classList.toggle("is-collapsed", !open);
   trigger.setAttribute("aria-expanded", String(open));
-  body.hidden = !open;
+  if (open) {
+    body.removeAttribute("hidden");
+  } else {
+    body.setAttribute("hidden", "");
+  }
 }
 
 function initAccordions() {

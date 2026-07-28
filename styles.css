@@ -1600,6 +1600,11 @@ body {
   min-width: 0;
 }
 
+.profile-panel.is-collapsed .profile-accordion__body,
+.profile-accordion__body[hidden] {
+  display: none !important;
+}
+
 .profile-panel__lede {
   margin: 0;
   color: #4b5563;
