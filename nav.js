@@ -78,8 +78,9 @@ function createNavShell(activePage = "home") {
       <a class="app-nav__brand" href="index.html">Congress Bills</a>
       <div class="app-nav__links">
         <a class="app-nav__link ${activePage === "home" ? "is-active" : ""}" href="index.html">Bills</a>
-        <a class="app-nav__link ${activePage === "bills-policies" ? "is-active" : ""}" href="bills-policies.html">Bills, Laws & Policies</a>
-        <a class="app-nav__link ${activePage === "feed" ? "is-active" : ""}" href="feed.html">Feed</a>
+        <a class="app-nav__link ${
+          activePage === "feed" || activePage === "bills-policies" ? "is-active" : ""
+        }" href="bills-policies.html">Feed</a>
         <a class="app-nav__link ${activePage === "topics" ? "is-active" : ""}" href="topics.html">Topics</a>
         <a class="app-nav__link ${activePage === "politicians" ? "is-active" : ""}" href="politicians.html">Politicians</a>
         <a class="app-nav__link ${activePage === "profile" ? "is-active" : ""}" href="profile.html">Profile</a>
@@ -169,7 +170,7 @@ async function renderAppNav(activePage = "home") {
     notifications.forEach((item) => {
       const li = document.createElement("li");
       const link = document.createElement("a");
-      link.href = `feed.html?n=${encodeURIComponent(item.id)}`;
+      link.href = `bills-policies.html?tab=updates&n=${encodeURIComponent(item.id)}`;
       link.className = `notif-bell__item ${item.read_at ? "" : "is-unread"}`;
       link.innerHTML = `
         <strong>${escapeHtml(item.bill_title || "Bill update")}</strong>
@@ -192,7 +193,7 @@ async function renderAppNav(activePage = "home") {
 
     const footer = document.createElement("a");
     footer.className = "notif-bell__footer";
-    footer.href = "feed.html";
+    footer.href = "bills-policies.html?tab=updates";
     footer.textContent = "Open feed";
     panel.append(footer);
   }

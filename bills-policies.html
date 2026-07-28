@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bills, Laws & Policies · Congress Bills</title>
+    <title>Feed · Congress Bills</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -13,15 +13,19 @@
       <header class="header">
         <div>
           <p class="eyebrow">Legislation</p>
-          <h1>Bills, Laws & Policies</h1>
+          <h1>Feed</h1>
           <p class="subtitle">
             Track what government is proposing, changing, and passing across
-            Federal, State, City, and District levels.
+            Federal, State, City, and District levels — plus updates for what
+            you follow.
           </p>
         </div>
+        <a class="refresh-btn" href="topics.html" id="feed-manage-topics" hidden
+          >Manage topics</a
+        >
       </header>
 
-      <section class="policy-feed-tabs" aria-label="Bills feeds">
+      <section class="policy-feed-tabs" aria-label="Feed views">
         <button
           id="tab-all-feed"
           class="policy-feed-tabs__button is-active"
@@ -38,9 +42,21 @@
         >
           My Feed
         </button>
+        <button
+          id="tab-updates-feed"
+          class="policy-feed-tabs__button"
+          type="button"
+          data-tab="updates"
+        >
+          Updates
+        </button>
       </section>
 
-      <section class="policy-feed-filters" aria-label="Filter bills">
+      <section
+        id="policy-feed-filters"
+        class="policy-feed-filters"
+        aria-label="Filter bills"
+      >
         <label class="policy-feed-filters__field">
           <span>State</span>
           <select id="policy-state-filter" name="state">
@@ -67,24 +83,48 @@
         <p id="policy-filter-status" class="policy-feed-filters__status" hidden></p>
       </section>
 
-      <section class="policy-feed-summary">
-        <div id="policy-feed-coverage" class="policy-feed-coverage"></div>
-        <p id="policy-feed-status" class="status" hidden></p>
-      </section>
+      <div id="policy-feed-panel">
+        <section class="policy-feed-summary">
+          <div id="policy-feed-coverage" class="policy-feed-coverage"></div>
+          <p id="policy-feed-status" class="status" hidden></p>
+        </section>
 
-      <section
-        id="policy-feed-empty"
-        class="policy-feed-empty"
-        hidden
-        aria-live="polite"
-      ></section>
+        <section
+          id="policy-feed-empty"
+          class="policy-feed-empty"
+          hidden
+          aria-live="polite"
+        ></section>
 
-      <section id="policy-feed-list" class="policy-feed-list" aria-live="polite"></section>
+        <section
+          id="policy-feed-list"
+          class="policy-feed-list"
+          aria-live="polite"
+        ></section>
+      </div>
+
+      <div id="updates-feed-panel" hidden>
+        <p id="feed-status" class="status" hidden></p>
+        <section
+          id="feed-stream"
+          class="feed-stream"
+          aria-label="Update feed"
+        ></section>
+        <section
+          id="suggestions"
+          class="feed-suggestions"
+          aria-label="Suggested bills"
+          hidden
+        >
+          <h2>You might also care about</h2>
+          <div id="suggestions-list" class="feed-stream"></div>
+        </section>
+      </div>
     </main>
 
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js"></script>
-    <script src="bills-policies.js?v=20260728h" defer></script>
+    <script src="bills-policies.js?v=20260728m" defer></script>
   </body>
 </html>
