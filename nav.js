@@ -170,7 +170,7 @@ async function renderAppNav(activePage = "home") {
     notifications.forEach((item) => {
       const li = document.createElement("li");
       const link = document.createElement("a");
-      link.href = `bills-policies.html?tab=updates&n=${encodeURIComponent(item.id)}`;
+      link.href = `bills-policies.html?tab=mine&n=${encodeURIComponent(item.id)}`;
       link.className = `notif-bell__item ${item.read_at ? "" : "is-unread"}`;
       link.innerHTML = `
         <strong>${escapeHtml(item.bill_title || "Bill update")}</strong>
@@ -193,7 +193,7 @@ async function renderAppNav(activePage = "home") {
 
     const footer = document.createElement("a");
     footer.className = "notif-bell__footer";
-    footer.href = "bills-policies.html?tab=updates";
+    footer.href = "bills-policies.html?tab=mine";
     footer.textContent = "Open feed";
     panel.append(footer);
   }

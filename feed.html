@@ -8,17 +8,17 @@
       (function () {
         var params = new URLSearchParams(window.location.search);
         var next = new URLSearchParams();
-        next.set("tab", "updates");
+        next.set("tab", "mine");
         if (params.get("n")) next.set("n", params.get("n"));
         window.location.replace("bills-policies.html?" + next.toString());
       })();
     </script>
-    <meta http-equiv="refresh" content="0;url=bills-policies.html?tab=updates" />
+    <meta http-equiv="refresh" content="0;url=bills-policies.html?tab=mine" />
   </head>
   <body>
     <p>
       Moved to
-      <a href="bills-policies.html?tab=updates">Feed → Updates</a>.
+      <a href="bills-policies.html?tab=mine">Feed → My Feed</a>.
     </p>
   </body>
 </html>

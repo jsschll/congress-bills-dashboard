@@ -15,9 +15,8 @@
           <p class="eyebrow">Legislation</p>
           <h1>Feed</h1>
           <p class="subtitle">
-            Track what government is proposing, changing, and passing across
-            Federal, State, City, and District levels — plus updates for what
-            you follow.
+            All government activity, updates on what you follow, and related
+            suggestions you might also care about.
           </p>
         </div>
         <a class="refresh-btn" href="topics.html" id="feed-manage-topics" hidden
@@ -32,7 +31,7 @@
           type="button"
           data-tab="all"
         >
-          All News Feed
+          All News
         </button>
         <button
           id="tab-my-feed"
@@ -43,12 +42,12 @@
           My Feed
         </button>
         <button
-          id="tab-updates-feed"
+          id="tab-foryou-feed"
           class="policy-feed-tabs__button"
           type="button"
-          data-tab="updates"
+          data-tab="foryou"
         >
-          Updates
+          For You
         </button>
       </section>
 
@@ -103,21 +102,15 @@
         ></section>
       </div>
 
-      <div id="updates-feed-panel" hidden>
-        <p id="feed-status" class="status" hidden></p>
-        <section
-          id="feed-stream"
-          class="feed-stream"
-          aria-label="Update feed"
-        ></section>
-        <section
-          id="suggestions"
-          class="feed-suggestions"
-          aria-label="Suggested bills"
-          hidden
-        >
-          <h2>You might also care about</h2>
-          <div id="suggestions-list" class="feed-stream"></div>
+      <div id="foryou-feed-panel" hidden>
+        <p id="foryou-status" class="status" hidden></p>
+        <section class="feed-suggestions" aria-label="Suggested items">
+          <h2>What you might also care about</h2>
+          <p class="subtitle" style="margin-top: 0.25rem; margin-bottom: 1rem">
+            Related bills and proposals based on topics and people you follow —
+            not already in your feed.
+          </p>
+          <div id="foryou-list" class="feed-stream"></div>
         </section>
       </div>
     </main>
@@ -125,6 +118,6 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js"></script>
-    <script src="bills-policies.js?v=20260728n" defer></script>
+    <script src="bills-policies.js?v=20260728o" defer></script>
   </body>
 </html>

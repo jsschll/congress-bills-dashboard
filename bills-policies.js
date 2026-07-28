@@ -4,15 +4,13 @@ const policyFeedList = document.getElementById("policy-feed-list");
 const policyFeedEmpty = document.getElementById("policy-feed-empty");
 const policyFeedPanel = document.getElementById("policy-feed-panel");
 const policyFeedFilters = document.getElementById("policy-feed-filters");
-const updatesFeedPanel = document.getElementById("updates-feed-panel");
-const feedStatus = document.getElementById("feed-status");
-const feedStream = document.getElementById("feed-stream");
-const suggestionsSection = document.getElementById("suggestions");
-const suggestionsList = document.getElementById("suggestions-list");
+const forYouFeedPanel = document.getElementById("foryou-feed-panel");
+const forYouStatus = document.getElementById("foryou-status");
+const forYouList = document.getElementById("foryou-list");
 const feedManageTopics = document.getElementById("feed-manage-topics");
 const tabAllFeed = document.getElementById("tab-all-feed");
 const tabMyFeed = document.getElementById("tab-my-feed");
-const tabUpdatesFeed = document.getElementById("tab-updates-feed");
+const tabForYouFeed = document.getElementById("tab-foryou-feed");
 const stateFilterSelect = document.getElementById("policy-state-filter");
 const locationToggle = document.getElementById("policy-location-toggle");
 const locationForm = document.getElementById("policy-location-form");
@@ -86,7 +84,9 @@ let rawItems = [];
 let allItems = [];
 let myItems = [];
 let followedBillIds = new Set();
-let updatesLoaded = false;
+let cachedNotifications = [];
+let notificationsLoaded = false;
+let forYouLoaded = false;
 let feedPreferences = {
   topics: [],
   billIds: [],
@@ -103,8 +103,18 @@ let filterState = {
 function tabFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const tab = String(params.get("tab") || "").toLowerCase();
-  if (tab === "mine" || tab === "my") return "mine";
-  if (tab === "updates" || tab === "update" || params.get("n")) return "updates";
+  if (params.get("n")) return "mine";
+  if (tab === "mine" || tab === "my" || tab === "updates" || tab === "update") {
+    return "mine";
+  }
+  if (
+    tab === "foryou" ||
+    tab === "for-you" ||
+    tab === "suggested" ||
+    tab === "suggestions"
+  ) {
+    return "foryou";
+  }
   if (tab === "all") return "all";
   return "all";
 }
@@ -113,7 +123,7 @@ function syncTabQuery(tabName) {
   const url = new URL(window.location.href);
   if (tabName === "all") url.searchParams.delete("tab");
   else url.searchParams.set("tab", tabName);
-  if (tabName !== "updates") url.searchParams.delete("n");
+  if (tabName !== "mine") url.searchParams.delete("n");
   window.history.replaceState({}, "", url);
 }
 
@@ -736,11 +746,27 @@ function renderBillCard(item) {
   return card;
 }
 
-function setUpdatesFeedStatus(message, type = "loading") {
-  if (!feedStatus) return;
-  feedStatus.hidden = !message;
-  feedStatus.textContent = message;
-  feedStatus.dataset.type = type;
+function setForYouStatus(message, type = "loading") {
+  if (!forYouStatus) return;
+  forYouStatus.hidden = !message;
+  forYouStatus.textContent = message;
+  forYouStatus.dataset.type = type;
+}
+
+function notificationBillKey(item = {}) {
+  return `${item.bill_congress || ""}-${item.bill_type || ""}-${
+    item.bill_number || ""
+  }`
+    .toLowerCase()
+    .trim();
+}
+
+function policyItemBillKey(item = {}) {
+  const fromId = String(item.id || "").replace(/^federal-/i, "");
+  if (fromId.includes("-")) return fromId.toLowerCase();
+  return String(item.billNumber || "")
+    .toLowerCase()
+    .replace(/\s+/g, "-");
 }
 
 function renderUpdateCard(item, { highlight = false, suggestion = false } = {}) {
@@ -795,133 +821,238 @@ function renderUpdateCard(item, { highlight = false, suggestion = false } = {}) 
   return card;
 }
 
-async function loadUpdateSuggestions(notifications) {
+async function ensureNotificationsLoaded({ force = false } = {}) {
+  if (notificationsLoaded && !force) return cachedNotifications;
+  if (!isSupabaseConfigured()) {
+    cachedNotifications = [];
+    notificationsLoaded = true;
+    return cachedNotifications;
+  }
+  cachedNotifications = await fetchNotifications({ limit: 40 });
+  notificationsLoaded = true;
+  return cachedNotifications;
+}
+
+async function loadForYouSuggestions({ force = false } = {}) {
+  if (forYouLoaded && !force) return;
+  if (!forYouList) return;
+
+  if (!isSupabaseConfigured()) {
+    setForYouStatus(
+      "Sign in to get personalized suggestions based on what you follow.",
+      "error"
+    );
+    return;
+  }
+
   const client = getSupabase();
   const user = await getUser();
-  if (!client || !user || typeof API_KEY === "undefined" || !API_KEY) return;
-  if (!suggestionsSection || !suggestionsList) return;
+  if (!client || !user) {
+    setForYouStatus("Sign in to see suggestions tailored to your follows.", "error");
+    return;
+  }
+
+  setForYouStatus("Finding related items…", "loading");
+  forYouList.replaceChildren();
+
+  const notifications = await ensureNotificationsLoaded();
+  const excludeKeys = new Set(notifications.map(notificationBillKey));
+  myItems.forEach((item) => excludeKeys.add(policyItemBillKey(item)));
+  followedBillIds.forEach((id) => excludeKeys.add(String(id).replace(/^federal-/i, "").toLowerCase()));
 
   const { data: follows, error } = await client
     .from("followed_topics")
     .select("*")
     .eq("user_id", user.id);
 
-  if (error || !follows?.length) return;
-
-  const notifiedKeys = new Set(
-    notifications.map(
-      (item) =>
-        `${item.bill_congress}-${item.bill_type}-${item.bill_number}`.toLowerCase()
-    )
-  );
-
-  const keywords = follows
-    .filter((item) => item.kind === "keyword")
-    .map((item) => item.value.toLowerCase());
-  const policyAreas = follows
-    .filter((item) => item.kind === "policy_area")
-    .map((item) => item.value.toLowerCase());
-
-  try {
-    const listUrl = `https://api.congress.gov/v3/bill/119?limit=40&sort=updateDate+desc&format=json&api_key=${API_KEY}`;
-    const response = await fetch(listUrl);
-    if (!response.ok) return;
-    const payload = await response.json();
-    const bills = payload.bills || [];
-
-    const suggestions = [];
-    for (const bill of bills) {
-      const key = `${bill.congress}-${bill.type}-${bill.number}`.toLowerCase();
-      if (notifiedKeys.has(key)) continue;
-
-      const title = (bill.title || "").toLowerCase();
-      const matchedKeyword = keywords.find((word) => title.includes(word));
-      const matchedPolicy = policyAreas.find(
-        (area) =>
-          title.includes(area) ||
-          area
-            .split(/[^a-z0-9]+/)
-            .filter((word) => word.length > 4)
-            .some((word) => title.includes(word))
-      );
-
-      if (!matchedKeyword && !matchedPolicy) continue;
-
-      suggestions.push({
-        bill_congress: bill.congress,
-        bill_type: bill.type,
-        bill_number: bill.number,
-        bill_title: bill.title,
-        matched_topic: matchedKeyword || matchedPolicy || "Related",
-        action_text: bill.latestAction?.text || "Recent activity",
-        action_date: bill.latestAction?.actionDate || bill.updateDate,
-        suggestion_topic: matchedKeyword
-          ? `Keyword · ${matchedKeyword}`
-          : `Related · ${matchedPolicy}`,
-      });
-
-      if (suggestions.length >= 6) break;
-    }
-
-    if (suggestions.length === 0) return;
-
-    suggestionsSection.hidden = false;
-    suggestionsList.replaceChildren(
-      ...suggestions.map((item) => renderUpdateCard(item, { suggestion: true }))
-    );
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-async function loadUpdatesFeed({ force = false } = {}) {
-  if (updatesLoaded && !force) return;
-
-  if (!isSupabaseConfigured()) {
-    setUpdatesFeedStatus(
-      "Sign-in is not configured yet, so personalized updates are unavailable.",
-      "error"
-    );
+  if (error) {
+    setForYouStatus("Could not load suggestions.", "error");
     return;
   }
 
-  setUpdatesFeedStatus("Loading your updates…", "loading");
-  try {
-    const notifications = await fetchNotifications({ limit: 40 });
-    const params = new URLSearchParams(window.location.search);
-    const focusId = params.get("n");
+  const keywords = (follows || [])
+    .filter((item) => item.kind === "keyword")
+    .map((item) => item.value.toLowerCase());
+  const policyAreas = (follows || [])
+    .filter((item) => item.kind === "policy_area")
+    .map((item) => item.value.toLowerCase());
+  const topicValues = [
+    ...keywords,
+    ...policyAreas,
+    ...feedPreferences.topics,
+  ].filter(Boolean);
 
-    feedStream?.replaceChildren();
-    if (suggestionsSection) suggestionsSection.hidden = true;
-    suggestionsList?.replaceChildren();
+  const suggestions = [];
 
-    if (notifications.length === 0) {
-      setUpdatesFeedStatus(
-        "No updates yet. Follow topics and check back after the watcher runs.",
-        "loading"
+  // Prefer related items from the broader all-news payload first.
+  for (const item of allItems) {
+    if (matchesMyFeed(item)) continue;
+    const key = policyItemBillKey(item);
+    if (excludeKeys.has(key)) continue;
+    const haystack = tagsKey(item);
+    const matched = topicValues.find((value) => value && haystack.includes(value));
+    const softMatch =
+      matched ||
+      topicValues.find((value) =>
+        value
+          .split(/[^a-z0-9]+/)
+          .filter((word) => word.length > 4)
+          .some((word) => haystack.includes(word))
       );
-    } else {
-      setUpdatesFeedStatus("", "success");
-      notifications.forEach((item) => {
-        feedStream?.append(
-          renderUpdateCard(item, { highlight: Boolean(focusId && item.id === focusId) })
-        );
-      });
-    }
+    if (!softMatch) continue;
 
-    if (focusId) {
-      await markNotificationRead(focusId);
-      const target = document.getElementById(`notif-${focusId}`);
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+    suggestions.push({
+      bill_congress: CONGRESS,
+      bill_type: String(item.billNumber || "").split(/\s+/)[0] || "",
+      bill_number: String(item.billNumber || "").split(/\s+/)[1] || "",
+      bill_title: item.title,
+      matched_topic: softMatch,
+      suggestion_topic: `Related · ${softMatch}`,
+      action_text: item.shortPitch || item.status?.stepName || "Recent activity",
+      action_date: item.lastUpdated,
+      officialUrl: item.officialUrl,
+      sourceItem: item,
+    });
+    excludeKeys.add(key);
+    if (suggestions.length >= 8) break;
+  }
+
+  // Supplement with Congress.gov when a client key is available.
+  if (
+    suggestions.length < 8 &&
+    typeof API_KEY !== "undefined" &&
+    API_KEY &&
+    !API_KEY.includes("YOUR_") &&
+    (keywords.length || policyAreas.length)
+  ) {
+    try {
+      const listUrl = `${CONGRESS_API_BASE}/bill/${CONGRESS}?limit=40&sort=updateDate+desc&format=json&api_key=${API_KEY}`;
+      const response = await fetch(listUrl);
+      if (response.ok) {
+        const payload = await response.json();
+        for (const bill of payload.bills || []) {
+          const key = `${bill.congress}-${bill.type}-${bill.number}`.toLowerCase();
+          if (excludeKeys.has(key)) continue;
+          const title = (bill.title || "").toLowerCase();
+          const matchedKeyword = keywords.find((word) => title.includes(word));
+          const matchedPolicy = policyAreas.find(
+            (area) =>
+              title.includes(area) ||
+              area
+                .split(/[^a-z0-9]+/)
+                .filter((word) => word.length > 4)
+                .some((word) => title.includes(word))
+          );
+          if (!matchedKeyword && !matchedPolicy) continue;
+          suggestions.push({
+            bill_congress: bill.congress,
+            bill_type: bill.type,
+            bill_number: bill.number,
+            bill_title: bill.title,
+            matched_topic: matchedKeyword || matchedPolicy || "Related",
+            action_text: bill.latestAction?.text || "Recent activity",
+            action_date: bill.latestAction?.actionDate || bill.updateDate,
+            suggestion_topic: matchedKeyword
+              ? `Related · ${matchedKeyword}`
+              : `Related · ${matchedPolicy}`,
+          });
+          excludeKeys.add(key);
+          if (suggestions.length >= 8) break;
+        }
       }
+    } catch (error) {
+      console.error(error);
     }
+  }
 
-    await loadUpdateSuggestions(notifications);
-    updatesLoaded = true;
+  if (!suggestions.length) {
+    setForYouStatus(
+      topicValues.length || feedPreferences.politicianIds.length
+        ? "No extra suggestions right now. Check back as more bills move."
+        : "Follow topics or politicians to get tailored suggestions.",
+      "loading"
+    );
+    forYouLoaded = true;
+    return;
+  }
+
+  setForYouStatus("", "success");
+  forYouList.replaceChildren(
+    ...suggestions.map((item) => {
+      if (item.sourceItem) {
+        return renderBillCard(item.sourceItem);
+      }
+      return renderUpdateCard(item, { suggestion: true });
+    })
+  );
+  forYouLoaded = true;
+}
+
+async function renderMyFeed() {
+  policyFeedList.replaceChildren();
+  updateFilterStatusLine();
+
+  let notifications = [];
+  try {
+    notifications = await ensureNotificationsLoaded();
   } catch (error) {
     console.error(error);
-    setUpdatesFeedStatus("Could not load updates.", "error");
+  }
+
+  const focusId = new URLSearchParams(window.location.search).get("n");
+  const notifiedKeys = new Set(notifications.map(notificationBillKey));
+  const nodes = [];
+
+  notifications.forEach((item) => {
+    nodes.push(
+      renderUpdateCard(item, { highlight: Boolean(focusId && item.id === focusId) })
+    );
+  });
+
+  myItems.forEach((item) => {
+    const key = policyItemBillKey(item);
+    if (notifiedKeys.has(key)) return;
+    // Also skip loose "hr-123" style overlaps with "119-hr-123"
+    const loose = String(item.billNumber || "")
+      .toLowerCase()
+      .replace(/\s+/g, "");
+    const alreadyNotified = notifications.some((notif) => {
+      const label = `${notif.bill_type || ""}${notif.bill_number || ""}`
+        .toLowerCase()
+        .replace(/\s+/g, "");
+      return label && loose && label === loose;
+    });
+    if (alreadyNotified) return;
+    nodes.push(renderBillCard(item));
+  });
+
+  if (!nodes.length) {
+    policyFeedEmpty.hidden = false;
+    const needsLocation =
+      filterState.locationOn &&
+      !filterState.resolved?.state &&
+      !filterState.resolved?.city;
+    if (needsLocation) {
+      policyFeedEmpty.innerHTML = `<h2>Add your location</h2><p>Enter an address or ZIP and click Apply to see followed items that affect your area.</p>`;
+    } else {
+      policyFeedEmpty.innerHTML = `<h2>Nothing in your feed yet</h2><p>Follow topics, politicians, and bills to see new and updated actions here. <a href="topics.html">Manage topics</a></p>`;
+    }
+    return;
+  }
+
+  policyFeedEmpty.hidden = true;
+  policyFeedList.append(...nodes);
+
+  if (focusId) {
+    try {
+      await markNotificationRead(focusId);
+    } catch (error) {
+      console.warn(error);
+    }
+    const target = document.getElementById(`notif-${focusId}`);
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 }
 
@@ -929,21 +1060,30 @@ function setActiveTab(tabName) {
   activeTab = tabName;
   tabAllFeed?.classList.toggle("is-active", tabName === "all");
   tabMyFeed?.classList.toggle("is-active", tabName === "mine");
-  tabUpdatesFeed?.classList.toggle("is-active", tabName === "updates");
+  tabForYouFeed?.classList.toggle("is-active", tabName === "foryou");
 
-  const isUpdates = tabName === "updates";
-  if (policyFeedFilters) policyFeedFilters.hidden = isUpdates;
-  if (policyFeedPanel) policyFeedPanel.hidden = isUpdates;
-  if (updatesFeedPanel) updatesFeedPanel.hidden = !isUpdates;
-  if (feedManageTopics) feedManageTopics.hidden = !isUpdates;
+  const isForYou = tabName === "foryou";
+  if (policyFeedFilters) policyFeedFilters.hidden = isForYou;
+  if (policyFeedPanel) policyFeedPanel.hidden = isForYou;
+  if (forYouFeedPanel) forYouFeedPanel.hidden = !isForYou;
+  if (feedManageTopics) feedManageTopics.hidden = tabName === "all";
+
+  // Coverage badges are most useful on All News.
+  if (policyFeedCoverage) {
+    policyFeedCoverage.hidden = tabName !== "all";
+  }
 
   syncTabQuery(tabName);
 }
 
 function renderActiveTab() {
-  if (activeTab === "updates") return;
+  if (activeTab === "foryou") return;
+  if (activeTab === "mine") {
+    renderMyFeed();
+    return;
+  }
 
-  const items = activeTab === "all" ? allItems : myItems;
+  const items = allItems;
   policyFeedList.replaceChildren();
   updateFilterStatusLine();
 
@@ -954,10 +1094,6 @@ function renderActiveTab() {
     const filteredOut = rawItems.length > 0;
     if (needsLocation) {
       policyFeedEmpty.innerHTML = `<h2>Add your location</h2><p>Enter an address or ZIP and click Apply to see bills that affect your area.</p>`;
-    } else if (activeTab === "mine") {
-      policyFeedEmpty.innerHTML = filteredOut
-        ? `<h2>No matches for these filters</h2><p>Try another state, clear location filtering, or follow more bills.</p>`
-        : `<h2>No personalized matches yet</h2><p>Follow topics, politicians, or bill cards to build your feed.</p>`;
     } else {
       policyFeedEmpty.innerHTML = filteredOut
         ? `<h2>No matches for these filters</h2><p>Try another state or clear “Affects my location.” City and district coverage is still limited to sample areas.</p>`
@@ -973,22 +1109,22 @@ function renderActiveTab() {
 async function requireSignedInForTab(tabName) {
   const user = await getUser();
   if (user) return true;
-  const next = encodeURIComponent(
-    `bills-policies.html?tab=${encodeURIComponent(tabName)}`
-  );
+  const next = encodeURIComponent(`bills-policies.html?tab=${tabName}`);
   window.location.href = `auth.html?next=${next}`;
   return false;
 }
 
-async function activateTab(tabName, { forceUpdates = false } = {}) {
-  if (tabName === "mine" || tabName === "updates") {
+async function activateTab(tabName, { force = false } = {}) {
+  if (tabName === "mine" || tabName === "foryou") {
     const ok = await requireSignedInForTab(tabName);
     if (!ok) return;
   }
 
   setActiveTab(tabName);
-  if (tabName === "updates") {
-    await loadUpdatesFeed({ force: forceUpdates });
+  if (tabName === "foryou") {
+    await loadForYouSuggestions({ force });
+  } else if (tabName === "mine") {
+    await renderMyFeed();
   } else {
     renderActiveTab();
   }
@@ -1068,8 +1204,8 @@ tabMyFeed?.addEventListener("click", () => {
   activateTab("mine");
 });
 
-tabUpdatesFeed?.addEventListener("click", () => {
-  activateTab("updates");
+tabForYouFeed?.addEventListener("click", () => {
+  activateTab("foryou");
 });
 
 stateFilterSelect?.addEventListener("change", async () => {
@@ -1129,13 +1265,8 @@ locationForm?.addEventListener("submit", async (event) => {
   const initialTab = tabFromQuery();
 
   try {
-    if (initialTab === "updates") {
-      await activateTab("updates", { forceUpdates: true });
-      loadBillsPoliciesPage().catch((error) => console.error(error));
-    } else {
-      await loadBillsPoliciesPage();
-      await activateTab(initialTab);
-    }
+    await loadBillsPoliciesPage();
+    await activateTab(initialTab, { force: true });
   } catch (error) {
     console.error(error);
     setPolicyFeedStatus(error.message || "Could not load page.", "error");

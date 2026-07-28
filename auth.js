@@ -29,7 +29,7 @@ async function finishLogin(user) {
     window.location.href = next;
     return;
   }
-  window.location.href = follows === 0 ? "topics.html" : "bills-policies.html?tab=updates";
+  window.location.href = follows === 0 ? "topics.html" : "bills-policies.html?tab=mine";
 }
 
 async function resolveEmail(identifier) {
