@@ -392,11 +392,13 @@ async function lookupGeography(query) {
       const response = await fetch(`${endpoint}?q=${encodeURIComponent(q)}`);
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
+        const label = data.formattedAddress || data.address || q;
+        const parsed = parseCityStateFromLabel(label);
         return {
-          state: String(data.geography?.state || "").toUpperCase(),
-          city: String(data.geography?.city || "").trim(),
+          state: String(data.geography?.state || parsed.state || "").toUpperCase(),
+          city: String(data.geography?.city || parsed.city || "").trim(),
           county: String(data.geography?.county || "").trim(),
-          label: data.formattedAddress || q,
+          label,
         };
       }
       lastError = new Error(data.error || `Lookup failed (${response.status})`);
@@ -413,8 +415,18 @@ function matchesStateFilter(item, stateCode) {
   return String(item.stateCode || "").toUpperCase() === stateCode;
 }
 
+function citiesMatch(left, right) {
+  const a = normalizeCityName(left);
+  const b = normalizeCityName(right);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
 function matchesLocationFilter(item, resolved, stateCode) {
-  if (!resolved) return true;
+  // Location mode requires a resolved place — never pass everything through.
+  if (!resolved?.state && !resolved?.city) return false;
+
+  // National laws still affect every location.
   if (item.level === "Federal") return true;
 
   const itemState = String(item.stateCode || "").toUpperCase();
@@ -422,26 +434,23 @@ function matchesLocationFilter(item, resolved, stateCode) {
   if (resolvedState && itemState && itemState !== resolvedState) return false;
 
   if (item.level === "State") {
-    return !resolvedState || itemState === resolvedState;
+    return Boolean(resolvedState) && itemState === resolvedState;
   }
 
-  // City / District: narrow to matching city when we have one.
+  // City / District: only items for the resolved city (not every city in the state).
   const resolvedCity = normalizeCityName(resolved.city);
-  if (!resolvedCity) {
-    return !resolvedState || itemState === resolvedState;
-  }
+  if (!resolvedCity) return false;
 
-  const itemCity = normalizeCityName(item.cityName);
-  const jurisdiction = normalizeCityName(item.jurisdiction);
-  if (itemCity && (itemCity === resolvedCity || itemCity.includes(resolvedCity) || resolvedCity.includes(itemCity))) {
-    return true;
-  }
-  if (jurisdiction.includes(resolvedCity)) return true;
+  if (citiesMatch(item.cityName, resolved.city)) return true;
+  if (citiesMatch(item.jurisdiction, resolved.city)) return true;
   return false;
 }
 
 function applyGeoFilters(items) {
   const stateCode = filterState.stateCode || "";
+  if (filterState.locationOn && !filterState.resolved?.state && !filterState.resolved?.city) {
+    return [];
+  }
   return items.filter((item) => {
     if (!matchesStateFilter(item, stateCode)) return false;
     if (filterState.locationOn) {
@@ -449,6 +458,23 @@ function applyGeoFilters(items) {
     }
     return true;
   });
+}
+
+function parseCityStateFromLabel(label = "") {
+  const text = String(label || "").trim();
+  if (!text) return { city: "", state: "" };
+  // "San Diego, CA 92101" or "Austin, Texas"
+  const match = text.match(
+    /^([^,]+),\s*([A-Za-z]{2}|[A-Za-z]+(?:\s+[A-Za-z]+)?)(?:\s+\d{5})?/
+  );
+  if (!match) return { city: "", state: "" };
+  const city = match[1].trim();
+  let state = match[2].trim().toUpperCase();
+  if (state.length > 2) {
+    const found = US_STATES.find(([, name]) => name.toLowerCase() === match[2].trim().toLowerCase());
+    state = found ? found[0] : "";
+  }
+  return { city, state };
 }
 
 function recomputeVisibleItems() {
@@ -681,14 +707,18 @@ function renderActiveTab() {
 
   if (!items.length) {
     policyFeedEmpty.hidden = false;
+    const needsLocation =
+      filterState.locationOn && !filterState.resolved?.state && !filterState.resolved?.city;
     const filteredOut = rawItems.length > 0;
-    if (activeTab === "mine") {
+    if (needsLocation) {
+      policyFeedEmpty.innerHTML = `<h2>Add your location</h2><p>Enter an address or ZIP and click Apply to see bills that affect your area.</p>`;
+    } else if (activeTab === "mine") {
       policyFeedEmpty.innerHTML = filteredOut
         ? `<h2>No matches for these filters</h2><p>Try another state, clear location filtering, or follow more bills.</p>`
         : `<h2>No personalized matches yet</h2><p>Follow topics, politicians, or bill cards to build your feed.</p>`;
     } else {
       policyFeedEmpty.innerHTML = filteredOut
-        ? `<h2>No matches for these filters</h2><p>Try another state or clear “Affects my location.”</p>`
+        ? `<h2>No matches for these filters</h2><p>Try another state or clear “Affects my location.” City and district coverage is still limited to sample areas.</p>`
         : `<h2>No bill updates available</h2><p>Check back shortly for new legislative activity.</p>`;
     }
     return;
@@ -793,6 +823,17 @@ locationToggle?.addEventListener("change", async () => {
     filterState.resolved = null;
   }
   syncFilterControls();
+  if (
+    filterState.locationOn &&
+    !String(locationInput?.value || filterState.addressQuery || "").trim()
+  ) {
+    locationInput?.focus();
+    setPolicyFeedStatus("Enter an address or ZIP, then click Apply.", "error");
+    recomputeVisibleItems();
+    renderActiveTab();
+    persistFilters();
+    return;
+  }
   await refreshWithFilters({ resolveLocation: filterState.locationOn });
 });
 
