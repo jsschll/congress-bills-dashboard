@@ -532,8 +532,7 @@ function nationalOfficialChamber(group) {
 }
 
 function isFederalExecutivePerson(person) {
-  const group = String(person?.metadata?.national_group || "").toLowerCase();
-  if (group === "executive") return true;
+  // Never treat generic chamber=executive (Chief of Staff, OMB, etc.) as POTUS/VP.
   return isPresidentOrVicePresidentTitle(person);
 }
 
@@ -2165,12 +2164,39 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         : [];
     let nationalExecutives =
       level === "federal"
-        ? dedupePoliticiansInGroup(nationalByGroup("executive"))
+        ? dedupePoliticiansInGroup(
+            nationalByGroup("executive").filter(isPresidentOrVicePresidentTitle)
+          )
         : [];
     let otherNational =
       level === "federal"
         ? dedupePoliticiansInGroup(nationalByGroup("other"))
         : [];
+
+    // Any national_officials wrongly tagged as executive but not POTUS/VP
+    // belong in White House & Executive Office (or another subgroup).
+    if (level === "federal") {
+      const misplacedExec = nationalByGroup("executive").filter(
+        (p) => !isPresidentOrVicePresidentTitle(p)
+      );
+      for (const person of misplacedExec) {
+        const regrouped = classifyFederalOfficeGroup({
+          ...person,
+          metadata: { ...(person.metadata || {}), national_group: "" },
+          category: person.metadata?.category || "",
+          title: officeTitleText(person),
+          chamber: person.chamber,
+        });
+        if (regrouped === "cabinet") cabinet.push(person);
+        else if (regrouped === "agency_director") agencyDirectors.push(person);
+        else if (regrouped === "supreme_court") justices.push(person);
+        else whiteHouse.push(person);
+      }
+      cabinet = dedupePoliticiansInGroup(cabinet);
+      agencyDirectors = dedupePoliticiansInGroup(agencyDirectors);
+      justices = dedupePoliticiansInGroup(justices);
+      whiteHouse = dedupePoliticiansInGroup(whiteHouse);
+    }
 
     // Keep address-based federal officials out of national subgroups by name
     // (loose match drops middle initials so "Howard W. Lutnick" ≈ "Howard Lutnick").
@@ -2252,13 +2278,15 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     cabinet = preferNationalOfficialsByLastName(cabinet);
     agencyDirectors = preferNationalOfficialsByLastName(agencyDirectors);
     justices = preferNationalOfficialsByLastName(justices);
-    whiteHouse = preferNationalOfficialsByLastName(whiteHouse);
 
-    // President & VP: prefer national_officials; only one person per office title.
+    // President & VP: hard-gate on title so EOP staff can never appear here.
     const executives = dedupePresidentVicePresident([
       ...nationalExecutives,
       ...addressByGroup.executive,
     ]);
+    whiteHouse = preferNationalOfficialsByLastName(
+      whiteHouse.filter((p) => !isPresidentOrVicePresidentTitle(p))
+    );
 
     const stateSplit =
       level === "state"
@@ -2355,6 +2383,26 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           level
         );
       }
+      // Always show as its own category — never mixed into President & VP.
+      if (whiteHouse.length) {
+        appendPoliticianSubgroup(
+          list,
+          "White House & Executive Office",
+          whiteHouse,
+          cardOptions,
+          level,
+          { startCollapsed: false }
+        );
+      } else {
+        appendStateCategorySection(
+          list,
+          "White House & Executive Office",
+          [],
+          "White House and Executive Office officials will appear here (Chief of Staff, OMB, CEA, UN Ambassador, and similar roles).",
+          cardOptions,
+          level
+        );
+      }
       if (localGroup.length) {
         appendPoliticianSubgroup(
           list,
@@ -2364,13 +2412,6 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
           level
         );
       }
-      appendPoliticianSubgroup(
-        list,
-        "White House & Executive Office",
-        whiteHouse,
-        cardOptions,
-        level
-      );
       appendPoliticianSubgroup(
         list,
         "Cabinet Secretaries",
