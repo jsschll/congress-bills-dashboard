@@ -1,3 +1,193 @@
+.policy-feed-tabs {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.25rem 0 1rem;
+  flex-wrap: wrap;
+}
+
+.policy-feed-tabs__button {
+  border: 1px solid var(--border-color, #d0d7de);
+  background: #fff;
+  color: inherit;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.policy-feed-tabs__button.is-active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+.policy-feed-summary {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.policy-feed-coverage {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.policy-feed-coverage__badge {
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.9rem;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.policy-feed-coverage__badge.is-planned {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.policy-feed-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.policy-feed-empty {
+  border: 1px dashed var(--border-color, #d0d7de);
+  border-radius: 16px;
+  padding: 1.25rem;
+  background: #fafafa;
+  margin-top: 1rem;
+}
+
+.policy-bill-card {
+  border: 1px solid var(--border-color, #d0d7de);
+  border-radius: 18px;
+  padding: 1rem;
+  background: #fff;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.policy-bill-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.policy-bill-card__badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}
+
+.policy-bill-card__level,
+.policy-bill-card__bill-number {
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.policy-bill-card__bill-number {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.policy-bill-card__title {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.policy-bill-card__meta,
+.policy-bill-card__pitch {
+  margin: 0;
+  color: #4b5563;
+}
+
+.policy-bill-card__progress {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.6rem;
+}
+
+.policy-bill-card__step {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.25rem;
+  background: #fff;
+}
+
+.policy-bill-card__step.is-complete {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.policy-bill-card__step.is-current {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.policy-bill-card__step-number {
+  font-weight: 700;
+}
+
+.policy-bill-card__delta {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.policy-bill-card__delta h3,
+.policy-bill-card__delta h4 {
+  margin: 0;
+}
+
+.policy-bill-card__delta-group {
+  border-left: 4px solid #cbd5e1;
+  padding-left: 0.8rem;
+}
+
+.policy-bill-card__delta-group.is-added {
+  border-left-color: #10b981;
+}
+
+.policy-bill-card__delta-group.is-changed {
+  border-left-color: #3b82f6;
+}
+
+.policy-bill-card__delta-group.is-removed {
+  border-left-color: #ef4444;
+}
+
+.policy-bill-card__delta-group ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1rem;
+}
+
+.policy-bill-card__tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.policy-bill-card__tags span {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 720px) {
+  .policy-bill-card__header {
+    flex-direction: column;
+  }
+}
 :root {
   color-scheme: light;
   --bg: #f4f6f8;
