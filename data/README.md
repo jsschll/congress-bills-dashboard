@@ -1,5 +1,30 @@
 # Judge data — published to cloud Supabase
 
+## Full Texas load (mapping + high courts) — do this first
+
+File: [`../supabase/seed-tx-all-mapping-and-high-courts.sql`](../supabase/seed-tx-all-mapping-and-high-courts.sql)
+
+1. Open Supabase → **SQL Editor** → New query  
+2. Open that `.sql` file in Cursor, **Select All → Copy**  
+3. Paste into Supabase SQL Editor → **Run**  
+4. Confirm:
+
+```sql
+select count(*) from county_district_mapping where state_code = 'TX';
+-- expect 254
+
+select level, count(*) from state_officials where state_code = 'TX' group by level order by 1;
+```
+
+What it loads:
+- **All 254 TX counties** → appellate + judicial district numbers  
+- **Statewide** (Supreme Court, Court of Criminal Appeals, Governor)  
+- **Appellate** chief justices for Courts of Appeals 1–14 (+ some 14th Court justices)
+
+What it does **not** wipe: your existing **District** / **County/Magistrate** rows (e.g. Fort Bend).
+
+---
+
 The live site already reads from **cloud Supabase**. Publishing means loading
 CSVs from this repo into that database (not keeping anything only on your laptop).
 
