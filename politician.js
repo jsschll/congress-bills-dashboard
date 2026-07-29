@@ -946,8 +946,12 @@ function renderVotesList(target, votes, emptyMessage, person) {
 
     if (window.PolicyEngagement?.mountVote) {
       window.PolicyEngagement.mountVote(card, item, {
+        supportLabel: item.yeaLabel || "Yea",
+        opposeLabel: item.nayLabel || "Nay",
         compareBioguides: bioguide ? [bioguide] : [],
-        whoVotedHint: `Tap Yea or Nay to compare with ${personName}.`,
+        whoVotedHint: `Tap ${item.yeaLabel || "Yea"} or ${
+          item.nayLabel || "Nay"
+        } to compare with ${personName}.`,
         onStanceChange: async () => {
           if (!bioguide) return;
           const payload = await loadMatchRows(bioguide);
