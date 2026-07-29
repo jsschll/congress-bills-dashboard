@@ -207,6 +207,10 @@ async function runSearch({ debounce = false } = {}) {
   if (query) params.set("q", query);
   params.set("types", types);
   params.set("limit", "12");
+  // Server prefers CONGRESS_API_KEY env; this matches config.js used by other pages.
+  if (typeof API_KEY === "string" && API_KEY.trim()) {
+    params.set("api_key", API_KEY.trim());
+  }
 
   const thisRequest = ++requestId;
   setStatus(

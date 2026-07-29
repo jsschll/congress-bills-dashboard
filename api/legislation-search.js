@@ -569,15 +569,20 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const apiKey = process.env.CONGRESS_API_KEY || process.env.API_KEY || "";
+  const url = new URL(req.url, "http://localhost");
+  // Prefer Vercel env; fall back to client config.js API_KEY (already used by Bills/Feed).
+  const apiKey =
+    process.env.CONGRESS_API_KEY ||
+    process.env.API_KEY ||
+    String(url.searchParams.get("api_key") || "").trim();
   if (!apiKey) {
     json(res, 500, {
-      error: "Missing CONGRESS_API_KEY (also used for GovInfo search).",
+      error:
+        "Missing Congress.gov API key. Set CONGRESS_API_KEY on Vercel, or API_KEY in config.js.",
     });
     return;
   }
 
-  const url = new URL(req.url, "http://localhost");
   const query = String(url.searchParams.get("q") || "").trim();
   const types = parseTypes(url.searchParams.get("types"));
   const limit = clampLimit(url.searchParams.get("limit"));
