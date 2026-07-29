@@ -212,7 +212,7 @@ const CONGRESS_API_BASE = "https://api.congress.gov/v3";
 const CONGRESS = 119;
 
 function policySteps(currentStep, actionDate = "") {
-  const steps = ["Introduced", "In Committee", "Chamber Vote", "Signed into Law"];
+  const steps = ["Introduced", "In Committee", "Chamber Vote", "Signed"];
   return steps.map((stepName, index) => ({
     stepNumber: index + 1,
     totalSteps: steps.length,
@@ -887,18 +887,26 @@ function renderBillCard(item) {
       </button>
     </div>
     <p class="policy-bill-card__pitch">${escapePolicyHtml(item.shortPitch)}</p>
-    <div class="policy-bill-card__progress">
-      ${item.allSteps
-        .map(
-          (step) => `
-            <div class="policy-bill-card__step ${step.isCompleted ? "is-complete" : ""} ${
-            step.isCurrent ? "is-current" : ""
-          }">
-              <span class="policy-bill-card__step-number">${step.stepNumber}</span>
-              <span class="policy-bill-card__step-name">${escapePolicyHtml(step.stepName)}</span>
+    <div class="policy-bill-card__progress" role="list" aria-label="Bill status">
+      ${(item.allSteps || [])
+        .map((step) => {
+          const stepName = String(step.stepName || "")
+            .replace(/into law/i, "")
+            .trim() || "Step";
+          return `
+            <div
+              class="policy-bill-card__step ${step.isCompleted ? "is-complete" : ""} ${
+                step.isCurrent ? "is-current" : ""
+              } ${!step.isCompleted && !step.isCurrent ? "is-upcoming" : ""}"
+              role="listitem"
+            >
+              <span class="policy-bill-card__node" aria-hidden="true"></span>
+              <span class="policy-bill-card__step-name">${escapePolicyHtml(
+                stepName
+              )}</span>
             </div>
-          `
-        )
+          `;
+        })
         .join("")}
     </div>
     <section class="policy-bill-card__delta">

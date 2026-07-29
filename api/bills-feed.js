@@ -158,12 +158,7 @@ function inferStatus(actionText = "", title = "") {
 }
 
 function buildSteps(currentStep, actionDate = "") {
-  const steps = [
-    "Introduced",
-    "In Committee",
-    "Chamber Vote",
-    "Signed into Law",
-  ];
+  const steps = ["Introduced", "In Committee", "Chamber Vote", "Signed"];
   return steps.map((stepName, index) => ({
     stepNumber: index + 1,
     totalSteps: steps.length,
