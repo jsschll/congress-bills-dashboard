@@ -2442,6 +2442,50 @@ function selectedLevelsLabel(selected, availableLevels, showAll = false) {
     .join(", ");
 }
 
+/** Flat card list for browse / name search — no address-lookup category chrome. */
+function renderPoliticianFlatList(container, politicians, cardOptions = {}) {
+  const list = dedupePoliticiansInGroup(politicians || []);
+  container.replaceChildren();
+  container._politicianData = { politicians: list, cardOptions };
+  delete container._selectedLevels;
+  delete container._showAllLevels;
+  delete container._collapsedLevels;
+
+  if (!list.length) return;
+
+  const search = String(cardOptions.searchQuery || "")
+    .trim()
+    .toLowerCase();
+  const sorted = [...list].sort((a, b) => {
+    if (search) {
+      const score = (p) => {
+        const name = String(p.name || "").toLowerCase();
+        if (name === search) return 0;
+        if (name.startsWith(search)) return 1;
+        if (name.includes(search)) return 2;
+        const tokens = search.split(/\s+/).filter(Boolean);
+        if (tokens.length && tokens.every((t) => name.includes(t))) return 3;
+        return 4;
+      };
+      const diff = score(a) - score(b);
+      if (diff !== 0) return diff;
+    }
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
+
+  const grid = document.createElement("div");
+  grid.className = "politician-grid politician-grid--flat";
+  grid.setAttribute("role", "list");
+
+  for (const politician of sorted) {
+    const card = renderPoliticianCard(politician, cardOptions);
+    card.setAttribute("role", "listitem");
+    grid.append(card);
+  }
+
+  container.append(grid);
+}
+
 function renderPoliticianGroups(container, politicians, cardOptions = {}) {
   const nationalOfficials = Array.isArray(cardOptions.nationalOfficials)
     ? cardOptions.nationalOfficials

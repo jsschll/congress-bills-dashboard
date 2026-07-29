@@ -159,21 +159,6 @@ function applyFilters() {
     return true;
   });
 
-  const nationalOfficials = filtered.filter(
-    (politician) => politician.source === "national_officials"
-  );
-  const stateJudges = filtered.filter(
-    (politician) =>
-      politician.source === "state_officials" ||
-      politician.source === "state_judges"
-  );
-  const others = filtered.filter(
-    (politician) =>
-      politician.source !== "national_officials" &&
-      politician.source !== "state_officials" &&
-      politician.source !== "state_judges"
-  );
-
   politiciansGrid.replaceChildren();
   if (!filtered.length) {
     setBrowseStatus(
@@ -185,19 +170,10 @@ function applyFilters() {
     return;
   }
 
-  const geography = {
-    state: filterState.value || "",
-    county: "",
-    appellateDistricts: [],
-    trialDistricts: [],
-  };
-
-  renderPoliticianGroups(politiciansGrid, others, {
+  renderPoliticianFlatList(politiciansGrid, filtered, {
     followedIds,
     user: currentUser,
-    nationalOfficials,
-    stateJudges,
-    geography,
+    searchQuery: filterSearch?.value || "",
   });
   setBrowseStatus(
     followingOnly || filterFollowing?.checked

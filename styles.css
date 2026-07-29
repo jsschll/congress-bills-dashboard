@@ -3161,6 +3161,10 @@ body {
   color: #f1f5f9;
 }
 
+.page-politicians .politician-grid--flat {
+  margin-top: 0.25rem;
+}
+
 .page-politicians .politician-card__name {
   color: #f8fafc;
   font-weight: 700;
