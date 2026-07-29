@@ -386,17 +386,6 @@ function renderOverview(person, congress) {
     );
   }
 
-  contactBits.unshift(`
-    <button
-      type="button"
-      id="politician-follow-btn"
-      class="politician-profile-follow-btn"
-      aria-pressed="false"
-    >
-      Track Official
-    </button>
-  `);
-
   contactBits.push(`
     <div class="politician-profile-note-wrap" id="politician-note-wrap">
       <button
@@ -475,7 +464,21 @@ function renderOverview(person, congress) {
         formatRole(person)
       )}</p>
       <p class="politician-profile-card__tenure">${escapeHtml(tenureLabel)}</p>
-      <div class="politician-profile-contact" aria-label="Contact, tracking, and notes">
+      <div class="politician-profile-follow">
+        <button
+          type="button"
+          id="politician-follow-btn"
+          class="politician-profile-follow-btn"
+          aria-pressed="false"
+        >
+          <span class="politician-profile-follow-btn__icon" aria-hidden="true">+</span>
+          <span class="politician-profile-follow-btn__label">Follow</span>
+        </button>
+        <p class="politician-profile-follow__hint">
+          Get their bills and updates in My Feed
+        </p>
+      </div>
+      <div class="politician-profile-contact" aria-label="Contact and notes">
         ${
           contactBits.length
             ? contactBits.join("")
@@ -501,15 +504,19 @@ function renderOverview(person, congress) {
 function syncFollowButton() {
   const button = document.getElementById("politician-follow-btn");
   if (!button) return;
-  const tracking = Boolean(
+  const following = Boolean(
     activePerson?.id && followedPoliticianIds.has(String(activePerson.id))
   );
-  button.textContent = tracking ? "Tracking" : "Track Official";
-  button.classList.toggle("is-tracking", tracking);
-  button.setAttribute("aria-pressed", tracking ? "true" : "false");
-  button.title = tracking
-    ? "Stop tracking this official"
-    : "Track this official to find them quickly from the nav";
+  const label = button.querySelector(".politician-profile-follow-btn__label");
+  const icon = button.querySelector(".politician-profile-follow-btn__icon");
+  if (label) label.textContent = following ? "Following" : "Follow";
+  else button.textContent = following ? "Following" : "Follow";
+  if (icon) icon.textContent = following ? "✓" : "+";
+  button.classList.toggle("is-following", following);
+  button.setAttribute("aria-pressed", following ? "true" : "false");
+  button.title = following
+    ? "Unfollow this official"
+    : "Follow this official to see their actions in My Feed";
 }
 
 function bindFollowButton(person) {
@@ -531,12 +538,12 @@ function bindFollowButton(person) {
       let record = activePerson || person;
       if (!record.id && typeof upsertPoliticianRecord === "function") {
         const saved = await upsertPoliticianRecord(record);
-        if (!saved?.id) throw new Error("Could not save official for tracking.");
+        if (!saved?.id) throw new Error("Could not save official to follow.");
         record = { ...record, id: saved.id };
         activePerson = record;
         if (person) person.id = saved.id;
       }
-      if (!record?.id) throw new Error("Could not track this official.");
+      if (!record?.id) throw new Error("Could not follow this official.");
 
       const id = String(record.id);
       if (followedPoliticianIds.has(id)) {
@@ -549,7 +556,7 @@ function bindFollowButton(person) {
       syncFollowButton();
     } catch (error) {
       console.error(error);
-      setStatus(error.message || "Could not update tracking.", "error");
+      setStatus(error.message || "Could not update follow.", "error");
     } finally {
       button.disabled = false;
     }

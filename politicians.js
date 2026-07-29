@@ -2,15 +2,17 @@ const filterLevel = document.getElementById("filter-level");
 const filterParty = document.getElementById("filter-party");
 const filterState = document.getElementById("filter-state");
 const filterSearch = document.getElementById("filter-search");
-const filterTracked = document.getElementById("filter-tracked");
+const filterFollowing = document.getElementById("filter-following");
 const browseStatus = document.getElementById("browse-status");
 const politiciansGrid = document.getElementById("politicians-grid");
 
 let allPoliticians = [];
 let followedIds = new Set();
 let currentUser = null;
-let trackedOnly =
-  new URLSearchParams(window.location.search).get("tracked") === "1";
+let followingOnly = (() => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("following") === "1" || params.get("tracked") === "1";
+})();
 
 function setBrowseStatus(message, type = "loading") {
   browseStatus.hidden = !message;
@@ -120,7 +122,7 @@ function applyFilters() {
   const search = filterSearch.value.trim().toLowerCase();
 
   const filtered = allPoliticians.filter((politician) => {
-    if (trackedOnly || filterTracked?.checked) {
+    if (followingOnly || filterFollowing?.checked) {
       if (!politician.id || !followedIds.has(politician.id)) return false;
     }
     if (level !== "all") {
@@ -171,8 +173,8 @@ function applyFilters() {
   politiciansGrid.replaceChildren();
   if (!filtered.length) {
     setBrowseStatus(
-      trackedOnly || filterTracked?.checked
-        ? "No tracked officials match these filters."
+      followingOnly || filterFollowing?.checked
+        ? "No followed officials match these filters."
         : "No politicians match these filters.",
       "error"
     );
@@ -194,8 +196,8 @@ function applyFilters() {
     geography,
   });
   setBrowseStatus(
-    trackedOnly || filterTracked?.checked
-      ? `Showing ${filtered.length} tracked official${
+    followingOnly || filterFollowing?.checked
+      ? `Showing ${filtered.length} followed official${
           filtered.length === 1 ? "" : "s"
         }.`
       : `Showing ${filtered.length} politicians.`,
@@ -260,11 +262,11 @@ filterLevel.addEventListener("change", () => {
 filterParty.addEventListener("change", applyFilters);
 filterState.addEventListener("change", applyFilters);
 filterSearch.addEventListener("input", applyFilters);
-filterTracked?.addEventListener("change", () => {
-  trackedOnly = Boolean(filterTracked.checked);
+filterFollowing?.addEventListener("change", () => {
+  followingOnly = Boolean(filterFollowing.checked);
   const url = new URL(window.location.href);
-  if (trackedOnly) url.searchParams.set("tracked", "1");
-  else url.searchParams.delete("tracked");
+  if (followingOnly) url.searchParams.set("following", "1");
+  else url.searchParams.delete("following");
   window.history.replaceState({}, "", url);
   applyFilters();
 });
@@ -305,13 +307,13 @@ filterTracked?.addEventListener("change", () => {
   if (currentUser) {
     followedIds = await loadFollowedPoliticianIds(currentUser.id);
   }
-  if (filterTracked) {
-    filterTracked.checked = trackedOnly;
+  if (filterFollowing) {
+    filterFollowing.checked = followingOnly;
     if (!currentUser) {
-      filterTracked.disabled = true;
-      filterTracked.title = "Sign in to filter tracked officials";
-    } else if (trackedOnly && filterLevel) {
-      // Show tracked officials across levels by default.
+      filterFollowing.disabled = true;
+      filterFollowing.title = "Sign in to filter followed officials";
+    } else if (followingOnly && filterLevel) {
+      // Show followed officials across levels by default.
       filterLevel.value = "all";
     }
   }

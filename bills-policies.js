@@ -800,10 +800,6 @@ function recomputeVisibleItems() {
   myItems = filtered.filter(matchesMyFeed);
 }
 
-function sponsorKey(item) {
-  return String(item?.primarySponsor?.name || "").toLowerCase().trim();
-}
-
 function tagsKey(item) {
   return [
     ...(item.tags || []),
@@ -814,6 +810,42 @@ function tagsKey(item) {
     .toLowerCase();
 }
 
+function normalizeSponsorName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\b(rep\.?|sen\.?|senator|representative|hon\.?|dr\.?|mr\.?|mrs\.?|ms\.?)\b/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sponsorMatchKeys(item) {
+  const sponsor = item?.primarySponsor || {};
+  return {
+    name: normalizeSponsorName(sponsor.name),
+    bioguide: String(sponsor.bioguideId || sponsor.bioguide_id || "")
+      .trim()
+      .toLowerCase(),
+  };
+}
+
+function matchesFollowedPolitician(item) {
+  const keys = sponsorMatchKeys(item);
+  if (!keys.name && !keys.bioguide) return false;
+  return (feedPreferences.politicianIds || []).some((raw) => {
+    const value = String(raw || "").trim().toLowerCase();
+    if (!value) return false;
+    if (keys.bioguide && value === keys.bioguide) return true;
+    // Skip opaque external keys for name matching.
+    if (value.includes(":") || /^[0-9a-f-]{36}$/i.test(value)) return false;
+    const followedName = normalizeSponsorName(value);
+    if (!followedName || !keys.name) return false;
+    return (
+      keys.name.includes(followedName) || followedName.includes(keys.name)
+    );
+  });
+}
+
 function isFollowedBill(item) {
   return followedBillIds.has(item.id);
 }
@@ -821,8 +853,10 @@ function isFollowedBill(item) {
 function matchesMyFeed(item) {
   if (isFollowedBill(item)) return true;
   if (feedPreferences.billIds.includes(item.id)) return true;
-  if (feedPreferences.politicianIds.some((value) => sponsorKey(item).includes(value))) return true;
-  if (feedPreferences.topics.some((value) => tagsKey(item).includes(value))) return true;
+  if (matchesFollowedPolitician(item)) return true;
+  if (feedPreferences.topics.some((value) => tagsKey(item).includes(value))) {
+    return true;
+  }
   return false;
 }
 
@@ -844,7 +878,9 @@ async function loadFeedPreferences() {
     client.from("followed_bills").select("bill_id").eq("user_id", user.id),
     client
       .from("followed_politicians")
-      .select("politician:politician_id(name, bioguide_id, external_key)")
+      .select(
+        "politician:politician_id(name, bioguide_id, external_key)"
+      )
       .eq("user_id", user.id),
   ]);
 
@@ -855,11 +891,14 @@ async function loadFeedPreferences() {
   const politicianIds = (followedPoliticiansRes.data || [])
     .map((item) => item.politician)
     .filter(Boolean)
-    .flatMap((person) =>
-      [person.name, person.bioguide_id, person.external_key]
-        .filter(Boolean)
-        .map((value) => String(value).toLowerCase())
-    );
+    .flatMap((person) => {
+      const values = [];
+      if (person.bioguide_id) {
+        values.push(String(person.bioguide_id).toLowerCase());
+      }
+      if (person.name) values.push(String(person.name).toLowerCase());
+      return values;
+    });
 
   feedPreferences = {
     topics,

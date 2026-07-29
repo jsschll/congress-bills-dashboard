@@ -197,7 +197,7 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
   };
 
   panel.append(
-    mkItem("a", { href: "politicians.html?tracked=1", text: "Tracked officials" }),
+    mkItem("a", { href: "politicians.html?following=1", text: "Following" }),
     mkItem("a", { href: "profile.html#account", text: "Settings" }),
     mkItem("a", { href: "profile.html", text: "Profile" }),
     mkItem("button", {
@@ -216,12 +216,6 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
       el.hidden = true;
     });
     document.querySelectorAll(".notif-bell__button").forEach((el) => {
-      el.setAttribute("aria-expanded", "false");
-    });
-    document.querySelectorAll(".tracked-nav__panel").forEach((el) => {
-      el.hidden = true;
-    });
-    document.querySelectorAll(".tracked-nav__button").forEach((el) => {
       el.setAttribute("aria-expanded", "false");
     });
     wrap.classList.add("is-open");
@@ -280,139 +274,6 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
 
   wrap.append(trigger, panel);
   if (compact) wrap.classList.add("user-menu--compact");
-  return wrap;
-}
-
-function navPoliticianHref(person) {
-  if (typeof politicianProfileHref === "function") {
-    return politicianProfileHref(person) || "politicians.html?tracked=1";
-  }
-  if (person?.bioguide_id) {
-    return `politician.html?bioguide=${encodeURIComponent(person.bioguide_id)}`;
-  }
-  if (person?.external_key) {
-    return `politician.html?key=${encodeURIComponent(person.external_key)}`;
-  }
-  if (person?.id) {
-    return `politician.html?id=${encodeURIComponent(person.id)}`;
-  }
-  return "politicians.html?tracked=1";
-}
-
-async function loadTrackedOfficialsForNav(userId) {
-  const client = getSupabase();
-  if (!client || !userId) return [];
-  const { data, error } = await client
-    .from("followed_politicians")
-    .select(
-      "created_at, politician:politician_id(id, name, party, state, chamber, office_title, level, bioguide_id, external_key, photo_url, source, metadata)"
-    )
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(12);
-  if (error) {
-    console.warn(error);
-    return [];
-  }
-  return (data || [])
-    .map((row) => row.politician)
-    .filter((person) => person?.id && person?.name);
-}
-
-function buildTrackedOfficialsMenu(officials) {
-  const wrap = document.createElement("div");
-  wrap.className = "tracked-nav";
-
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "tracked-nav__button";
-  button.setAttribute("aria-label", "Tracked officials");
-  button.setAttribute("aria-expanded", "false");
-  button.innerHTML = `
-    <span class="tracked-nav__icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-        <path d="M12 4.5l1.8 4.4 4.7.4-3.6 3.1 1.1 4.6L12 14.8 7.9 17l1.1-4.6-3.6-3.1 4.7-.4L12 4.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-      </svg>
-    </span>
-    <span class="tracked-nav__label">Tracked</span>
-    ${
-      officials.length
-        ? `<span class="tracked-nav__count">${
-            officials.length > 9 ? "9+" : officials.length
-          }</span>`
-        : ""
-    }
-  `;
-
-  const panel = document.createElement("div");
-  panel.className = "tracked-nav__panel";
-  panel.hidden = true;
-
-  if (!officials.length) {
-    panel.innerHTML = `
-      <p class="tracked-nav__empty">No tracked officials yet. Open a profile and tap Track Official.</p>
-      <a class="tracked-nav__footer" href="politicians.html">Browse politicians</a>
-    `;
-  } else {
-    const list = document.createElement("ul");
-    list.className = "tracked-nav__list";
-    for (const person of officials) {
-      const li = document.createElement("li");
-      const link = document.createElement("a");
-      link.className = "tracked-nav__item";
-      link.href = navPoliticianHref(person);
-      const role = [
-        person.office_title || person.chamber,
-        person.state,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      link.innerHTML = `
-        <strong>${escapeHtml(person.name)}</strong>
-        <span>${escapeHtml(role || "Official")}</span>
-      `;
-      li.append(link);
-      list.append(li);
-    }
-    panel.append(list);
-    const footer = document.createElement("a");
-    footer.className = "tracked-nav__footer";
-    footer.href = "politicians.html?tracked=1";
-    footer.textContent = "View all tracked";
-    panel.append(footer);
-  }
-
-  const closePanel = () => {
-    panel.hidden = true;
-    button.setAttribute("aria-expanded", "false");
-  };
-
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const open = panel.hidden;
-    document.querySelectorAll(".user-menu__panel").forEach((el) => {
-      el.hidden = true;
-    });
-    document.querySelectorAll(".user-menu").forEach((el) => {
-      el.classList.remove("is-open");
-    });
-    document.querySelectorAll(".user-menu__trigger").forEach((el) => {
-      el.setAttribute("aria-expanded", "false");
-    });
-    document.querySelectorAll(".notif-bell__panel").forEach((el) => {
-      el.hidden = true;
-    });
-    document.querySelectorAll(".notif-bell__button").forEach((el) => {
-      el.setAttribute("aria-expanded", "false");
-    });
-    panel.hidden = !open;
-    button.setAttribute("aria-expanded", String(open));
-  });
-
-  document.addEventListener("click", closePanel);
-  panel.addEventListener("click", (event) => event.stopPropagation());
-
-  wrap.append(button, panel);
   return wrap;
 }
 
@@ -491,12 +352,6 @@ function buildNotificationBell(notifications, unreadCount) {
     document.querySelectorAll(".user-menu__trigger").forEach((el) => {
       el.setAttribute("aria-expanded", "false");
     });
-    document.querySelectorAll(".tracked-nav__panel").forEach((el) => {
-      el.hidden = true;
-    });
-    document.querySelectorAll(".tracked-nav__button").forEach((el) => {
-      el.setAttribute("aria-expanded", "false");
-    });
     panel.hidden = !open;
     bellBtn.setAttribute("aria-expanded", String(open));
   });
@@ -545,19 +400,12 @@ async function renderAppNav(activePage = "home") {
     console.error(error);
   }
 
-  const trackedOfficials = await loadTrackedOfficialsForNav(user.id).catch(
-    (error) => {
-      console.error(error);
-      return [];
-    }
-  );
-  const trackedWrap = buildTrackedOfficialsMenu(trackedOfficials);
   const bellWrap = buildNotificationBell(notifications, unreadCount);
   const userMenu = buildUserMenuControl(user, profile, {
     onSignOut: () => signOut(),
   });
 
-  actions.replaceChildren(trackedWrap, bellWrap, userMenu);
+  actions.replaceChildren(bellWrap, userMenu);
 }
 
 function escapeHtml(value) {
