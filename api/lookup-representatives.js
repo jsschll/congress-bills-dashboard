@@ -305,7 +305,11 @@ function mapFederalLegislator(legislator, state, district) {
     party: normalizeParty(bio.party),
     state: state || "",
     district: districtValue,
-    photo_url: bio.photo_url || "",
+    photo_url:
+      bio.photo_url ||
+      (bioguide
+        ? `https://www.congress.gov/img/member/${String(bioguide).toLowerCase()}_200.jpg`
+        : ""),
     website_url: contact.url || "",
     phone: contact.phone || "",
     source: "geocodio",

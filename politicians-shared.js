@@ -1759,6 +1759,95 @@ function officeForLevel(politician, sectionLevel) {
   return match || offices[0] || null;
 }
 
+function politicianInitials(name) {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.replace(/[^A-Za-z]/g, ""))
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function portraitHue(name) {
+  const text = String(name || "official");
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+  // Keep hues in a muted civic range (teal → slate → olive).
+  return 160 + (hash % 80);
+}
+
+/** Always-available portrait when no official photo URL exists. */
+function generatedPortraitDataUrl(name) {
+  const initials = politicianInitials(name);
+  const hue = portraitHue(name);
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="hsl(${hue} 28% 38%)"/>
+      <stop offset="100%" stop-color="hsl(${hue + 24} 22% 28%)"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#g)"/>
+  <circle cx="64" cy="48" r="22" fill="rgba(255,255,255,0.18)"/>
+  <ellipse cx="64" cy="112" rx="40" ry="28" fill="rgba(255,255,255,0.14)"/>
+  <text x="64" y="78" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="36" font-weight="600" fill="#f7faf8">${initials}</text>
+</svg>`.trim();
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function congressBioguidePhotoUrl(bioguideId) {
+  const id = String(bioguideId || "").trim().toLowerCase();
+  if (!id) return "";
+  return `https://www.congress.gov/img/member/${id}_200.jpg`;
+}
+
+/**
+ * Prefer a real official photo, then Congress bioguide art, then a generated
+ * initials portrait so every listed name has a photo slot.
+ */
+function resolvePoliticianPhotoUrl(politician) {
+  const direct = String(
+    politician?.photo_url ||
+      politician?.photoUrl ||
+      politician?.image_url ||
+      politician?.image ||
+      ""
+  ).trim();
+  if (direct) return direct;
+
+  const bioguide =
+    politician?.bioguide_id ||
+    politician?.metadata?.references?.bioguide_id ||
+    "";
+  const congressPhoto = congressBioguidePhotoUrl(bioguide);
+  if (congressPhoto) return congressPhoto;
+
+  return generatedPortraitDataUrl(politician?.name || "Official");
+}
+
+function mountPoliticianPhoto(mediaEl, politician) {
+  const img = document.createElement("img");
+  img.className = "politician-card__photo";
+  img.alt = politician?.name
+    ? `Portrait of ${politician.name}`
+    : "Official portrait";
+  img.loading = "lazy";
+  img.decoding = "async";
+  img.width = 96;
+  img.height = 96;
+  img.src = resolvePoliticianPhotoUrl(politician);
+  img.addEventListener("error", () => {
+    const fallback = generatedPortraitDataUrl(politician?.name || "Official");
+    if (img.getAttribute("src") !== fallback) img.src = fallback;
+  });
+  mediaEl.replaceChildren(img);
+}
+
 function renderPoliticianCard(
   politician,
   { followedIds, user, onFollowChange, sectionLevel = null }
@@ -1772,22 +1861,7 @@ function renderPoliticianCard(
 
   const media = document.createElement("div");
   media.className = "politician-card__media";
-  if (politician.photo_url) {
-    const img = document.createElement("img");
-    img.src = politician.photo_url;
-    img.alt = politician.name;
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.width = 96;
-    img.height = 96;
-    // Prefer a sharper face crop for vertical official portraits.
-    img.style.objectPosition = "center 15%";
-    media.append(img);
-  } else {
-    media.innerHTML = `<div class="politician-card__avatar">${escapePoliticianHtml(
-      (politician.name || "?").slice(0, 1)
-    )}</div>`;
-  }
+  mountPoliticianPhoto(media, politician);
 
   const body = document.createElement("div");
   body.className = "politician-card__body";

@@ -1404,7 +1404,14 @@ body {
   box-shadow: none;
 }
 
+.politician-card__media {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+}
+
 .politician-card__media img,
+.politician-card__photo,
 .politician-card__avatar {
   width: 72px;
   height: 72px;
@@ -1413,6 +1420,7 @@ body {
   object-position: center 15%;
   background: var(--accent-soft);
   image-rendering: auto;
+  display: block;
 }
 
 .politician-card__avatar {
@@ -1877,10 +1885,24 @@ body {
 }
 
 .profile-rep-card {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 0.7rem;
+  align-items: center;
   border: 1px solid var(--border-color, #d0d7de);
   border-radius: 12px;
   padding: 0.75rem;
   background: #fafafa;
+}
+
+.profile-rep-card__photo {
+  width: 56px;
+  height: 56px;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  object-position: center 15%;
+  background: #dce6df;
+  display: block;
 }
 
 .profile-rep-card h4 {

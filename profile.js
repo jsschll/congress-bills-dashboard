@@ -439,7 +439,21 @@ async function loadFollows() {
   } else {
     for (const person of politicians) {
       const li = document.createElement("li");
+      const photoUrl =
+        typeof resolvePoliticianPhotoUrl === "function"
+          ? resolvePoliticianPhotoUrl(person)
+          : person.photo_url || "";
+      const fallback =
+        typeof generatedPortraitDataUrl === "function"
+          ? generatedPortraitDataUrl(person.name || "Official")
+          : "";
+      li.className = "profile-follow-list__person";
       li.innerHTML = `
+        <img class="profile-follow-list__photo" src="${escapeProfileHtml(
+          photoUrl
+        )}" alt="${escapeProfileHtml(
+          person.name ? `Portrait of ${person.name}` : "Official portrait"
+        )}" width="40" height="40" loading="lazy" />
         <div>
           <strong>${escapeProfileHtml(person.name)}</strong>
           <span>${escapeProfileHtml(
@@ -456,6 +470,12 @@ async function loadFollows() {
           person.followId
         )}">Unfollow</button>
       `;
+      const img = li.querySelector("img");
+      if (img && fallback) {
+        img.addEventListener("error", () => {
+          if (img.getAttribute("src") !== fallback) img.src = fallback;
+        });
+      }
       followedPoliticiansList.append(li);
     }
   }
@@ -1006,14 +1026,35 @@ function renderRepresentation(people, geography = {}) {
         person.chamber ||
         person.metadata?.office_title ||
         "";
+      const photoUrl =
+        typeof resolvePoliticianPhotoUrl === "function"
+          ? resolvePoliticianPhotoUrl(person)
+          : person.photo_url || "";
+      const fallback =
+        typeof generatedPortraitDataUrl === "function"
+          ? generatedPortraitDataUrl(person.name || "Official")
+          : "";
       card.innerHTML = `
-        <h4>${escapeProfileHtml(person.name)}</h4>
-        <p>${escapeProfileHtml(
-          [office, person.party, person.state, person.district]
-            .filter(Boolean)
-            .join(" · ")
-        )}</p>
+        <img class="profile-rep-card__photo" src="${escapeProfileHtml(
+          photoUrl
+        )}" alt="${escapeProfileHtml(
+          person.name ? `Portrait of ${person.name}` : "Official portrait"
+        )}" width="56" height="56" loading="lazy" />
+        <div>
+          <h4>${escapeProfileHtml(person.name)}</h4>
+          <p>${escapeProfileHtml(
+            [office, person.party, person.state, person.district]
+              .filter(Boolean)
+              .join(" · ")
+          )}</p>
+        </div>
       `;
+      const img = card.querySelector("img");
+      if (img && fallback) {
+        img.addEventListener("error", () => {
+          if (img.src !== fallback) img.src = fallback;
+        });
+      }
       list.append(card);
     }
     section.append(list);
