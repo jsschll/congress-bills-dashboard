@@ -8,6 +8,9 @@ const {
   DEFAULT_YEA_LABEL,
   DEFAULT_NAY_LABEL,
 } = require("../lib/format-bill-summary");
+const {
+  fetchRecentSenateVotesForMember,
+} = require("../lib/senate-votes");
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -113,21 +116,30 @@ function plainEnglishForVote(vote, summaryText = "") {
   const crs = toSentences(summaryText, 2);
   if (crs) return crs;
   const kind = vote.voteKind;
+  const chamberLabel =
+    String(vote.jurisdiction || "").toLowerCase().includes("senate") ||
+    String(vote.chamber || "").toLowerCase() === "senate"
+      ? "Senate"
+      : "House";
   const bill = vote.billNumber || "this measure";
   const title =
     vote.title && vote.title !== vote.voteQuestion ? ` (${vote.title})` : "";
   if (kind === "final_passage") {
-    return `This was a final House vote on whether to pass ${bill}${title}.`;
+    return `This was a final ${chamberLabel} vote on whether to pass ${bill}${title}.`;
   }
   if (kind === "amendment") {
-    return `This House vote was on an amendment to ${bill}${title}.`;
+    return `This ${chamberLabel} vote was on an amendment to ${bill}${title}.`;
   }
   const question = String(vote.voteQuestion || "").trim();
-  if (question) return `House roll call on: ${question.replace(/\.$/, "")}.`;
-  if (vote.hasLinkedBill || (vote.legislationType && vote.legislationNumber)) {
-    return `House roll-call vote on ${bill}${title}. Yea supports the measure on this question; Nay opposes it.`;
+  if (question) {
+    return `${chamberLabel} roll call on: ${question.replace(/\.$/, "")}.`;
   }
-  return `Recent House roll-call vote${vote.result ? ` — result: ${vote.result}` : ""}.`;
+  if (vote.hasLinkedBill || (vote.legislationType && vote.legislationNumber)) {
+    return `${chamberLabel} roll-call vote on ${bill}${title}. Yea supports the measure on this question; Nay opposes it.`;
+  }
+  return `Recent ${chamberLabel} roll-call vote${
+    vote.result ? ` — result: ${vote.result}` : ""
+  }.`;
 }
 
 function yeaNayMeans(vote) {
@@ -535,6 +547,11 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
 
   // Enrich a capped set with CRS summary + plain-English card.
   // Keep this small so the profile API stays fast on Vercel.
+  await enrichVoteCards(found, apiKey);
+  return found;
+}
+
+async function enrichVoteCards(found, apiKey) {
   const enrichCount = Math.min(found.length, 8);
   const llmBudget = env("OPENAI_API_KEY", "OPENAI_KEY", "AI_API_KEY") ? 3 : 0;
   const chunkEnrich = 4;
@@ -589,6 +606,21 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
     String(b.date || "").localeCompare(String(a.date || ""))
   );
   return found;
+}
+
+async function fetchRecentSenateVotes(apiKey, bioguideId, limit = 16) {
+  try {
+    const found = await fetchRecentSenateVotesForMember(bioguideId, {
+      congress: CONGRESS,
+      limit,
+      scanLimit: 48,
+    });
+    await enrichVoteCards(found, apiKey);
+    return found;
+  } catch (error) {
+    console.warn(error);
+    return [];
+  }
 }
 
 function isImpactful(bill) {
@@ -647,6 +679,8 @@ module.exports = async function handler(req, res) {
     let recentVotes = [];
     if (overview.chamber === "house") {
       recentVotes = await fetchRecentVotesForMember(apiKey, bioguide, 16);
+    } else if (overview.chamber === "senate") {
+      recentVotes = await fetchRecentSenateVotes(apiKey, bioguide, 16);
     }
 
     const recentActions = [...recentVotes, ...sponsored]

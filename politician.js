@@ -864,10 +864,13 @@ function setActivityTab(tab) {
   });
 }
 
-function voteKindLabel(kind) {
+function voteKindLabel(kind, item = {}) {
   if (kind === "final_passage") return "Final passage";
   if (kind === "amendment") return "Amendment";
-  return "House vote";
+  const chamber = String(item.chamber || item.jurisdiction || "").toLowerCase();
+  if (chamber.includes("senate")) return "Senate vote";
+  if (chamber.includes("house")) return "House vote";
+  return "Floor vote";
 }
 
 function formatVoteMeta(item) {
@@ -923,8 +926,14 @@ function renderVotesList(target, votes, emptyMessage, person) {
     card.className = "politician-vote-card";
     const cast = item.voteCast || "—";
     const subject = item.subjectCategory || item.policyArea || "";
-    const kind = voteKindLabel(item.voteKind);
+    const kind = voteKindLabel(item.voteKind, item);
     const copy = voteCardCopy(item);
+    const titleFallback =
+      String(item.jurisdiction || item.chamber || "")
+        .toLowerCase()
+        .includes("senate")
+        ? "Senate roll-call vote"
+        : "House roll-call vote";
     card.innerHTML = `
       <header class="politician-vote-card__header">
         <span class="politician-vote-cast ${voteCastClass(cast)}" title="${escapeHtml(
@@ -945,7 +954,7 @@ function renderVotesList(target, votes, emptyMessage, person) {
             }
           </div>
           <h3 class="politician-vote-card__title">${escapeHtml(
-            item.title || item.voteQuestion || "House roll-call vote"
+            item.title || item.voteQuestion || titleFallback
           )}</h3>
           <p class="politician-vote-card__meta">${escapeHtml(
             formatVoteMeta(item)
@@ -1066,8 +1075,16 @@ function renderActivity(congress, person) {
   if (activityLede) {
     activityLede.textContent =
       roleKind === "senate"
-        ? "Sponsored legislation from Congress.gov. Cast Yea / Nay on House votes elsewhere to build Action Match when comparable rolls exist."
+        ? "Browse recent Senate votes below — read the plain-English summary, then cast Yea or Nay to build your Action Match Score."
         : "Browse recent House votes below — read the plain-English summary, then cast Yea or Nay to build your Action Match Score.";
+  }
+
+  const votesIntro = document.querySelector(".politician-votes-intro");
+  if (votesIntro) {
+    votesIntro.textContent =
+      roleKind === "senate"
+        ? "Recent Senate roll calls for this member — what was proposed, what Yea / Nay mean, and how you’d vote (feeds Action Match)."
+        : "Recent House roll calls for this member — what was proposed, what Yea / Nay mean, and how you’d vote (feeds Action Match).";
   }
 
   const votes = congress?.recentVotes || [];
@@ -1084,7 +1101,7 @@ function renderActivity(congress, person) {
       "Vote history loads for federal legislators with a bioguide ID.";
   } else if (roleKind === "senate" && !votes.length) {
     votesEmpty =
-      "Senate roll-call votes aren’t listed here yet. Use Feed → Votes to cast Yea / Nay on House rolls and build Action Match.";
+      "No recent Yea / Nay Senate votes found yet for this member.";
   } else if (roleKind === "house" && !votes.length) {
     votesEmpty = "No recent Yea / Nay / Present House votes found yet.";
   }
