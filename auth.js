@@ -121,6 +121,30 @@ async function finishLogin(user) {
     follows === 0 ? "topics.html" : "bills-policies.html?tab=mine";
 }
 
+/** Reject sessions created by accidental magic-link signup (empty profile). */
+async function requireRegisteredProfile(user, { allowMissingUsername = false } = {}) {
+  const client = getSupabase();
+  if (!client || !user?.id) return null;
+
+  const { data: profile, error } = await client
+    .from("profiles")
+    .select("username, email")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    throw new Error("Could not load your profile. Try signing in again.");
+  }
+
+  if (profile?.username || allowMissingUsername) return profile;
+
+  await client.auth.signOut();
+  throw new Error(
+    "No account found for that email. Create an account first, then sign in."
+  );
+}
+
 async function resolveEmail(identifier) {
   const value = identifier.trim();
   if (value.includes("@")) return value.toLowerCase();
@@ -258,6 +282,31 @@ forgotForm?.addEventListener("submit", async (event) => {
   try {
     const email = await resolveEmail(identifier);
 
+    // Confirm a real signup exists before sending any reset mail/link.
+    // admin.generateLink(recovery) can otherwise create an empty Auth user.
+    try {
+      await postAuthCode({ identifier: email, purpose: "check" });
+    } catch (checkError) {
+      if (
+        checkError?.status === 404 ||
+        /no account found/i.test(checkError?.message || "")
+      ) {
+        setAuthStatus(
+          checkError.message ||
+            "No account found for that email. Create an account first.",
+          "error"
+        );
+        return;
+      }
+      // If the check API is unavailable, still avoid inventing accounts:
+      // username lookups already proved existence; bare emails continue below.
+      if (!String(identifier || "").includes("@")) {
+        // username resolved → account exists
+      } else {
+        console.warn("Account check unavailable:", checkError);
+      }
+    }
+
     // 1) Always request Supabase recovery (works with the browser anon key).
     const { error: recoverError } = await client.auth.resetPasswordForEmail(
       email,
@@ -292,6 +341,17 @@ forgotForm?.addEventListener("submit", async (event) => {
       document.getElementById("otp-code")?.focus();
       return;
     } catch (serverError) {
+      if (
+        serverError?.status === 404 ||
+        /no account found/i.test(serverError?.message || "")
+      ) {
+        setAuthStatus(
+          serverError.message ||
+            "No account found for that email. Create an account first.",
+          "error"
+        );
+        return;
+      }
       console.warn("Resend recovery unavailable:", serverError);
       resendNote =
         " If you do not see a code email, open the password reset link from Supabase instead (same inbox/spam).";
@@ -366,9 +426,11 @@ async function postAuthCode({ identifier, purpose }) {
       if (response.ok && payload.ok) {
         return payload;
       }
-      lastError = new Error(
+      const err = new Error(
         payload.error || `Could not send email (${response.status}).`
       );
+      err.status = response.status;
+      lastError = err;
       // Don't fall through hosts on explicit client errors.
       if (response.status >= 400 && response.status < 500) break;
     } catch (error) {
@@ -389,6 +451,14 @@ async function sendSignInCode(identifier) {
     pendingOtpEmail = payload.email;
     return true;
   } catch (serverError) {
+    // 404 = no registered account. Do not fall back — generateLink/OTP
+    // must never create a user for an unknown email.
+    if (
+      serverError?.status === 404 ||
+      /no account found/i.test(serverError?.message || "")
+    ) {
+      throw serverError;
+    }
     console.warn("send-auth-code API failed, trying Supabase OTP:", serverError);
   }
 
@@ -497,6 +567,19 @@ otpVerifyForm?.addEventListener("submit", async (event) => {
     return;
   }
 
+  try {
+    await requireRegisteredProfile(user);
+  } catch (profileError) {
+    console.error(profileError);
+    setAuthStatus(
+      profileError.message ||
+        "No account found for that email. Create an account first.",
+      "error"
+    );
+    showAuthView("signup");
+    return;
+  }
+
   setAuthStatus("Signed in. Redirecting…", "loading");
   await finishLogin(user);
 });
@@ -586,6 +669,20 @@ function hashParams() {
       setAuthStatus(
         "Choose a new password to finish resetting your account.",
         "success"
+      );
+      return;
+    }
+    try {
+      // Magic-link / OTP for unknown emails used to auto-create empty profiles.
+      // Sign those out instead of treating them as logged-in accounts.
+      await requireRegisteredProfile(data.session.user);
+    } catch (profileError) {
+      console.error(profileError);
+      showAuthView("signup");
+      setAuthStatus(
+        profileError.message ||
+          "No account found for that email. Create an account first.",
+        "error"
       );
       return;
     }

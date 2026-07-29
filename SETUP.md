@@ -66,8 +66,10 @@ Cron jobs (`vercel.json`):
 ## 5. Auth flow
 1. Sign up with username, email, and password
 2. User clicks the verification link in email
-3. User signs in with email or username + password
+3. User signs in with email or username + password (or a one-time email code)
 4. Nav shows **Sign out** (Sign up is hidden while signed in)
+
+**Important:** Sign-in codes, magic links, and password-reset links are only issued for emails that already have a real signup (`profiles.username` set). Requesting a code for an unknown email must not create an Auth user or empty profile.
 
 ## 6. Phone signup
 Deferred. Can be added later with Twilio in Supabase.

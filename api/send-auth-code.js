@@ -58,6 +58,82 @@ async function resolveEmail(identifier, supabase) {
   return String(data).toLowerCase();
 }
 
+async function findAuthUserByEmail(supabase, email) {
+  const normalized = String(email || "").toLowerCase();
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+    if (error) throw error;
+    const users = data?.users || [];
+    const found = users.find(
+      (user) => String(user.email || "").toLowerCase() === normalized
+    );
+    if (found) return found;
+    if (users.length < 200) break;
+  }
+  return null;
+}
+
+/**
+ * Passwordless / recovery must never create accounts.
+ * admin.generateLink({ type: "magiclink"|"recovery" }) will create an Auth
+ * user (and empty profile via trigger) for unknown emails — block that.
+ * Real signups always set profiles.username via user_metadata.
+ */
+async function requireRegisteredAccount(supabase, email) {
+  const normalized = String(email || "").trim().toLowerCase();
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("id, username, email")
+    .eq("email", normalized)
+    .maybeSingle();
+
+  if (error) {
+    const err = new Error(error.message || "Could not verify account.");
+    err.status = 500;
+    throw err;
+  }
+
+  if (profile?.username) return profile;
+
+  // Incomplete / accidental Auth user (magic-link auto-create): remove so the
+  // address can be used for a real signup, and never send codes for it.
+  if (profile?.id) {
+    try {
+      await supabase.auth.admin.deleteUser(profile.id);
+      console.warn("Removed incomplete auth user (no username):", normalized);
+    } catch (deleteError) {
+      console.warn("Could not remove incomplete auth user:", deleteError);
+    }
+  } else {
+    const authUser = await findAuthUserByEmail(supabase, normalized);
+    const metaUsername = authUser?.user_metadata?.username;
+    if (authUser && metaUsername) {
+      return {
+        id: authUser.id,
+        username: String(metaUsername).toLowerCase(),
+        email: normalized,
+      };
+    }
+    if (authUser) {
+      try {
+        await supabase.auth.admin.deleteUser(authUser.id);
+        console.warn("Removed incomplete auth user (no username):", normalized);
+      } catch (deleteError) {
+        console.warn("Could not remove incomplete auth user:", deleteError);
+      }
+    }
+  }
+
+  const err = new Error(
+    "No account found for that email. Create an account first."
+  );
+  err.status = 404;
+  throw err;
+}
+
 async function sendResendEmail({ to, subject, html, text }) {
   const apiKey = env("RESEND_API_KEY");
   const from =
@@ -90,23 +166,34 @@ async function sendResendEmail({ to, subject, html, text }) {
   return data;
 }
 
-function codeEmail({ code, purpose }) {
-  const heading =
-    purpose === "recovery" ? "Reset your password" : "Your sign-in code";
-  const lead =
-    purpose === "recovery"
-      ? "Use this code on the password reset page, or open the reset link if one was included."
-      : "Enter this code on the Congress Bills sign-in page to finish signing in.";
+function codeEmail({ code, purpose, actionLink }) {
+  const isRecovery = purpose === "recovery";
+  const heading = isRecovery ? "Reset your password" : "Your sign-in code";
+  const lead = isRecovery
+    ? "Enter this code on the password reset page to choose a new password."
+    : "Enter this code on the Congress Bills sign-in page to finish signing in.";
+  const linkLabel = isRecovery
+    ? "Or open this link to reset your password"
+    : "Or open this link to sign in";
+  const linkBlock =
+    actionLink &&
+    `\n\n${linkLabel}:\n${actionLink}\n`;
+  const linkHtml =
+    actionLink
+      ? `<p style="margin:1rem 0 0"><a href="${actionLink}" style="color:#1a2332;font-weight:600">${linkLabel}</a></p>`
+      : "";
+
   return {
     subject: `${code} is your Congress Bills ${
-      purpose === "recovery" ? "reset" : "sign-in"
+      isRecovery ? "reset" : "sign-in"
     } code`,
-    text: `${heading}\n\n${lead}\n\nCode: ${code}\n\nThis code expires soon. If you did not request it, you can ignore this email.`,
+    text: `${heading}\n\n${lead}\n\nCode: ${code}${linkBlock}\nThis code expires soon. If you did not request it, you can ignore this email.`,
     html: `<div style="font-family:Figtree,Segoe UI,sans-serif;line-height:1.5;color:#1a2332">
       <h1 style="font-size:1.35rem;margin:0 0 0.75rem">${heading}</h1>
       <p style="margin:0 0 1rem">${lead}</p>
       <p style="font-size:2rem;letter-spacing:0.18em;font-weight:700;margin:0 0 1rem">${code}</p>
-      <p style="color:#5c6b7a;margin:0;font-size:0.95rem">This code expires soon. If you did not request it, you can ignore this email.</p>
+      ${linkHtml}
+      <p style="color:#5c6b7a;margin:1rem 0 0;font-size:0.95rem">This code expires soon. If you did not request it, you can ignore this email.</p>
     </div>`,
   };
 }
@@ -135,12 +222,25 @@ module.exports = async function handler(req, res) {
   body = body || {};
 
   const purpose = String(body.purpose || "signin").toLowerCase();
-  const linkType = purpose === "recovery" || purpose === "reset" ? "recovery" : "magiclink";
+  const linkType =
+    purpose === "recovery" || purpose === "reset" ? "recovery" : "magiclink";
+  const checkOnly = purpose === "check" || purpose === "exists";
 
   try {
     const email = await resolveEmail(body.email || body.identifier, supabase);
     if (!email || !email.includes("@")) {
       return json(res, 400, { error: "Enter a valid email or username." });
+    }
+
+    await requireRegisteredAccount(supabase, email);
+
+    if (checkOnly) {
+      return json(res, 200, {
+        ok: true,
+        email,
+        purpose: "check",
+        message: "Account found.",
+      });
     }
 
     const redirectTo = `${siteBaseUrl(req)}/auth.html${
@@ -156,7 +256,8 @@ module.exports = async function handler(req, res) {
     if (error) {
       console.error("generateLink failed:", error);
       return json(res, 400, {
-        error: error.message || "Could not create a sign-in code for that account.",
+        error:
+          error.message || "Could not create a sign-in code for that account.",
       });
     }
 
@@ -172,9 +273,13 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    const actionLink =
+      data?.properties?.action_link || data?.action_link || "";
+
     const mail = codeEmail({
       code,
       purpose: linkType === "recovery" ? "recovery" : "signin",
+      actionLink,
     });
     await sendResendEmail({
       to: email,
