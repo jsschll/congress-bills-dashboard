@@ -287,9 +287,10 @@ async function toBillItem(bill, apiKey) {
     status,
     allSteps,
     shortPitch:
-      toSentences(summaryText, 2) ||
-      toSentences(stripHtml(actionText), 1) ||
+      toSentences(summaryText, 3) ||
+      toSentences(stripHtml(actionText), 2) ||
       "Recent federal legislative activity.",
+    statusLabel: actionText || status.stepName || "Updated",
     deltaSummary: deltaSummaryFromText(summaryText || actionText),
     officialUrl: `https://www.congress.gov/bill/${bill.congress}th-congress/${type}/${number}`,
     tags,
@@ -344,9 +345,11 @@ async function fetchOpenStatesBillsForJurisdictions(apiKey, jurisdictions, perJu
           status,
           allSteps,
           shortPitch:
-            toSentences(stripHtml(summaryText), 2) ||
-            toSentences(stripHtml(actionText), 1) ||
+            toSentences(stripHtml(summaryText), 3) ||
+            toSentences(stripHtml(actionText), 2) ||
             "Recent state legislative activity.",
+          statusLabel: actionText || status.stepName || "Updated",
+          deltaSummary: deltaSummaryFromText(summaryText || actionText),
           deltaSummary: deltaSummaryFromText(summaryText || actionText),
           officialUrl: bill.openstates_url || "",
           tags: Array.isArray(bill.subject) ? bill.subject.slice(0, 6) : [],
@@ -393,6 +396,7 @@ function localPolicyItem({
     status,
     allSteps,
     shortPitch,
+    statusLabel: shortPitch || status.stepName || "Updated",
     deltaSummary,
     officialUrl,
     tags,
@@ -644,7 +648,9 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   if (req.method !== "GET") return json(res, 405, { error: "Method not allowed" });
 
-  const apiKey = process.env.CONGRESS_API_KEY || process.env.API_KEY || "";
+  const queryKey = String(req.query?.api_key || "").trim();
+  const apiKey =
+    process.env.CONGRESS_API_KEY || process.env.API_KEY || queryKey || "";
   const openStatesKey =
     process.env.OPENSTATES_API_KEY || process.env.OPEN_STATES_API_KEY || "";
 

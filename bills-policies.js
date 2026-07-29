@@ -390,14 +390,35 @@ async function fetchClientFederalFeed(limit = 12) {
   }
 
   const bills = Array.isArray(listData.bills) ? listData.bills : [];
-  return bills.map((bill) => {
+  const items = [];
+  for (const bill of bills) {
     const type = String(bill.type || "").toLowerCase();
     const number = String(bill.number || "");
     const actionText = bill.latestAction?.text || "Updated";
     const actionDate = bill.latestAction?.actionDate || bill.updateDate || "";
     const allSteps = policySteps(inferFederalStep(actionText), actionDate);
     const status = allSteps.find((step) => step.isCurrent) || allSteps[0];
-    return {
+    let summaryText = "";
+    try {
+      const summariesUrl = `${CONGRESS_API_BASE}/bill/${bill.congress}/${type}/${number}/summaries?format=json&api_key=${API_KEY}`;
+      const summariesRes = await fetch(summariesUrl);
+      const summariesData = await summariesRes.json().catch(() => ({}));
+      const summaries = summariesData.summaries || [];
+      const latest = summaries[summaries.length - 1];
+      summaryText = String(latest?.text || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    } catch (error) {
+      console.warn(error);
+    }
+    const summaryPitch = summaryText
+      .split(/(?<=[.!?])\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(" ");
+    items.push({
       id: `federal-${bill.congress}-${type}-${number}`.toLowerCase(),
       billNumber: `${String(bill.type || "").toUpperCase()} ${number}`.trim(),
       title: bill.title || "Untitled bill",
@@ -411,17 +432,27 @@ async function fetchClientFederalFeed(limit = 12) {
         : new Date().toISOString(),
       status,
       allSteps,
-      shortPitch: actionText,
-      deltaSummary: clientDeltaFromText(actionText),
+      shortPitch:
+        summaryPitch || actionText || "Recent federal legislative activity.",
+      statusLabel: actionText,
+      deltaSummary: clientDeltaFromText(summaryPitch || actionText),
       officialUrl: `https://www.congress.gov/bill/${bill.congress}th-congress/${type}/${number}`,
       tags: [],
-    };
-  });
+    });
+  }
+  return items;
 }
 
 async function fetchBillsFeedPayload(limit = 16, stateCode = "") {
   const query = new URLSearchParams({ limit: String(limit) });
   if (stateCode) query.set("state", stateCode);
+  if (
+    typeof API_KEY === "string" &&
+    API_KEY.trim() &&
+    !API_KEY.includes("YOUR_")
+  ) {
+    query.set("api_key", API_KEY.trim());
+  }
 
   const endpoints = [BILLS_FEED_PATH];
   if (
@@ -886,7 +917,19 @@ function renderBillCard(item) {
         ${followed ? "Following" : "Follow bill"}
       </button>
     </div>
-    <p class="policy-bill-card__pitch">${escapePolicyHtml(item.shortPitch)}</p>
+    <section class="policy-bill-card__summary" aria-label="Summary">
+      <h3 class="policy-bill-card__summary-label">Summary</h3>
+      <p class="policy-bill-card__pitch">${escapePolicyHtml(
+        item.shortPitch || "Summary unavailable."
+      )}</p>
+      ${
+        item.statusLabel
+          ? `<p class="policy-bill-card__status">${escapePolicyHtml(
+              item.statusLabel
+            )}</p>`
+          : ""
+      }
+    </section>
     <div class="policy-bill-card__progress" role="list" aria-label="Bill status">
       ${(item.allSteps || [])
         .map((step) => {
