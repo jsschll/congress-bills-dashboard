@@ -249,13 +249,36 @@ signupForm?.addEventListener("submit", async (event) => {
 
 forgotForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const client = requireSupabaseClient();
-  if (!client) return;
-
   const identifier = document.getElementById("forgot-identifier").value;
-  setAuthStatus("Sending reset link…", "loading");
+  setAuthStatus("Sending reset email…", "loading");
 
   try {
+    // Prefer Resend-delivered code/link so reset emails actually arrive.
+    try {
+      const payload = await postAuthCode({
+        identifier,
+        purpose: "recovery",
+      });
+      pendingOtpEmail = payload.email;
+      showAuthView("otp-verify");
+      document.getElementById("auth-title").textContent = "Enter reset code";
+      document.getElementById("auth-subtitle").textContent =
+        "Enter the code from your email, then choose a new password.";
+      setAuthStatus(
+        `Reset code sent to ${payload.email}. Check inbox and spam, then enter it below.`,
+        "success"
+      );
+      // After OTP verify we'll be signed in via recovery-equivalent session;
+      // route password update by flipping recoveryMode on successful verify.
+      window.__pendingPasswordReset = true;
+      document.getElementById("otp-code")?.focus();
+      return;
+    } catch (serverError) {
+      console.warn("recovery send-auth-code failed, using Supabase email:", serverError);
+    }
+
+    const client = requireSupabaseClient();
+    if (!client) return;
     const email = await resolveEmail(identifier);
     const { error } = await client.auth.resetPasswordForEmail(email, {
       redirectTo: authRedirectUrl({ reset: "1" }),
@@ -266,7 +289,7 @@ forgotForm?.addEventListener("submit", async (event) => {
       return;
     }
     setAuthStatus(
-      `If an account exists for ${email}, a password reset link is on the way. Check your inbox and spam folder.`,
+      `If an account exists for ${email}, a password reset email is on the way. Check your inbox and spam folder.`,
       "success"
     );
   } catch (error) {
@@ -310,7 +333,56 @@ resetForm?.addEventListener("submit", async (event) => {
   setAuthStatus("Password updated. Sign in with your new password.", "success");
 });
 
+async function postAuthCode({ identifier, purpose }) {
+  const endpoints = ["/api/send-auth-code"];
+  if (
+    typeof location !== "undefined" &&
+    location.origin &&
+    !location.origin.includes("vercel.app")
+  ) {
+    endpoints.push(
+      "https://congress-bills-dashboard.vercel.app/api/send-auth-code"
+    );
+  }
+
+  let lastError = null;
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, purpose }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload.ok) {
+        return payload;
+      }
+      lastError = new Error(
+        payload.error || `Could not send email (${response.status}).`
+      );
+      // Don't fall through hosts on explicit client errors.
+      if (response.status >= 400 && response.status < 500) break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Could not send email code.");
+}
+
 async function sendSignInCode(identifier) {
+  // Prefer server-sent codes via Resend so users get a visible OTP
+  // (Supabase's default template is a magic link, and built-in mail is unreliable).
+  try {
+    const payload = await postAuthCode({
+      identifier,
+      purpose: "signin",
+    });
+    pendingOtpEmail = payload.email;
+    return true;
+  } catch (serverError) {
+    console.warn("send-auth-code API failed, trying Supabase OTP:", serverError);
+  }
+
   const client = requireSupabaseClient();
   if (!client) return false;
 
@@ -343,7 +415,7 @@ otpRequestForm?.addEventListener("submit", async (event) => {
     await sendSignInCode(identifier);
     showAuthView("otp-verify");
     setAuthStatus(
-      `Code sent to ${pendingOtpEmail}. Enter it below to sign in.`,
+      `Code sent to ${pendingOtpEmail}. Check inbox and spam, then enter it below.`,
       "success"
     );
     document.getElementById("otp-code")?.focus();
@@ -372,20 +444,47 @@ otpVerifyForm?.addEventListener("submit", async (event) => {
   }
 
   setAuthStatus("Verifying code…", "loading");
-  const { data, error } = await client.auth.verifyOtp({
-    email: pendingOtpEmail,
-    token,
-    type: "email",
-  });
-  if (error) {
-    console.error(error);
-    setAuthStatus(error.message || "That code is invalid or expired.", "error");
+
+  const typesToTry = window.__pendingPasswordReset
+    ? ["recovery", "email", "magiclink"]
+    : ["email", "magiclink"];
+
+  let data = null;
+  let lastVerifyError = null;
+  for (const type of typesToTry) {
+    const result = await client.auth.verifyOtp({
+      email: pendingOtpEmail,
+      token,
+      type,
+    });
+    if (!result.error && (result.data?.user || result.data?.session?.user)) {
+      data = result.data;
+      lastVerifyError = null;
+      break;
+    }
+    lastVerifyError = result.error;
+  }
+
+  if (!data) {
+    console.error(lastVerifyError);
+    setAuthStatus(
+      lastVerifyError?.message || "That code is invalid or expired.",
+      "error"
+    );
     return;
   }
 
   const user = data.user || data.session?.user;
   if (!user) {
     setAuthStatus("Code accepted, but no session was returned.", "error");
+    return;
+  }
+
+  if (window.__pendingPasswordReset) {
+    window.__pendingPasswordReset = false;
+    recoveryMode = true;
+    showAuthView("reset");
+    setAuthStatus("Code verified. Choose a new password.", "success");
     return;
   }
 

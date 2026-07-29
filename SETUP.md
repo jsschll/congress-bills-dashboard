@@ -5,11 +5,11 @@
 2. Authentication → Providers → Email:
    - Enable Email provider
    - Enable **Confirm email** (verification link)
-   - Enable **Email OTP** / magic link so users can **Sign in with email code** and use **Forgot password** reset links
 3. Authentication → URL Configuration:
    - Site URL: your live site (e.g. `https://jsschll.github.io/congress-bills-dashboard/` or your Vercel URL)
    - Redirect URLs: include `https://YOUR_DOMAIN/auth.html`, `https://YOUR_DOMAIN/auth.html?verified=1`, and `https://YOUR_DOMAIN/auth.html?reset=1`
-4. SQL Editor: run [`supabase/schema.sql`](supabase/schema.sql)
+4. For reliable **email sign-in codes** and password-reset codes, set `RESEND_API_KEY` (+ optional `NOTIFY_FROM_EMAIL`) and `SUPABASE_SERVICE_ROLE_KEY` on Vercel. The app sends codes through `/api/send-auth-code` instead of Supabase’s built-in mailer.
+5. SQL Editor: run [`supabase/schema.sql`](supabase/schema.sql)
    - If you already ran an older schema, also run [`supabase/migration-username-auth.sql`](supabase/migration-username-auth.sql)
    - For Bills location filters, also run [`supabase/migration-profile-home-address.sql`](supabase/migration-profile-home-address.sql) (adds `profiles.home_address`)
    - For civic profile preferences, also run [`supabase/migration-profile-civic-prefs.sql`](supabase/migration-profile-civic-prefs.sql)
@@ -17,7 +17,7 @@
    - For voter registration status on Profile, also run [`supabase/migration-voter-registration-status.sql`](supabase/migration-voter-registration-status.sql)
    - For notification delivery categories/email tracking, also run [`supabase/migration-notification-delivery.sql`](supabase/migration-notification-delivery.sql)
    - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
-5. Project Settings → API: copy Project URL and the **anon / publishable** key
+6. Project Settings → API: copy Project URL and the **anon / publishable** key
 
 ## 2. Local config
 Copy `config.example.js` to `config.js` and set:
@@ -35,8 +35,8 @@ Set these for Production/Preview (Project Settings → Environment Variables, th
 - `CICERO_API_KEY` — recommended for city, county, school board, governors, AGs, mayors, and judges ([Cicero free trial](https://www.cicerodata.com/api/)). The lookup API queries NATIONAL/STATE/LOCAL/COUNTY/SCHOOL/JUDICIAL district types.
 - `GOOGLE_CIVIC_API_KEY` — optional for Politicians lookup; **required for live Election & Voting Center** polling places / contests (Representatives API was turned down in April 2025, but Elections + voterinfo still work)
 - `OPENSTATES_API_KEY` — state bill feed + optional enrichment for state / municipal officials ([Open States](https://openstates.org/accounts/login/))
-- `RESEND_API_KEY` — required for notification **email** delivery (critical alerts + digests). Get a key at [resend.com](https://resend.com)
-- `NOTIFY_FROM_EMAIL` — optional verified sender, e.g. `Congress Bills <alerts@yourdomain.com>` (defaults to Resend onboarding sender)
+- `RESEND_API_KEY` — required for notification **email** delivery and for **auth email codes** / password-reset codes (Forgot password + Sign in with email code). Get a key at [resend.com](https://resend.com)
+- `NOTIFY_FROM_EMAIL` — optional verified sender, e.g. `Congress Bills <alerts@yourdomain.com>` (defaults to Resend onboarding sender). Must be allowed by your Resend domain.
 - `SITE_URL` — optional canonical site URL used in email links
 
 Cron jobs (`vercel.json`):
