@@ -19,6 +19,7 @@
    - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
    - For Support/Oppose stances + community stats on Feed/Search cards, run [`supabase/migration-bill-stances.sql`](supabase/migration-bill-stances.sql)
    - For pocketbook baselines + Who Voted With Me / match scores, run [`supabase/migration-pocketbook-and-votes.sql`](supabase/migration-pocketbook-and-votes.sql)
+   - For impact estimator roles (teacher, veteran, etc.), run [`supabase/migration-impact-roles.sql`](supabase/migration-impact-roles.sql)
    - For profile avatars + display name (nav account menu), run [`supabase/migration-profile-avatar.sql`](supabase/migration-profile-avatar.sql)
 6. Project Settings → API: copy Project URL and the **anon / publishable** key
 

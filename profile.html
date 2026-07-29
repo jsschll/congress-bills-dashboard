@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729y" />
+    <link rel="stylesheet" href="styles.css?v=20260729z" />
   </head>
   <body class="page-app page-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -302,8 +302,9 @@
           </button>
           <div class="profile-accordion__body">
             <p class="profile-panel__lede">
-              Saved values auto-fill Impact calculators on Feed and Search
-              cards.
+              Saved values and roles power Impact calculators on Feed and Search
+              cards. Add roles so bills for teachers, veterans, and other groups
+              don’t show misleading dollar estimates.
             </p>
             <form id="profile-pocketbook-form" class="profile-form">
               <label class="profile-form__field">
@@ -351,6 +352,69 @@
                   placeholder="1"
                 />
               </label>
+
+              <fieldset class="profile-impact-roles">
+                <legend>Roles that affect impact estimates</legend>
+                <p class="profile-form__note">
+                  Select any that apply. Bills aimed at a group you haven’t
+                  selected won’t invent a personal dollar impact.
+                </p>
+                <div id="profile-impact-roles" class="profile-impact-roles__grid">
+                  <label
+                    ><input type="checkbox" name="impact_roles" value="teacher" />
+                    Teacher / educator</label
+                  >
+                  <label
+                    ><input type="checkbox" name="impact_roles" value="student" />
+                    Student</label
+                  >
+                  <label
+                    ><input type="checkbox" name="impact_roles" value="parent" />
+                    Parent / guardian</label
+                  >
+                  <label
+                    ><input
+                      type="checkbox"
+                      name="impact_roles"
+                      value="homeowner"
+                    />
+                    Homeowner</label
+                  >
+                  <label
+                    ><input type="checkbox" name="impact_roles" value="renter" />
+                    Renter</label
+                  >
+                  <label
+                    ><input type="checkbox" name="impact_roles" value="veteran" />
+                    Veteran / military</label
+                  >
+                  <label
+                    ><input type="checkbox" name="impact_roles" value="farmer" />
+                    Farmer / rancher</label
+                  >
+                  <label
+                    ><input
+                      type="checkbox"
+                      name="impact_roles"
+                      value="small_business"
+                    />
+                    Small-business owner</label
+                  >
+                  <label
+                    ><input
+                      type="checkbox"
+                      name="impact_roles"
+                      value="healthcare"
+                    />
+                    Healthcare worker</label
+                  >
+                  <label
+                    ><input type="checkbox" name="impact_roles" value="retiree" />
+                    Retiree</label
+                  >
+                </div>
+              </fieldset>
+
               <button class="refresh-btn" type="submit">Save baselines</button>
             </form>
           </div>
@@ -812,6 +876,6 @@
     <script src="nav.js?v=20260729x"></script>
     <script src="politicians-shared.js?v=20260729u"></script>
     <script src="engagement.js?v=20260729t"></script>
-    <script src="profile.js?v=20260729v" defer></script>
+    <script src="profile.js?v=20260729z" defer></script>
   </body>
 </html>

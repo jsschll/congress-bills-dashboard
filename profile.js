@@ -81,7 +81,7 @@ const VOTER_INFO_FALLBACK =
 const ACCORDION_STORAGE_KEY = "profileAccordionState";
 
 const PROFILE_SELECT =
-  "username, email, display_name, avatar_url, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status, estimated_property_value, estimated_income, filing_status, vehicle_count";
+  "username, email, display_name, avatar_url, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status, estimated_property_value, estimated_income, filing_status, vehicle_count, impact_roles";
 
 let currentUser = null;
 let profile = {
