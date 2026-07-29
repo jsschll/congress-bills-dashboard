@@ -27,9 +27,11 @@ function siteBaseUrl(req) {
 }
 
 function adminClient() {
-  const url = env("SUPABASE_URL");
+  // URL is public (also in config.js); service role must still come from Vercel env.
+  const url =
+    env("SUPABASE_URL") || "https://inosruobpxnqcfxxosqr.supabase.co";
   const serviceKey = env("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceKey) return null;
+  if (!serviceKey) return null;
   return createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -117,7 +119,8 @@ module.exports = async function handler(req, res) {
   if (!supabase) {
     return json(res, 503, {
       error:
-        "Server auth is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on Vercel.",
+        "Server auth email is not configured. Add SUPABASE_SERVICE_ROLE_KEY and RESEND_API_KEY in Vercel → Project Settings → Environment Variables, then Redeploy.",
+      missing: ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY"],
     });
   }
 

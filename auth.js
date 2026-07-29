@@ -249,47 +249,56 @@ signupForm?.addEventListener("submit", async (event) => {
 
 forgotForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const client = requireSupabaseClient();
+  if (!client) return;
+
   const identifier = document.getElementById("forgot-identifier").value;
-  setAuthStatus("Sending reset email…", "loading");
+  setAuthStatus("Sending password reset…", "loading");
 
   try {
-    // Prefer Resend-delivered code/link so reset emails actually arrive.
+    const email = await resolveEmail(identifier);
+
+    // 1) Always request Supabase recovery (works with the browser anon key).
+    const { error: recoverError } = await client.auth.resetPasswordForEmail(
+      email,
+      { redirectTo: authRedirectUrl({ reset: "1" }) }
+    );
+    if (recoverError) {
+      console.error(recoverError);
+      setAuthStatus(
+        recoverError.message || "Could not start password reset.",
+        "error"
+      );
+      return;
+    }
+
+    // 2) Also try Resend-delivered code when Vercel env vars are configured.
+    let resendNote = "";
     try {
       const payload = await postAuthCode({
-        identifier,
+        identifier: email,
         purpose: "recovery",
       });
       pendingOtpEmail = payload.email;
+      window.__pendingPasswordReset = true;
       showAuthView("otp-verify");
       document.getElementById("auth-title").textContent = "Enter reset code";
       document.getElementById("auth-subtitle").textContent =
-        "Enter the code from your email, then choose a new password.";
+        "Enter the code from your email, then choose a new password. You can also use the reset link in the email.";
       setAuthStatus(
-        `Reset code sent to ${payload.email}. Check inbox and spam, then enter it below.`,
+        `Reset email sent to ${payload.email}. Check inbox and spam for a code or link.`,
         "success"
       );
-      // After OTP verify we'll be signed in via recovery-equivalent session;
-      // route password update by flipping recoveryMode on successful verify.
-      window.__pendingPasswordReset = true;
       document.getElementById("otp-code")?.focus();
       return;
     } catch (serverError) {
-      console.warn("recovery send-auth-code failed, using Supabase email:", serverError);
+      console.warn("Resend recovery unavailable:", serverError);
+      resendNote =
+        " If you do not see a code email, open the password reset link from Supabase instead (same inbox/spam).";
     }
 
-    const client = requireSupabaseClient();
-    if (!client) return;
-    const email = await resolveEmail(identifier);
-    const { error } = await client.auth.resetPasswordForEmail(email, {
-      redirectTo: authRedirectUrl({ reset: "1" }),
-    });
-    if (error) {
-      console.error(error);
-      setAuthStatus(error.message || "Could not send reset email.", "error");
-      return;
-    }
     setAuthStatus(
-      `If an account exists for ${email}, a password reset email is on the way. Check your inbox and spam folder.`,
+      `Password reset email sent to ${email}. Check inbox and spam, then open the link to choose a new password.${resendNote}`,
       "success"
     );
   } catch (error) {
