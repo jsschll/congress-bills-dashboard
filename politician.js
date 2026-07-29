@@ -2,9 +2,12 @@ const statusEl = document.getElementById("politician-status");
 const overviewEl = document.getElementById("politician-overview");
 const matchSection = document.getElementById("politician-match");
 const matchBody = document.getElementById("politician-match-body");
+const matchLede = document.getElementById("politician-match-lede");
 const activitySection = document.getElementById("politician-activity");
-const recentActionsEl = document.getElementById("politician-recent-actions");
-const keyBillsEl = document.getElementById("politician-key-bills");
+const activityLede = document.getElementById("politician-activity-lede");
+const recentVotesEl = document.getElementById("politician-recent-votes");
+const sponsoredBillsEl = document.getElementById("politician-sponsored-bills");
+const statementsBodyEl = document.getElementById("politician-statements-body");
 const notesModal = document.getElementById("politician-notes-modal");
 const notesStatusEl = document.getElementById("politician-notes-status");
 const notesEditorEl = document.getElementById("politician-notes-editor");
@@ -19,6 +22,10 @@ let politicianNote = null;
 /** @type {Element | null} */
 let notesModalLastFocus = null;
 let notePopoverHideTimer = 0;
+/** @type {string} */
+let activeActivityTab = "votes";
+/** @type {Record<string, unknown> | null} */
+let activeCongress = null;
 
 const CATEGORY_RULES = [
   { key: "Immigration", re: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i },
@@ -474,13 +481,111 @@ function renderOverview(person, congress) {
   document.title = `${person.name || "Politician"} · Congress Bills`;
 }
 
+function officialRoleKind(person = {}) {
+  const chamber = String(person.chamber || "").toLowerCase();
+  const group = String(person.metadata?.national_group || "").toLowerCase();
+  const source = String(person.source || "").toLowerCase();
+  const title = String(
+    person.office_title || person.metadata?.office_title || person.role_label || ""
+  ).toLowerCase();
+  const hasBioguide = Boolean(person.bioguide_id || person.bioguideId);
+
+  if (chamber === "senate") return "senate";
+  if (chamber === "house") return "house";
+  if (hasBioguide) return "house";
+
+  if (
+    chamber === "supreme_court" ||
+    group === "supreme_court" ||
+    /\b(justice|judge|supreme court)\b/.test(title)
+  ) {
+    return "judiciary";
+  }
+
+  if (
+    ["executive", "cabinet", "white_house", "agency_director"].includes(chamber) ||
+    ["executive", "cabinet", "white_house", "agency_director"].includes(group) ||
+    source === "national_officials" ||
+    /\b(secretary|director|advisor|administrator|ambassador|counsel|chief of staff|ostp|cabinet|white house|president|vice president)\b/.test(
+      title
+    )
+  ) {
+    return "executive";
+  }
+
+  return "non_legislative";
+}
+
+function isLegislativeOfficial(person) {
+  const kind = officialRoleKind(person);
+  return kind === "house" || kind === "senate";
+}
+
+function nonVotingEmptyCopy(person) {
+  const name = person?.name || "This official";
+  const kind = officialRoleKind(person);
+  if (kind === "executive") {
+    return {
+      matchLede: "Action Match tracks congressional roll-call votes.",
+      matchBody: `${name} holds an executive appointment and does not participate in congressional roll-call votes or sponsor legislation.`,
+      activityLede: "Legislative activity applies to members of Congress.",
+      activityBody: `${name} holds an executive appointment and does not participate in congressional roll-call votes or sponsor legislation.`,
+      votesEmpty: `${name} does not cast congressional roll-call votes.`,
+      sponsoredEmpty: `${name} does not sponsor congressional legislation.`,
+      statementsEmpty:
+        "Official statements and news for executive appointees aren’t listed here yet.",
+    };
+  }
+  if (kind === "judiciary") {
+    return {
+      matchLede: "Action Match tracks congressional roll-call votes.",
+      matchBody: `${name} serves in the judiciary and does not cast congressional roll-call votes or sponsor legislation.`,
+      activityLede: "Legislative activity applies to members of Congress.",
+      activityBody: `${name} serves in the judiciary and does not cast congressional roll-call votes or sponsor legislation.`,
+      votesEmpty: `${name} does not cast congressional roll-call votes.`,
+      sponsoredEmpty: `${name} does not sponsor congressional legislation.`,
+      statementsEmpty:
+        "Court opinions and related news aren’t listed in this activity feed yet.",
+    };
+  }
+  return {
+    matchLede: "Action Match tracks congressional roll-call votes.",
+    matchBody: `${name} does not cast congressional roll-call votes, so Support / Oppose comparisons aren’t available here.`,
+    activityLede: "Legislative activity applies to members of Congress.",
+    activityBody: `${name} is not a voting member of Congress, so roll-call votes and sponsored legislation aren’t available here.`,
+    votesEmpty: `${name} does not cast congressional roll-call votes.`,
+    sponsoredEmpty: `${name} does not sponsor congressional legislation.`,
+    statementsEmpty:
+      "Statements and news for this official aren’t listed here yet.",
+  };
+}
+
 function renderMatchScorecard({ user, rows }, person) {
   matchSection.hidden = false;
-  const isLegislator = Boolean(
-    person?.bioguide_id ||
-      person?.bioguideId ||
-      ["house", "senate"].includes(String(person?.chamber || "").toLowerCase())
-  );
+  const legislative = isLegislativeOfficial(person);
+  const roleKind = officialRoleKind(person);
+
+  if (!legislative) {
+    const copy = nonVotingEmptyCopy(person);
+    if (matchLede) matchLede.textContent = copy.matchLede;
+    matchBody.innerHTML = `
+      <div class="politician-match-hero politician-match-hero--empty">
+        <div class="politician-match-hero__score">
+          <span class="politician-match-hero__value">—</span>
+          <span class="politician-match-hero__label">Action Match Score</span>
+        </div>
+        <p class="politician-match-hero__meta">${escapeHtml(copy.matchBody)}</p>
+      </div>`;
+    return;
+  }
+
+  if (matchLede) {
+    matchLede.textContent =
+      roleKind === "senate"
+        ? "Your Support / Oppose stances compared to this senator’s recorded votes when available."
+        : "Your Support / Oppose stances compared to this official’s House roll-call votes.";
+  }
+
   if (!user) {
     matchBody.innerHTML = `
       <p class="politician-profile-empty">
@@ -491,22 +596,6 @@ function renderMatchScorecard({ user, rows }, person) {
           person.name || "this official"
         )}.
       </p>`;
-    return;
-  }
-
-  if (!isLegislator) {
-    matchBody.innerHTML = `
-      <div class="politician-match-hero">
-        <div class="politician-match-hero__score">
-          <span class="politician-match-hero__value">—</span>
-          <span class="politician-match-hero__label">Action Match Score</span>
-        </div>
-        <p class="politician-match-hero__meta">
-          Roll-call match scores are available for U.S. House members.
-          ${escapeHtml(person.name || "This official")} doesn’t cast House floor
-          votes, so Support / Oppose comparisons aren’t tracked here yet.
-        </p>
-      </div>`;
     return;
   }
 
@@ -573,7 +662,9 @@ function renderMatchScorecard({ user, rows }, person) {
         ${
           compared.length
             ? `${matched.length} of ${compared.length} comparable House roll calls match your stance.`
-            : "No comparable roll calls yet. Support or Oppose federal bills that have House votes."
+            : roleKind === "senate"
+              ? "No comparable House roll calls for this senator yet. Action Match currently uses House floor votes linked to bills you Support or Oppose."
+              : "No comparable roll calls yet. Support or Oppose federal bills that have House votes."
         }
       </p>
     </div>
@@ -620,34 +711,89 @@ function renderMatchScorecard({ user, rows }, person) {
   `;
 }
 
-function renderActivityList(target, items, emptyMessage) {
+function voteCastClass(voteCast) {
+  const value = String(voteCast || "").toLowerCase();
+  if (value === "yea" || value === "yes" || value === "aye") return "is-yea";
+  if (value === "nay" || value === "no") return "is-nay";
+  if (value.includes("present")) return "is-present";
+  if (value.includes("not voting") || value === "nv") return "is-absent";
+  return "is-other";
+}
+
+function setActivityTab(tab) {
+  activeActivityTab = tab;
+  document.querySelectorAll("[data-activity-tab]").forEach((button) => {
+    const selected = button.dataset.activityTab === tab;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+  });
+  document.querySelectorAll("[data-activity-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.activityPanel !== tab;
+  });
+}
+
+function renderVotesList(target, votes, emptyMessage) {
+  if (!target) return;
   target.replaceChildren();
-  if (!items?.length) {
+  if (!votes?.length) {
     const li = document.createElement("li");
     li.className = "politician-profile-empty";
     li.textContent = emptyMessage;
     target.append(li);
     return;
   }
-  for (const item of items) {
+  for (const item of votes) {
+    const li = document.createElement("li");
+    li.className = "politician-vote-item";
+    const cast = item.voteCast || "—";
+    const date = item.date || "";
+    const roll =
+      item.rollCallNumber != null ? `Roll Call ${item.rollCallNumber}` : "";
+    const result = item.result ? `Result: ${item.result}` : "";
+    const meta = [date, roll, result].filter(Boolean).join(" · ");
+    li.innerHTML = `
+      <span class="politician-vote-cast ${voteCastClass(cast)}">${escapeHtml(
+        cast
+      )}</span>
+      <div class="politician-vote-item__body">
+        <a href="${escapeHtml(
+          item.officialUrl || "#"
+        )}" target="_blank" rel="noopener noreferrer">
+          <strong>${escapeHtml(item.billNumber || "")}</strong>
+          ${escapeHtml(item.title || "")}
+        </a>
+        <span>${escapeHtml(meta)}</span>
+      </div>
+    `;
+    target.append(li);
+  }
+}
+
+function renderSponsoredList(target, bills, emptyMessage) {
+  if (!target) return;
+  target.replaceChildren();
+  if (!bills?.length) {
+    const li = document.createElement("li");
+    li.className = "politician-profile-empty";
+    li.textContent = emptyMessage;
+    target.append(li);
+    return;
+  }
+  for (const item of bills) {
     const li = document.createElement("li");
     const date =
-      item.date ||
-      item.introducedDate ||
-      item.latestAction?.actionDate ||
-      "";
-    const kind =
-      item.kind === "vote"
-        ? `Voted ${item.voteCast || ""}`
-        : item.kind === "sponsored"
-          ? "Sponsored"
-          : "Action";
+      item.introducedDate || item.latestAction?.actionDate || item.date || "";
+    const action = item.latestAction?.text
+      ? String(item.latestAction.text).slice(0, 120)
+      : "Sponsored";
     li.innerHTML = `
-      <a href="${escapeHtml(item.officialUrl || "#")}" target="_blank" rel="noopener noreferrer">
+      <a href="${escapeHtml(
+        item.officialUrl || "#"
+      )}" target="_blank" rel="noopener noreferrer">
         <strong>${escapeHtml(item.billNumber || "")}</strong>
         ${escapeHtml(item.title || "")}
       </a>
-      <span>${escapeHtml(kind)}${date ? ` · ${escapeHtml(date)}` : ""}${
+      <span>${escapeHtml(action)}${date ? ` · ${escapeHtml(date)}` : ""}${
         item.policyArea ? ` · ${escapeHtml(item.policyArea)}` : ""
       }</span>
     `;
@@ -655,21 +801,96 @@ function renderActivityList(target, items, emptyMessage) {
   }
 }
 
-function renderActivity(congress) {
-  activitySection.hidden = false;
-  renderActivityList(
-    recentActionsEl,
-    congress?.recentActions || [],
-    congress
-      ? "No recent House votes or sponsored bills found yet."
-      : "Activity feed is available for federal members with a bioguide ID."
-  );
-  renderActivityList(
-    keyBillsEl,
-    congress?.keyLegislation || congress?.sponsored?.slice(0, 6) || [],
-    "No key sponsored legislation found."
-  );
+function renderStatementsPanel(person, emptyMessage) {
+  if (!statementsBodyEl) return;
+  const website = person?.website_url || "";
+  statementsBodyEl.innerHTML = `
+    <div class="politician-empty-state">
+      <p>${escapeHtml(emptyMessage)}</p>
+      ${
+        website
+          ? `<a class="politician-profile-contact__link" href="${escapeHtml(
+              website
+            )}" target="_blank" rel="noopener noreferrer">Official website</a>`
+          : ""
+      }
+    </div>
+  `;
 }
+
+function renderActivity(congress, person) {
+  activitySection.hidden = false;
+  activeCongress = congress || null;
+  activePerson = person || activePerson;
+  const legislative = isLegislativeOfficial(person);
+  const roleKind = officialRoleKind(person);
+  const copy = nonVotingEmptyCopy(person);
+
+  if (!legislative) {
+    if (activityLede) activityLede.textContent = copy.activityLede;
+    if (recentVotesEl) {
+      recentVotesEl.innerHTML = `<li class="politician-profile-empty">${escapeHtml(
+        copy.votesEmpty
+      )}</li>`;
+    }
+    if (sponsoredBillsEl) {
+      sponsoredBillsEl.innerHTML = `<li class="politician-profile-empty">${escapeHtml(
+        copy.sponsoredEmpty
+      )}</li>`;
+    }
+    renderStatementsPanel(person, copy.statementsEmpty);
+    setActivityTab(activeActivityTab || "votes");
+    return;
+  }
+
+  if (activityLede) {
+    activityLede.textContent =
+      roleKind === "senate"
+        ? "Sponsored legislation and related activity from Congress.gov. House roll-call history is shown when available."
+        : "Recent House roll-call votes and sponsored legislation from Congress.gov.";
+  }
+
+  const votes = congress?.recentVotes || [];
+  const sponsored =
+    congress?.sponsored ||
+    congress?.keyLegislation ||
+    (congress?.recentActions || []).filter((row) => row.kind === "sponsored") ||
+    [];
+
+  let votesEmpty =
+    "No recent roll-call votes found yet.";
+  if (!congress) {
+    votesEmpty =
+      "Vote history loads for federal legislators with a bioguide ID.";
+  } else if (roleKind === "senate" && !votes.length) {
+    votesEmpty =
+      "Senate roll-call votes aren’t listed here yet. Action Match currently uses House floor votes.";
+  } else if (roleKind === "house" && !votes.length) {
+    votesEmpty = "No recent Yea / Nay / Present House votes found yet.";
+  }
+
+  renderVotesList(recentVotesEl, votes, votesEmpty);
+  renderSponsoredList(
+    sponsoredBillsEl,
+    sponsored,
+    congress
+      ? "No sponsored legislation found yet."
+      : "Sponsored bills load for federal legislators with a bioguide ID."
+  );
+  renderStatementsPanel(
+    person,
+    "Statements and news aren’t collected here yet. Check the official website for press releases and remarks."
+  );
+  setActivityTab(activeActivityTab || "votes");
+}
+
+document
+  .querySelector(".politician-activity-tabs")
+  ?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-activity-tab]");
+    if (!button) return;
+    setActivityTab(button.dataset.activityTab);
+  });
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -1096,7 +1317,7 @@ async function boot() {
     renderOverview(person, congress);
     await setupNotes(person);
     renderMatchScorecard(matchPayload, person);
-    renderActivity(congress);
+    renderActivity(congress, person);
     setStatus("", "loading");
   } catch (error) {
     console.error(error);
