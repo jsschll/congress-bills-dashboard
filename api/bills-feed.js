@@ -326,6 +326,7 @@ async function toBillItem(bill, apiKey) {
     primarySponsor: {
       name: sponsor.fullName || sponsor.name || "Sponsor unavailable",
       title: sponsorTitle(sponsor),
+      bioguideId: sponsor.bioguideId || sponsor.bioguide_id || null,
     },
     lastUpdated: actionDate ? new Date(`${actionDate}T12:00:00`).toISOString() : new Date().toISOString(),
     status,

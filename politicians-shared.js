@@ -104,6 +104,141 @@ function escapePoliticianHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function politicianProfileHref(politician = {}) {
+  const id = politician.id || politician.politician_id || "";
+  const bioguide =
+    politician.bioguide_id || politician.bioguideId || politician.bioguide || "";
+  const key = politician.external_key || "";
+  if (id) return `politician.html?id=${encodeURIComponent(id)}`;
+  if (bioguide) {
+    return `politician.html?bioguide=${encodeURIComponent(
+      String(bioguide).toUpperCase()
+    )}`;
+  }
+  if (key) return `politician.html?key=${encodeURIComponent(key)}`;
+  return "";
+}
+
+function sponsorProfileHref(sponsor = {}) {
+  return politicianProfileHref({
+    bioguide_id: sponsor.bioguideId || sponsor.bioguide_id || "",
+    id: sponsor.id || "",
+    external_key: sponsor.external_key || "",
+    name: sponsor.name || sponsor.fullName || "",
+  });
+}
+
+function ordinalDistrict(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value || "");
+  const mod100 = num % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${num}th`;
+  switch (num % 10) {
+    case 1:
+      return `${num}st`;
+    case 2:
+      return `${num}nd`;
+    case 3:
+      return `${num}rd`;
+    default:
+      return `${num}th`;
+  }
+}
+
+function formatPoliticianRoleLabel(politician = {}) {
+  if (politician.role_label) return politician.role_label;
+  const office = readableOfficeTitle(
+    politician.office_title || politician.metadata?.office_title
+  );
+  const state = String(politician.state || "").toUpperCase();
+  const chamber = String(politician.chamber || "").toLowerCase();
+  const district = politician.district;
+
+  if (politician.level === "federal" || chamber === "house" || chamber === "senate") {
+    if (chamber === "senate") {
+      return state ? `US Senate · ${state}` : office || "US Senate";
+    }
+    if (chamber === "house") {
+      if (
+        state &&
+        district != null &&
+        district !== "" &&
+        !/^statewide$/i.test(String(district))
+      ) {
+        return `US House · ${state} ${ordinalDistrict(district)} District`;
+      }
+      return state ? `US House · ${state}` : office || "US House";
+    }
+  }
+
+  return [office || chamberLabel(chamber, politician), state, formatDistrictMeta(district, politician)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function mapPoliticianSocialLinks(politician = {}) {
+  const links = [];
+  const social = politician.metadata?.social || {};
+  const pairs = [
+    ["twitter", "Twitter / X"],
+    ["twitter_url", "Twitter / X"],
+    ["x", "Twitter / X"],
+    ["facebook", "Facebook"],
+    ["facebook_url", "Facebook"],
+    ["youtube", "YouTube"],
+    ["youtube_url", "YouTube"],
+    ["instagram", "Instagram"],
+  ];
+  const seen = new Set();
+  for (const [key, label] of pairs) {
+    let value = social[key];
+    if (!value) continue;
+    value = String(value).trim();
+    if (!value) continue;
+    if (!/^https?:\/\//i.test(value)) {
+      if (/twitter|x/i.test(key)) {
+        value = `https://twitter.com/${value.replace(/^@/, "")}`;
+      } else if (/facebook/i.test(key)) {
+        value = `https://facebook.com/${value}`;
+      } else if (/youtube/i.test(key)) {
+        value = `https://youtube.com/${value}`;
+      } else if (/instagram/i.test(key)) {
+        value = `https://instagram.com/${value.replace(/^@/, "")}`;
+      }
+    }
+    if (seen.has(label)) continue;
+    seen.add(label);
+    links.push({ label, url: value });
+  }
+
+  const channels = politician.metadata?.channels || [];
+  if (Array.isArray(channels)) {
+    for (const channel of channels) {
+      const type = String(channel.type || channel.id || "").toLowerCase();
+      const id = String(channel.id || channel.value || "").trim();
+      if (!id) continue;
+      let label = "";
+      let url = id;
+      if (type.includes("twitter") || type === "x") {
+        label = "Twitter / X";
+        if (!/^https?:\/\//i.test(url)) {
+          url = `https://twitter.com/${id.replace(/^@/, "")}`;
+        }
+      } else if (type.includes("facebook")) {
+        label = "Facebook";
+        if (!/^https?:\/\//i.test(url)) url = `https://facebook.com/${id}`;
+      } else if (type.includes("youtube")) {
+        label = "YouTube";
+        if (!/^https?:\/\//i.test(url)) url = `https://youtube.com/${id}`;
+      }
+      if (!label || seen.has(label)) continue;
+      seen.add(label);
+      links.push({ label, url });
+    }
+  }
+  return links;
+}
+
 function levelLabel(level) {
   return LEVEL_LABELS[level] || LEVEL_LABELS[toDisplayLevel(level)] || "Other";
 }
@@ -1867,9 +2002,22 @@ function renderPoliticianCard(
   const body = document.createElement("div");
   body.className = "politician-card__body";
 
-  const name = document.createElement("h3");
-  name.className = "politician-card__name";
-  name.textContent = politician.name;
+  const profileHref = politicianProfileHref(politician);
+  let name;
+  if (profileHref) {
+    name = document.createElement("h3");
+    name.className = "politician-card__name";
+    const nameLink = document.createElement("a");
+    nameLink.className = "politician-name-link";
+    nameLink.href = profileHref;
+    nameLink.textContent = politician.name;
+    nameLink.title = `Open profile for ${politician.name}`;
+    name.append(nameLink);
+  } else {
+    name = document.createElement("h3");
+    name.className = "politician-card__name";
+    name.textContent = politician.name;
+  }
 
   const officeTitle = readableOfficeTitle(
     activeOffice?.office_title ||
@@ -1917,10 +2065,13 @@ function renderPoliticianCard(
       ? window.PolicyEngagement.getMatchScoreForBioguide(bioguide)
       : null;
   if (matchScore != null) {
-    const matchBadge = document.createElement("span");
+    const matchBadge = document.createElement(
+      profileHref ? "a" : "span"
+    );
     matchBadge.className = "politician-badge politician-badge--match";
     matchBadge.textContent = `${matchScore}% Match`;
     matchBadge.title = "Based on your Support/Oppose stances vs House roll calls";
+    if (profileHref) matchBadge.href = profileHref;
     badges.append(matchBadge);
   }
 
@@ -1978,6 +2129,15 @@ function renderPoliticianCard(
 
   const actions = document.createElement("div");
   actions.className = "politician-card__actions";
+
+  const profileHrefForActions = politicianProfileHref(politician);
+  if (profileHrefForActions) {
+    const profileLink = document.createElement("a");
+    profileLink.className = "bill-card__link";
+    profileLink.href = profileHrefForActions;
+    profileLink.textContent = "Profile";
+    actions.append(profileLink);
+  }
 
   if (politician.website_url) {
     const link = document.createElement("a");

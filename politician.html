@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Politician · Congress Bills</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260729t" />
+  </head>
+  <body class="page-app page-politicians page-politician-profile">
+    <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
+
+    <main class="page page--politicians page--politician-profile">
+      <p class="politician-profile__back">
+        <a href="politicians.html">← Back to Politicians</a>
+      </p>
+      <p id="politician-status" class="status politicians-status" hidden></p>
+
+      <section
+        id="politician-overview"
+        class="politician-profile-card"
+        aria-labelledby="politician-name"
+        hidden
+      ></section>
+
+      <section
+        id="politician-match"
+        class="politician-profile-panel"
+        aria-labelledby="politician-match-title"
+        hidden
+      >
+        <div class="politician-profile-panel__header">
+          <h2 id="politician-match-title">Action Match Scorecard</h2>
+          <p class="politician-profile-panel__lede">
+            Your Support / Oppose stances compared to this official’s House roll
+            call votes.
+          </p>
+        </div>
+        <div id="politician-match-body"></div>
+      </section>
+
+      <section
+        id="politician-activity"
+        class="politician-profile-panel"
+        aria-labelledby="politician-activity-title"
+        hidden
+      >
+        <div class="politician-profile-panel__header">
+          <h2 id="politician-activity-title">Activity Feed</h2>
+        </div>
+        <div class="politician-profile-activity">
+          <div>
+            <h3>Recent Actions</h3>
+            <ul id="politician-recent-actions" class="politician-profile-list"></ul>
+          </div>
+          <div>
+            <h3>Key / Impactful Legislation</h3>
+            <ul id="politician-key-bills" class="politician-profile-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js?v=20260729t"></script>
+    <script src="engagement.js?v=20260729t"></script>
+    <script src="politicians-shared.js?v=20260729t"></script>
+    <script src="politician.js?v=20260729t" defer></script>
+  </body>
+</html>

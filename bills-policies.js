@@ -440,6 +440,31 @@ async function fetchClientFederalFeed(limit = 12) {
       .slice(0, 3)
       .join(" ");
     const cleanedAction = cleanClientActionText(actionText);
+    let primarySponsor = {
+      name: "Sponsor unavailable",
+      title: "Member of Congress",
+      bioguideId: null,
+    };
+    try {
+      const detailUrl = `${CONGRESS_API_BASE}/bill/${bill.congress}/${type}/${number}?format=json&api_key=${API_KEY}`;
+      const detailRes = await fetch(detailUrl);
+      const detailData = await detailRes.json().catch(() => ({}));
+      const sponsor = detailData.bill?.sponsors?.[0] || {};
+      if (sponsor.fullName || sponsor.name || sponsor.bioguideId) {
+        const chamberTerm = sponsor.terms?.item?.[0]?.chamber || "";
+        primarySponsor = {
+          name: sponsor.fullName || sponsor.name || "Sponsor unavailable",
+          title: /senate/i.test(chamberTerm)
+            ? "U.S. Senator"
+            : /house/i.test(chamberTerm)
+              ? "U.S. Representative"
+              : "Member of Congress",
+          bioguideId: sponsor.bioguideId || null,
+        };
+      }
+    } catch (error) {
+      console.warn(error);
+    }
     items.push({
       id: `federal-${bill.congress}-${type}-${number}`.toLowerCase(),
       billNumber: `${String(bill.type || "").toUpperCase()} ${number}`.trim(),
@@ -448,7 +473,7 @@ async function fetchClientFederalFeed(limit = 12) {
       jurisdiction: "U.S. Congress",
       stateCode: "",
       cityName: "",
-      primarySponsor: { name: "Sponsor unavailable", title: "Member of Congress" },
+      primarySponsor,
       lastUpdated: actionDate
         ? new Date(`${actionDate}T12:00:00`).toISOString()
         : new Date().toISOString(),
@@ -942,9 +967,18 @@ function renderBillCard(item) {
         </div>
         <h2 class="policy-bill-card__title">${escapePolicyHtml(item.title)}</h2>
         <p class="policy-bill-card__meta">
-          ${escapePolicyHtml(item.jurisdiction)} · Sponsor: ${escapePolicyHtml(
-            item.primarySponsor.name
-          )} · ${escapePolicyHtml(item.primarySponsor.title)} · Updated ${escapePolicyHtml(
+          ${escapePolicyHtml(item.jurisdiction)} · Sponsor: ${
+            item.primarySponsor?.bioguideId || item.primarySponsor?.bioguide_id
+              ? `<a class="politician-name-link" href="politician.html?bioguide=${encodeURIComponent(
+                  String(
+                    item.primarySponsor.bioguideId ||
+                      item.primarySponsor.bioguide_id
+                  ).toUpperCase()
+                )}">${escapePolicyHtml(item.primarySponsor.name)}</a>`
+              : escapePolicyHtml(item.primarySponsor?.name || "Sponsor unavailable")
+          } · ${escapePolicyHtml(
+            item.primarySponsor?.title || ""
+          )} · Updated ${escapePolicyHtml(
             formatRelativeDate(item.lastUpdated) || formatShortDate(item.lastUpdated)
           )}
         </p>

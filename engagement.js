@@ -139,6 +139,13 @@
       official_url: item.officialUrl || null,
       tags: item.tags || [],
       all_steps: item.allSteps || [],
+      metadata: {
+        ...(item.metadata || {}),
+        primary_sponsor_bioguide:
+          item.primarySponsor?.bioguideId ||
+          item.primarySponsor?.bioguide_id ||
+          null,
+      },
       updated_at: new Date().toISOString(),
     };
     const { error } = await client.from("bill_items").upsert(payload, {
@@ -288,7 +295,11 @@
             : row.matched === false
               ? "voted differently"
               : "no comparable vote";
-        return `<li><strong>${escapeHtml(row.name || row.bioguideId)}</strong> voted <em>${escapeHtml(
+        return `<li><a class="politician-name-link" href="politician.html?bioguide=${encodeURIComponent(
+          String(row.bioguideId || "").toUpperCase()
+        )}"><strong>${escapeHtml(
+          row.name || row.bioguideId
+        )}</strong></a> voted <em>${escapeHtml(
           row.voteCast
         )}</em> — ${escapeHtml(matchLabel)}</li>`;
       })

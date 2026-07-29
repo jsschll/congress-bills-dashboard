@@ -4239,3 +4239,323 @@ body {
 
 
 
+
+/* —— Politician name links —— */
+.politician-name-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(110, 231, 183, 0.35);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.politician-name-link:hover,
+.politician-name-link:focus-visible {
+  color: #6ee7b7;
+  border-bottom-color: #6ee7b7;
+  outline: none;
+}
+
+a.politician-badge--match {
+  text-decoration: none;
+}
+
+/* —— Politician profile page —— */
+.page--politician-profile {
+  display: grid;
+  gap: 1.15rem;
+  padding-top: 1.25rem;
+  padding-bottom: 3rem;
+}
+
+.politician-profile__back a {
+  color: #94a3b8;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.politician-profile__back a:hover {
+  color: #6ee7b7;
+}
+
+.politician-profile-card,
+.politician-profile-panel {
+  border: 1px solid var(--app-slate-border, #1e293b);
+  border-radius: 1rem;
+  background: var(--app-slate, rgba(15, 23, 42, 0.82));
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.politician-profile-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.25rem;
+  padding: 1.25rem 1.35rem;
+  align-items: start;
+}
+
+.politician-profile-card__media {
+  width: 7.5rem;
+  height: 7.5rem;
+}
+
+.politician-profile-card__photo {
+  width: 7.5rem;
+  height: 7.5rem;
+  object-fit: cover;
+  border-radius: 0.9rem;
+  border: 1px solid #334155;
+  background: #0f172a;
+  display: block;
+}
+
+.politician-profile-card__body {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.politician-profile-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.politician-profile-card__name {
+  margin: 0.15rem 0 0;
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  line-height: 1.15;
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.politician-profile-card__role {
+  margin: 0;
+  color: #cbd5e1;
+  font-weight: 600;
+  font-size: 1.02rem;
+}
+
+.politician-profile-card__tenure {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.92rem;
+}
+
+.politician-profile-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.politician-profile-contact__link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.72);
+  color: #6ee7b7;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.politician-profile-contact__link:hover {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.politician-profile-contact__empty {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.politician-profile-panel {
+  padding: 1.15rem 1.25rem 1.3rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.politician-profile-panel__header h2 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  color: #f8fafc;
+  font-size: 1.35rem;
+}
+
+.politician-profile-panel__lede {
+  margin: 0.35rem 0 0;
+  color: #94a3b8;
+  font-size: 0.92rem;
+}
+
+.politician-match-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 0.9rem;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.politician-match-hero__score {
+  width: 7.5rem;
+  height: 7.5rem;
+  border-radius: 1rem;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.politician-match-hero__score.is-mid {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.politician-match-hero__score.is-low {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.politician-match-hero__value {
+  font-family: "Fraunces", serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #6ee7b7;
+  line-height: 1;
+}
+
+.politician-match-hero__score.is-mid .politician-match-hero__value {
+  color: #93c5fd;
+}
+
+.politician-match-hero__score.is-low .politician-match-hero__value {
+  color: #fca5a5;
+}
+
+.politician-match-hero__label {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.politician-match-hero__meta {
+  margin: 0;
+  flex: 1 1 14rem;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.politician-match-categories {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.politician-match-categories__row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr auto;
+  gap: 0.65rem;
+  align-items: center;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.politician-match-categories__track {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #1e293b;
+  overflow: hidden;
+}
+
+.politician-match-categories__track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #34d399, #60a5fa);
+  border-radius: inherit;
+}
+
+.politician-match-split,
+.politician-profile-activity {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.politician-match-split h3,
+.politician-profile-activity h3 {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+  color: #f8fafc;
+}
+
+.politician-profile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.politician-profile-list li {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.politician-profile-list a {
+  color: #e8eef7;
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+
+.politician-profile-list a:hover {
+  color: #6ee7b7;
+}
+
+.politician-profile-list span,
+.politician-profile-empty {
+  color: #94a3b8;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 800px) {
+  .politician-profile-card {
+    grid-template-columns: 1fr;
+  }
+
+  .politician-match-split,
+  .politician-profile-activity {
+    grid-template-columns: 1fr;
+  }
+
+  .politician-match-categories__row {
+    grid-template-columns: 5.5rem 1fr auto;
+  }
+}
+
+.politician-card__photo-link {
+  display: block;
+  line-height: 0;
+  border-radius: inherit;
+}
+
+.politician-card__photo-link:focus-visible {
+  outline: 2px solid #6ee7b7;
+  outline-offset: 2px;
+}

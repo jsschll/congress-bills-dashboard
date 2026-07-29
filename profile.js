@@ -364,9 +364,11 @@ function renderAlignmentChart(payload) {
     .slice(0, 8)
     .map((row) => {
       const score = row.score == null ? "—" : `${row.score}%`;
-      return `<li><strong>${escapeProfileHtml(
+      return `<li><a class="politician-name-link" href="politician.html?bioguide=${encodeURIComponent(
+        String(row.bioguide_id || "").toUpperCase()
+      )}"><strong>${escapeProfileHtml(
         row.politician_name || row.bioguide_id
-      )}</strong> <span>${escapeProfileHtml(String(score))} · ${escapeProfileHtml(
+      )}</strong></a> <span>${escapeProfileHtml(String(score))} · ${escapeProfileHtml(
         String(row.matched_count || 0)
       )}/${escapeProfileHtml(String(row.compared || 0))} votes</span></li>`;
     })
@@ -591,7 +593,14 @@ async function loadFollows() {
           person.name ? `Portrait of ${person.name}` : "Official portrait"
         )}" width="40" height="40" loading="lazy" />
         <div>
-          <strong>${escapeProfileHtml(person.name)}</strong>
+          ${
+            typeof politicianProfileHref === "function" &&
+            politicianProfileHref(person)
+              ? `<strong><a class="politician-name-link" href="${escapeProfileHtml(
+                  politicianProfileHref(person)
+                )}">${escapeProfileHtml(person.name)}</a></strong>`
+              : `<strong>${escapeProfileHtml(person.name)}</strong>`
+          }
           <span>${escapeProfileHtml(
             [
               person.office_title || person.chamber,
@@ -1177,7 +1186,14 @@ function renderRepresentation(people, geography = {}) {
           person.name ? `Portrait of ${person.name}` : "Official portrait"
         )}" width="56" height="56" loading="lazy" />
         <div>
-          <h4>${escapeProfileHtml(person.name)}</h4>
+          ${
+            typeof politicianProfileHref === "function" &&
+            politicianProfileHref(person)
+              ? `<h4><a class="politician-name-link" href="${escapeProfileHtml(
+                  politicianProfileHref(person)
+                )}">${escapeProfileHtml(person.name)}</a></h4>`
+              : `<h4>${escapeProfileHtml(person.name)}</h4>`
+          }
           <p>${escapeProfileHtml(
             [office, person.party, person.state, person.district]
               .filter(Boolean)
