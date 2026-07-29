@@ -536,14 +536,8 @@ Sincerely,
       </details>
     `;
 
-    const pitch = card.querySelector(
-      ".policy-bill-card__pitch, .search-result-card__pitch"
-    );
-    if (pitch && pitch.nextSibling) {
-      pitch.after(wrap);
-    } else {
-      card.append(wrap);
-    }
+    // Keep engagement actions at the bottom of the card.
+    card.append(wrap);
 
     const roots = {
       root: wrap,

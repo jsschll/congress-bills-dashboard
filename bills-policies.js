@@ -234,7 +234,23 @@ function inferFederalStep(actionText = "") {
 function clientDeltaFromText(text = "") {
   const summary = String(text || "").trim();
   if (!summary) return { added: [], changed: [], removed: [] };
+  const lower = summary.toLowerCase();
+  if (
+    /calendar no\.?|legislative calendar|referred to the|read twice|agreed to without amendment/.test(
+      lower
+    )
+  ) {
+    return { added: [], changed: [], removed: [] };
+  }
   return { added: [summary], changed: [], removed: [] };
+}
+
+function cleanClientActionText(text = "") {
+  return String(text || "")
+    .replace(/\s*\([^)]*CR[^)]*\)\s*/gi, " ")
+    .replace(/\s*Calendar No\.?\s*\d+\.?/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeCityName(value) {
@@ -404,20 +420,26 @@ async function fetchClientFederalFeed(limit = 12) {
       const summariesRes = await fetch(summariesUrl);
       const summariesData = await summariesRes.json().catch(() => ({}));
       const summaries = summariesData.summaries || [];
-      const latest = summaries[summaries.length - 1];
-      summaryText = String(latest?.text || "")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+      let best = "";
+      for (const entry of summaries) {
+        const plain = String(entry?.text || "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (plain.length > best.length) best = plain;
+      }
+      summaryText = best;
     } catch (error) {
       console.warn(error);
     }
     const summaryPitch = summaryText
+      .replace(/\b(No|Nos|Mr|Mrs|Ms|Dr|Sen|Rep|vs|etc|U\.S)\./gi, "$1\u2024")
       .split(/(?<=[.!?])\s+/)
-      .map((part) => part.trim())
+      .map((part) => part.replace(/\u2024/g, ".").trim())
       .filter(Boolean)
       .slice(0, 3)
       .join(" ");
+    const cleanedAction = cleanClientActionText(actionText);
     items.push({
       id: `federal-${bill.congress}-${type}-${number}`.toLowerCase(),
       billNumber: `${String(bill.type || "").toUpperCase()} ${number}`.trim(),
@@ -433,9 +455,11 @@ async function fetchClientFederalFeed(limit = 12) {
       status,
       allSteps,
       shortPitch:
-        summaryPitch || actionText || "Recent federal legislative activity.",
-      statusLabel: actionText,
-      deltaSummary: clientDeltaFromText(summaryPitch || actionText),
+        summaryPitch ||
+        (bill.title ? `${String(bill.title).replace(/\.$/, "")}.` : "") ||
+        "Recent federal legislative activity.",
+      statusLabel: cleanedAction || actionText,
+      deltaSummary: clientDeltaFromText(summaryPitch),
       officialUrl: `https://www.congress.gov/bill/${bill.congress}th-congress/${type}/${number}`,
       tags: [],
     });
@@ -897,6 +921,18 @@ function renderBillCard(item) {
   card.className = "policy-bill-card";
 
   const followed = isFollowedBill(item);
+  const delta = item.deltaSummary || { added: [], changed: [], removed: [] };
+  const hasDelta =
+    (delta.added && delta.added.length) ||
+    (delta.changed && delta.changed.length) ||
+    (delta.removed && delta.removed.length);
+  const pitch = String(item.shortPitch || "").trim();
+  const statusLabel = String(item.statusLabel || "").trim();
+  const showStatus =
+    statusLabel &&
+    statusLabel.toLowerCase() !== pitch.toLowerCase() &&
+    !/calendar no\.?\s*$/i.test(statusLabel);
+
   card.innerHTML = `
     <div class="policy-bill-card__header">
       <div>
@@ -920,13 +956,11 @@ function renderBillCard(item) {
     <section class="policy-bill-card__summary" aria-label="Summary">
       <h3 class="policy-bill-card__summary-label">Summary</h3>
       <p class="policy-bill-card__pitch">${escapePolicyHtml(
-        item.shortPitch || "Summary unavailable."
+        pitch || "Summary unavailable."
       )}</p>
       ${
-        item.statusLabel
-          ? `<p class="policy-bill-card__status">${escapePolicyHtml(
-              item.statusLabel
-            )}</p>`
+        showStatus
+          ? `<p class="policy-bill-card__status">${escapePolicyHtml(statusLabel)}</p>`
           : ""
       }
     </section>
@@ -952,12 +986,16 @@ function renderBillCard(item) {
         })
         .join("")}
     </div>
-    <section class="policy-bill-card__delta">
+    ${
+      hasDelta
+        ? `<section class="policy-bill-card__delta">
       <h3>What changes?</h3>
-      ${renderDeltaGroup("Added", item.deltaSummary.added, "is-added")}
-      ${renderDeltaGroup("Changed", item.deltaSummary.changed, "is-changed")}
-      ${renderDeltaGroup("Removed", item.deltaSummary.removed, "is-removed")}
-    </section>
+      ${renderDeltaGroup("Added", delta.added, "is-added")}
+      ${renderDeltaGroup("Changed", delta.changed, "is-changed")}
+      ${renderDeltaGroup("Removed", delta.removed, "is-removed")}
+    </section>`
+        : ""
+    }
     ${
       item.tags?.length
         ? `<p class="policy-bill-card__tags">${item.tags

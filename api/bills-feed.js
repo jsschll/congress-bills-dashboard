@@ -116,11 +116,38 @@ function stripHtml(html) {
 }
 
 function toSentences(text, max = 2) {
-  const parts = String(text || "")
+  const protectedText = String(text || "")
+    .replace(/\b(No|Nos|Mr|Mrs|Ms|Dr|Sen|Rep|vs|etc|U\.S)\./gi, "$1\u2024");
+  const parts = protectedText
     .split(/(?<=[.!?])\s+/)
-    .map((part) => part.trim())
+    .map((part) => part.replace(/\u2024/g, ".").trim())
     .filter(Boolean);
   return parts.slice(0, max).join(" ");
+}
+
+function cleanActionText(text = "") {
+  return String(text || "")
+    .replace(/\s*\([^)]*CR[^)]*\)\s*/gi, " ")
+    .replace(/\s*Calendar No\.?\s*\d+\.?/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isProceduralActionText(text = "") {
+  const value = String(text || "").toLowerCase();
+  if (!value) return true;
+  return (
+    /calendar no\.?|legislative calendar|placed on senate legislative calendar|placed on house calendar/.test(
+      value
+    ) ||
+    /referred to the (committee|subcommittee)|read twice and referred|message on senate action|message on house action/.test(
+      value
+    ) ||
+    /became public law no|presented to the president|enrolled bill signed|agreed to without amendment/.test(
+      value
+    ) ||
+    /consideration:\s*cr\b/.test(value)
+  );
 }
 
 function sponsorTitle(member = {}) {
@@ -171,14 +198,15 @@ function buildSteps(currentStep, actionDate = "") {
 
 function deltaSummaryFromText(text = "") {
   const summary = String(text || "").trim();
-  if (!summary) {
+  if (!summary || isProceduralActionText(summary)) {
     return { added: [], changed: [], removed: [] };
   }
 
   const snippets = summary
+    .replace(/\b(No|Nos|Mr|Mrs|Ms|Dr|Sen|Rep|vs|etc|U\.S)\./gi, "$1\u2024")
     .split(/(?<=[.;])\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean)
+    .map((part) => part.replace(/\u2024/g, ".").trim())
+    .filter((part) => part && !isProceduralActionText(part) && part.length > 24)
     .slice(0, 3);
 
   const delta = { added: [], changed: [], removed: [] };
@@ -219,9 +247,15 @@ async function fetchBillSummary(congress, type, number, apiKey) {
     const url = `${API_BASE}/bill/${congress}/${type}/${number}/summaries?format=json&api_key=${apiKey}`;
     const data = await fetchJson(url);
     const summaries = data.summaries || [];
-    const latest = summaries[summaries.length - 1];
-    const plain = stripHtml(latest?.text || "");
-    return plain || "";
+    if (!summaries.length) return "";
+    const best = summaries.reduce((current, item) => {
+      const currentText = stripHtml(current?.text || "");
+      const itemText = stripHtml(item?.text || "");
+      if (!current) return item;
+      if (itemText.length > currentText.length) return item;
+      return current;
+    }, null);
+    return stripHtml(best?.text || "");
   } catch {
     return "";
   }
@@ -270,6 +304,13 @@ async function toBillItem(bill, apiKey) {
     details?.sponsors?.[0] ||
     bill.sponsors?.[0] ||
     {};
+  const cleanedAction = cleanActionText(actionText);
+  const crsPitch = toSentences(summaryText, 3);
+  const fallbackPitch = crsPitch
+    ? ""
+    : bill.title
+      ? `${String(bill.title).replace(/\.$/, "")}.`
+      : "Recent federal legislative activity.";
 
   return {
     id: `federal-${bill.congress}-${type}-${number}`.toLowerCase(),
@@ -286,12 +327,9 @@ async function toBillItem(bill, apiKey) {
     lastUpdated: actionDate ? new Date(`${actionDate}T12:00:00`).toISOString() : new Date().toISOString(),
     status,
     allSteps,
-    shortPitch:
-      toSentences(summaryText, 3) ||
-      toSentences(stripHtml(actionText), 2) ||
-      "Recent federal legislative activity.",
-    statusLabel: actionText || status.stepName || "Updated",
-    deltaSummary: deltaSummaryFromText(summaryText || actionText),
+    shortPitch: crsPitch || fallbackPitch,
+    statusLabel: cleanedAction || status.stepName || "Updated",
+    deltaSummary: deltaSummaryFromText(summaryText),
     officialUrl: `https://www.congress.gov/bill/${bill.congress}th-congress/${type}/${number}`,
     tags,
   };
@@ -329,6 +367,11 @@ async function fetchOpenStatesBillsForJurisdictions(apiKey, jurisdictions, perJu
         const stateCode =
           stateCodeFromJurisdiction(bill.jurisdiction?.name || jurisdiction) ||
           normalizeStateCode(jurisdiction);
+        const cleanedAction = cleanActionText(actionText);
+        const pitch =
+          toSentences(stripHtml(summaryText), 3) ||
+          (bill.title ? `${String(bill.title).replace(/\.$/, "")}.` : "") ||
+          "Recent state legislative activity.";
         items.push({
           id: `state-${bill.id}`.toLowerCase(),
           billNumber: bill.identifier || "State bill",
@@ -344,15 +387,11 @@ async function fetchOpenStatesBillsForJurisdictions(apiKey, jurisdictions, perJu
           lastUpdated: bill.updated_at || new Date().toISOString(),
           status,
           allSteps,
-          shortPitch:
-            toSentences(stripHtml(summaryText), 3) ||
-            toSentences(stripHtml(actionText), 2) ||
-            "Recent state legislative activity.",
-          statusLabel: actionText || status.stepName || "Updated",
-          deltaSummary: deltaSummaryFromText(summaryText || actionText),
-          deltaSummary: deltaSummaryFromText(summaryText || actionText),
-          officialUrl: bill.openstates_url || "",
-          tags: Array.isArray(bill.subject) ? bill.subject.slice(0, 6) : [],
+          shortPitch: pitch,
+          statusLabel: cleanedAction || status.stepName || "Updated",
+          deltaSummary: deltaSummaryFromText(summaryText),
+          officialUrl: bill.openstates_url || bill.sources?.[0]?.url || "https://openstates.org/",
+          tags: (bill.subject || []).slice(0, 6),
         });
       }
     } catch (error) {
