@@ -2834,7 +2834,7 @@ function mountAddressResultsPage({
   (async () => {
     results.replaceChildren();
     setStatus(
-      "Loading nationwide officials and looking up district representatives…",
+      "Checking cached roster, then loading representatives…",
       "loading"
     );
 
@@ -2845,22 +2845,39 @@ function mountAddressResultsPage({
         ? await loadFollowedPoliticianIds(user.id)
         : new Set();
 
-      // Nationwide roles never depend on address — always load the full table.
-      // Address lookup only supplies district / local officeholders.
-      // Also pull saved federal executives (White House / EOP) so that section
-      // stays populated when live Cicero NATIONAL_EXEC data is missing.
-      const [lookupResult, nationalOfficials, storedExecutives] =
-        await Promise.all([
-          lookupRepresentatives(address)
-            .then((data) => ({ ok: true, data }))
-            .catch((error) => ({
-              ok: false,
-              error:
-                error?.message || String(error) || "Address lookup failed.",
-            })),
+      // Address lookup API now: cache hit (<30d) → return instantly; else live
+      // Civic APIs + merge Federal/State directors from Supabase + write cache.
+      const lookupResult = await lookupRepresentatives(address)
+        .then((data) => ({ ok: true, data }))
+        .catch((error) => ({
+          ok: false,
+          error:
+            error?.message || String(error) || "Address lookup failed.",
+        }));
+
+      const rosterFromApi = Boolean(
+        lookupResult.ok && lookupResult.data?.rosterEnriched
+      );
+      const cacheHit = Boolean(lookupResult.ok && lookupResult.data?.cache?.hit);
+
+      // Prefer server-enriched directors when present (cached or freshly built).
+      // Fall back to client Supabase reads for older API responses / cache misses
+      // that predate roster enrichment.
+      let nationalOfficials = rosterFromApi
+        ? lookupResult.data.nationalOfficials || []
+        : [];
+      let storedExecutives = rosterFromApi
+        ? lookupResult.data.storedExecutives || []
+        : [];
+
+      if (!rosterFromApi) {
+        const [national, stored] = await Promise.all([
           fetchNationalOfficials(),
           fetchStoredFederalExecutives(),
         ]);
+        nationalOfficials = national;
+        storedExecutives = stored;
+      }
 
       const uniquePeople = dedupeLookupPoliticians([
         ...(lookupResult.ok ? lookupResult.data.politicians || [] : []),
@@ -2869,7 +2886,8 @@ function mountAddressResultsPage({
         (politician) =>
           politician.source !== "national_officials" &&
           politician.source !== "state_judges" &&
-          politician.source !== "state_officials"
+          politician.source !== "state_officials" &&
+          politician.source !== "local_officials"
       );
 
       const geography = lookupResult.ok
@@ -2901,16 +2919,23 @@ function mountAddressResultsPage({
           }
         : {};
 
-      const stateOfficials = await fetchStateOfficialsForAddress({
-        state_code: geography.state,
-        county_name: geography.county,
-        state_senate_districts: geography.stateSenateDistricts,
-        state_house_districts: geography.stateHouseDistricts,
-      });
-      const localOfficials = await fetchLocalOfficialsForGeography({
-        state_code: geography.state,
-        city_name: geography.city,
-      });
+      let stateOfficials = [];
+      let localOfficials = [];
+      if (rosterFromApi) {
+        stateOfficials = lookupResult.data.stateOfficials || [];
+        localOfficials = lookupResult.data.localOfficials || [];
+      } else {
+        stateOfficials = await fetchStateOfficialsForAddress({
+          state_code: geography.state,
+          county_name: geography.county,
+          state_senate_districts: geography.stateSenateDistricts,
+          state_house_districts: geography.stateHouseDistricts,
+        });
+        localOfficials = await fetchLocalOfficialsForGeography({
+          state_code: geography.state,
+          city_name: geography.city,
+        });
+      }
       const stateJudges = stateOfficials;
 
       if (
@@ -2957,7 +2982,15 @@ function mountAddressResultsPage({
         geography.stateSenateDistricts?.length || 0;
       const houseDistrictCount =
         geography.stateHouseDistricts?.length || 0;
+      const cacheAge = lookupResult.ok
+        ? lookupResult.data.cache?.ageDays
+        : null;
       const summaryParts = [
+        cacheHit
+          ? `cached${cacheAge != null ? ` (${cacheAge}d old)` : ""}`
+          : rosterFromApi
+            ? "fresh lookup"
+            : null,
         nationalCount
           ? `${nationalCount} nationwide (White House, Cabinet, agencies, Court)`
           : null,

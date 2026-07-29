@@ -3,6 +3,15 @@ const CICERO_BASE = "https://app.cicerodata.com/v3.1";
 const OPENSTATES_BASE = "https://v3.openstates.org";
 const GOOGLE_CIVIC_BASE = "https://www.googleapis.com/civicinfo/v2";
 
+const {
+  buildCacheKey,
+  cacheMeta,
+  enrichLookupRoster,
+  getSupabaseAdmin,
+  readAddressLookupCache,
+  writeAddressLookupCache,
+} = require("../lib/address-lookup-cache");
+
 const LEVEL_ORDER = ["federal", "state", "county", "city", "school", "local"];
 
 function json(res, status, body) {
@@ -1651,6 +1660,33 @@ module.exports = async function handler(req, res) {
     return json(res, 400, { error: "Missing q (address or ZIP)" });
   }
 
+  const forceRefresh = ["1", "true", "yes"].includes(
+    String(url.searchParams.get("refresh") || "").toLowerCase()
+  );
+  const { cacheKey, zipCode, queryRaw } = buildCacheKey(q);
+  const supabase = getSupabaseAdmin();
+
+  // 1) Serve fresh cached roster (< 30 days) when available.
+  if (supabase && !forceRefresh) {
+    try {
+      const cached = await readAddressLookupCache(supabase, cacheKey);
+      if (cached?.payload) {
+        return json(res, 200, {
+          ...cached.payload,
+          ok: true,
+          query: q,
+          cache: cacheMeta({
+            hit: true,
+            fetchedAt: cached.fetched_at,
+            cacheKey,
+          }),
+        });
+      }
+    } catch (cacheError) {
+      console.warn("Cache read skipped:", cacheError.message || cacheError);
+    }
+  }
+
   const sourcesTried = [];
   const sourceErrors = [];
   const politicianLists = [];
@@ -1665,7 +1701,7 @@ module.exports = async function handler(req, res) {
   let samplePointCount = 0;
 
   try {
-    // 1) Geocode whenever possible — also supplies federal/state (+ school district names).
+    // 2) Live Civic APIs (Geocodio / Google Civic / Cicero / Open States).
     if (geocodioKey) {
       sourcesTried.push("geocodio");
       try {
@@ -1697,7 +1733,6 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 2) Google Civic (full local coverage when still available for a key).
     if (googleCivicKey) {
       sourcesTried.push("google-civic");
       try {
@@ -1710,7 +1745,6 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3) Cicero — best current replacement for city/county/school board officials.
     if (ciceroKey) {
       sourcesTried.push("cicero");
       try {
@@ -1732,7 +1766,6 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 4) Open States geo people — free enrichment for state (+ some municipal).
     if (openStatesKey && lat != null && lng != null) {
       sourcesTried.push("openstates");
       try {
@@ -1745,15 +1778,6 @@ module.exports = async function handler(req, res) {
     const politicians = mergePoliticians(politicianLists).filter(
       isRelevantOfficeholder
     );
-    if (!politicians.length) {
-      return json(res, 404, {
-        error:
-          "No representatives found. Try a full street address. For city, county, and school board coverage, set CICERO_API_KEY (Google Civic Representatives was turned down in 2025).",
-        sourcesTried,
-        sourceErrors,
-        geography: mergeGeography(geography, { state, city, county }),
-      });
-    }
 
     geography = mergeGeography(geography, { state, city, county });
 
@@ -1763,7 +1787,7 @@ module.exports = async function handler(req, res) {
       ? `City/place search: sampled ${samplePointCount || "multiple"} points across the place and matched ${senateCount} state senate and ${houseCount} state house/assembly districts. Statewide executives always load for the state. Use a street address for your exact single district.`
       : "Federal/state legislators come from Geocodio (+ Open States when configured). City, county, school board, and judges require Cicero or a working Google Civic key. State / appellate / county benches load from state_officials via county_district_mapping.";
 
-    return json(res, 200, {
+    const basePayload = {
       ok: true,
       query: q,
       address,
@@ -1777,7 +1801,72 @@ module.exports = async function handler(req, res) {
       sourcesTried,
       sourceErrors,
       coverageNote,
+    };
+
+    if (!politicians.length) {
+      basePayload.coverageNote =
+        "No district representatives found from live Civic APIs. Nationwide and statewide directors below still load from Supabase when available. Try a full street address, and set CICERO_API_KEY for city/county/school coverage.";
+    }
+
+    // 3) Combine live results with Federal/State directors (+ local directories).
+    let enriched = basePayload;
+    if (supabase) {
+      try {
+        enriched = await enrichLookupRoster(supabase, basePayload);
+      } catch (enrichError) {
+        console.warn(
+          "Roster enrichment skipped:",
+          enrichError.message || enrichError
+        );
+      }
+    }
+
+    const fetchedAt = enriched.fetchedAt || new Date().toISOString();
+    enriched.cache = cacheMeta({
+      hit: false,
+      fetchedAt,
+      cacheKey,
+      skippedReason: supabase
+        ? forceRefresh
+          ? "refresh requested"
+          : "cache miss or expired"
+        : "SUPABASE_SERVICE_ROLE_KEY not configured",
     });
+
+    // 4) Persist combined roster for the next lookup (instant for 30 days).
+    if (supabase) {
+      try {
+        await writeAddressLookupCache(supabase, {
+          cacheKey,
+          queryRaw,
+          zipCode:
+            zipCode ||
+            extractZipFromText(enriched.address || enriched.query || q),
+          payload: (() => {
+            const { cache: _cache, ...rest } = enriched;
+            return { ...rest, fetchedAt };
+          })(),
+        });
+      } catch (writeError) {
+        console.warn(
+          "Cache write skipped:",
+          writeError.message || writeError
+        );
+      }
+    }
+
+    if (!politicians.length && !(enriched.nationalOfficials || []).length) {
+      return json(res, 404, {
+        error:
+          "No representatives found. Try a full street address. For city, county, and school board coverage, set CICERO_API_KEY (Google Civic Representatives was turned down in 2025).",
+        sourcesTried,
+        sourceErrors,
+        geography,
+        cache: enriched.cache,
+      });
+    }
+
+    return json(res, 200, enriched);
   } catch (error) {
     console.error(error);
     return json(res, 500, {
@@ -1787,3 +1876,8 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+function extractZipFromText(value) {
+  const match = String(value || "").match(/\b(\d{5})(?:-\d{4})?\b/);
+  return match ? match[1] : null;
+}

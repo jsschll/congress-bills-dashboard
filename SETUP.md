@@ -46,10 +46,16 @@ Cron jobs (`vercel.json`):
 ## 4. Politicians feature
 1. Run [`supabase/migration-politicians.sql`](supabase/migration-politicians.sql)
 2. If you already ran an older politicians migration, also run [`supabase/migration-politicians-levels.sql`](supabase/migration-politicians-levels.sql)
-3. Open **Politicians** in the nav, or use the address lookup on the homepage
-4. Address lookup merges Geocodio (+ optional Cicero / Google Civic / Open States) and groups results by Federal, State, County, City, School, and Local
-5. Federal browse uses Congress.gov current members; other levels appear from address lookups (and are saved for browsing/follow)
-6. Signed-in users can Follow / Unfollow individual officeholders (stored in `followed_politicians`)
+3. Run [`supabase/migration-address-lookup-cache.sql`](supabase/migration-address-lookup-cache.sql) for the 30-day address/ZIP roster cache
+4. Open **Politicians** in the nav, or use the address lookup on the homepage
+5. Address lookup (`/api/lookup-representatives`):
+   - Checks Supabase `address_lookup_cache` for that address/ZIP
+   - If a cached roster is **< 30 days** old, returns it immediately
+   - Otherwise calls Geocodio / Cicero / Google Civic / Open States, merges **Federal Agency Directors** (`national_officials`) plus geography-scoped **state/local** directories, and saves the combined roster with `fetched_at`
+   - Pass `?refresh=1` to bypass cache
+6. Federal browse uses Congress.gov current members; other levels appear from address lookups (and are saved for browsing/follow)
+7. Signed-in users can Follow / Unfollow individual officeholders (stored in `followed_politicians`)
+8. Caching requires `SUPABASE_SERVICE_ROLE_KEY` on Vercel (same as auth/notification APIs)
 
 **Coverage note:** Geocodio alone covers federal and state legislators. City, county, and school board members need a Cicero key (or a still-working Google Civic key). Without those, lookups still return federal/state officials and school **district** names.
 
