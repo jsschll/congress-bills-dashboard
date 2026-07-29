@@ -1998,11 +1998,22 @@ function renderPoliticianCard(
   const media = document.createElement("div");
   media.className = "politician-card__media";
   mountPoliticianPhoto(media, politician);
+  const profileHref = politicianProfileHref(politician);
+  if (profileHref) {
+    const photoLink = document.createElement("a");
+    photoLink.className = "politician-card__photo-link";
+    photoLink.href = profileHref;
+    photoLink.setAttribute(
+      "aria-label",
+      `Open profile for ${politician.name || "politician"}`
+    );
+    while (media.firstChild) photoLink.append(media.firstChild);
+    media.append(photoLink);
+  }
 
   const body = document.createElement("div");
   body.className = "politician-card__body";
 
-  const profileHref = politicianProfileHref(politician);
   let name;
   if (profileHref) {
     name = document.createElement("h3");
