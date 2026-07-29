@@ -386,47 +386,6 @@ function renderOverview(person, congress) {
     );
   }
 
-  contactBits.push(`
-    <div class="politician-profile-note-wrap" id="politician-note-wrap">
-      <button
-        type="button"
-        id="politician-note-open"
-        class="politician-profile-note-btn"
-        aria-haspopup="true"
-        aria-expanded="false"
-        aria-controls="politician-note-popover"
-      >
-        <span class="politician-profile-note-btn__icon" aria-hidden="true">📝</span>
-        <span class="politician-profile-note-btn__label">Private note</span>
-      </button>
-      <div
-        id="politician-note-popover"
-        class="politician-profile-note-popover"
-        role="dialog"
-        aria-label="Private note preview"
-        hidden
-      >
-        <p class="politician-profile-note-popover__kicker">Your private note</p>
-        <div
-          id="politician-note-preview"
-          class="politician-profile-note-popover__body"
-        ></div>
-        <div class="politician-profile-note-popover__actions">
-          <button type="button" class="refresh-btn" data-note-action="open">
-            Open
-          </button>
-          <button
-            type="button"
-            class="politician-profile-note-popover__secondary"
-            data-note-action="edit"
-          >
-            Add note
-          </button>
-        </div>
-      </div>
-    </div>
-  `);
-
   overviewEl.innerHTML = `
     <div class="politician-profile-card__media">
       <img
@@ -464,21 +423,61 @@ function renderOverview(person, congress) {
         formatRole(person)
       )}</p>
       <p class="politician-profile-card__tenure">${escapeHtml(tenureLabel)}</p>
-      <div class="politician-profile-follow">
-        <button
-          type="button"
-          id="politician-follow-btn"
-          class="politician-profile-follow-btn"
-          aria-pressed="false"
-        >
-          <span class="politician-profile-follow-btn__icon" aria-hidden="true">+</span>
-          <span class="politician-profile-follow-btn__label">Follow</span>
-        </button>
+      <div class="politician-profile-actions">
+        <div class="politician-profile-actions__row">
+          <button
+            type="button"
+            id="politician-follow-btn"
+            class="politician-profile-follow-btn"
+            aria-pressed="false"
+          >
+            <span class="politician-profile-follow-btn__icon" aria-hidden="true">+</span>
+            <span class="politician-profile-follow-btn__label">Follow</span>
+          </button>
+          <div class="politician-profile-note-wrap" id="politician-note-wrap">
+            <button
+              type="button"
+              id="politician-note-open"
+              class="politician-profile-note-btn"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="politician-note-popover"
+            >
+              <span class="politician-profile-note-btn__icon" aria-hidden="true">📝</span>
+              <span class="politician-profile-note-btn__label">Private note</span>
+            </button>
+            <div
+              id="politician-note-popover"
+              class="politician-profile-note-popover"
+              role="dialog"
+              aria-label="Private note preview"
+              hidden
+            >
+              <p class="politician-profile-note-popover__kicker">Your private note</p>
+              <div
+                id="politician-note-preview"
+                class="politician-profile-note-popover__body"
+              ></div>
+              <div class="politician-profile-note-popover__actions">
+                <button type="button" class="refresh-btn" data-note-action="open">
+                  Open
+                </button>
+                <button
+                  type="button"
+                  class="politician-profile-note-popover__secondary"
+                  data-note-action="edit"
+                >
+                  Add note
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
         <p class="politician-profile-follow__hint">
-          Get their bills and updates in My Feed
+          Follow for My Feed updates · Notes stay private to you
         </p>
       </div>
-      <div class="politician-profile-contact" aria-label="Contact and notes">
+      <div class="politician-profile-contact" aria-label="Contact links">
         ${
           contactBits.length
             ? contactBits.join("")
