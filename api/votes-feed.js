@@ -19,6 +19,23 @@ function env(...keys) {
   return "";
 }
 
+function toIsoDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const date = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function displayDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const iso = toIsoDate(raw);
+  return iso ? iso.slice(0, 10) : raw;
+}
+
 async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -206,7 +223,7 @@ function mapVoteCard(raw) {
     raw.legislationTitle ||
     voteQuestion ||
     `House Roll Call ${rollCallNumber}`;
-  const date = raw.startDate || raw.date || null;
+  const date = displayDate(raw.startDate || raw.date || null);
 
   return {
     id: billId,
@@ -222,9 +239,7 @@ function mapVoteCard(raw) {
     voteKind,
     result,
     date,
-    lastUpdated: date
-      ? new Date(`${date}T12:00:00`).toISOString()
-      : new Date().toISOString(),
+    lastUpdated: toIsoDate(raw.startDate || raw.date) || new Date().toISOString(),
     officialUrl:
       type && number
         ? `https://www.congress.gov/bill/${congress}th-congress/${type}/${number}`
