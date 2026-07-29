@@ -210,17 +210,21 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
   );
 
   const openMenu = () => {
+    clearCloseTimer();
     document.querySelectorAll(".notif-bell__panel").forEach((el) => {
       el.hidden = true;
     });
     document.querySelectorAll(".notif-bell__button").forEach((el) => {
       el.setAttribute("aria-expanded", "false");
     });
+    wrap.classList.add("is-open");
     panel.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
   };
 
   const closeMenu = () => {
+    clearCloseTimer();
+    wrap.classList.remove("is-open");
     panel.hidden = true;
     trigger.setAttribute("aria-expanded", "false");
   };
@@ -235,30 +239,37 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
 
   const scheduleClose = () => {
     clearCloseTimer();
-    closeTimer = setTimeout(closeMenu, 120);
+    closeTimer = setTimeout(closeMenu, 150);
   };
 
-  // Desktop: open on hover, close when the pointer leaves the menu.
-  wrap.addEventListener("pointerenter", (event) => {
-    if (event.pointerType === "touch") return;
-    clearCloseTimer();
-    openMenu();
-  });
-  wrap.addEventListener("pointerleave", (event) => {
-    if (event.pointerType === "touch") return;
-    scheduleClose();
-  });
+  // Desktop hover: open while pointer is over the control, close on leave.
+  wrap.addEventListener("mouseenter", openMenu);
+  wrap.addEventListener("mouseleave", scheduleClose);
 
-  // Touch / keyboard: click toggles; outside click closes.
+  // Touch / keyboard fallback.
   trigger.addEventListener("click", (event) => {
+    event.preventDefault();
     event.stopPropagation();
-    clearCloseTimer();
-    if (panel.hidden) openMenu();
-    else closeMenu();
+    if (wrap.classList.contains("is-open")) closeMenu();
+    else openMenu();
   });
 
-  document.addEventListener("click", closeMenu);
-  panel.addEventListener("click", (event) => event.stopPropagation());
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeMenu();
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      openMenu();
+      panel.querySelector(".user-menu__item")?.focus?.();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeMenu();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!wrap.contains(event.target)) closeMenu();
+  });
 
   wrap.append(trigger, panel);
   if (compact) wrap.classList.add("user-menu--compact");
