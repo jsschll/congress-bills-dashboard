@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sign in · Congress Bills</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260729e" />
   </head>
   <body>
     <nav id="app-nav" class="app-nav" aria-label="Main">
@@ -37,8 +37,8 @@
           <p class="eyebrow">Account</p>
           <h1 id="auth-title">Sign in</h1>
           <p id="auth-subtitle" class="subtitle">
-            Sign in with your email or username and password after verifying
-            your email.
+            Sign in with your email or username and password, or request a
+            one-time code by email.
           </p>
         </div>
       </header>
@@ -70,6 +70,10 @@
         <button class="refresh-btn auth-card__submit" type="submit">
           Sign in
         </button>
+        <p class="auth-card__links">
+          <a href="auth.html?mode=forgot">Forgot password?</a>
+          <a href="auth.html?mode=otp">Sign in with email code</a>
+        </p>
         <p class="auth-card__note">
           New here?
           <a href="auth.html?mode=signup">Create an account</a>
@@ -121,11 +125,124 @@
           <a href="auth.html">Sign in</a>
         </p>
       </form>
+
+      <form id="forgot-form" class="auth-card" hidden>
+        <label class="search-bar__label" for="forgot-identifier"
+          >Email or username</label
+        >
+        <input
+          id="forgot-identifier"
+          class="search-bar__input"
+          type="text"
+          required
+          autocomplete="username"
+          placeholder="you@example.com or username"
+        />
+        <button class="refresh-btn auth-card__submit" type="submit">
+          Send reset link
+        </button>
+        <p class="auth-card__note">
+          We’ll email a link to choose a new password. The link expires after a
+          short time.
+        </p>
+        <p class="auth-card__note">
+          <a href="auth.html">Back to sign in</a>
+          ·
+          <a href="auth.html?mode=otp">Sign in with email code</a>
+        </p>
+      </form>
+
+      <form id="reset-form" class="auth-card" hidden>
+        <label class="search-bar__label" for="reset-password"
+          >New password</label
+        >
+        <input
+          id="reset-password"
+          class="search-bar__input"
+          type="password"
+          required
+          autocomplete="new-password"
+          placeholder="Choose a new password"
+          minlength="6"
+        />
+        <label class="search-bar__label" for="reset-password-confirm"
+          >Confirm new password</label
+        >
+        <input
+          id="reset-password-confirm"
+          class="search-bar__input"
+          type="password"
+          required
+          autocomplete="new-password"
+          placeholder="Type it again"
+          minlength="6"
+        />
+        <button class="refresh-btn auth-card__submit" type="submit">
+          Update password
+        </button>
+        <p class="auth-card__note">
+          After you save, you’ll be signed in with your new password.
+        </p>
+      </form>
+
+      <form id="otp-request-form" class="auth-card" hidden>
+        <label class="search-bar__label" for="otp-identifier"
+          >Email or username</label
+        >
+        <input
+          id="otp-identifier"
+          class="search-bar__input"
+          type="text"
+          required
+          autocomplete="username"
+          placeholder="you@example.com or username"
+        />
+        <button class="refresh-btn auth-card__submit" type="submit">
+          Send sign-in code
+        </button>
+        <p class="auth-card__note">
+          We’ll email a 6–8 digit code. Enter it on the next step to sign in
+          without your password.
+        </p>
+        <p class="auth-card__note">
+          <a href="auth.html">Back to password sign in</a>
+          ·
+          <a href="auth.html?mode=forgot">Forgot password?</a>
+        </p>
+      </form>
+
+      <form id="otp-verify-form" class="auth-card" hidden>
+        <p class="auth-card__note" id="otp-sent-to" hidden></p>
+        <label class="search-bar__label" for="otp-code">Email code</label>
+        <input
+          id="otp-code"
+          class="search-bar__input"
+          type="text"
+          inputmode="numeric"
+          required
+          autocomplete="one-time-code"
+          placeholder="Enter the code from your email"
+          minlength="6"
+          maxlength="12"
+        />
+        <button class="refresh-btn auth-card__submit" type="submit">
+          Verify code &amp; sign in
+        </button>
+        <p class="auth-card__links">
+          <button id="otp-resend-btn" class="auth-text-btn" type="button">
+            Resend code
+          </button>
+          <a href="auth.html?mode=otp">Use a different email</a>
+        </p>
+        <p class="auth-card__note">
+          <a href="auth.html">Back to password sign in</a>
+        </p>
+      </form>
     </main>
 
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js"></script>
-    <script src="auth.js" defer></script>
+    <script src="auth.js?v=20260729e" defer></script>
   </body>
 </html>

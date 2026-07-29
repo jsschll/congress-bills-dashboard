@@ -1,6 +1,14 @@
 const signinForm = document.getElementById("signin-form");
 const signupForm = document.getElementById("signup-form");
+const forgotForm = document.getElementById("forgot-form");
+const resetForm = document.getElementById("reset-form");
+const otpRequestForm = document.getElementById("otp-request-form");
+const otpVerifyForm = document.getElementById("otp-verify-form");
+const otpResendBtn = document.getElementById("otp-resend-btn");
 const authStatus = document.getElementById("auth-status");
+
+let pendingOtpEmail = "";
+let recoveryMode = false;
 
 function setAuthStatus(message, type = "loading") {
   authStatus.hidden = !message;
@@ -16,10 +24,90 @@ function getNextPath() {
   return next.replace(/^\//, "");
 }
 
-function authRedirectUrl() {
+function authRedirectUrl(extraParams = {}) {
   const url = new URL("auth.html", window.location.href);
-  url.searchParams.set("verified", "1");
+  for (const [key, value] of Object.entries(extraParams)) {
+    if (value == null || value === "") continue;
+    url.searchParams.set(key, value);
+  }
   return url.toString();
+}
+
+function hideAllAuthForms() {
+  [
+    signinForm,
+    signupForm,
+    forgotForm,
+    resetForm,
+    otpRequestForm,
+    otpVerifyForm,
+  ].forEach((form) => {
+    if (form) form.hidden = true;
+  });
+}
+
+function showAuthView(view) {
+  hideAllAuthForms();
+  const title = document.getElementById("auth-title");
+  const subtitle = document.getElementById("auth-subtitle");
+
+  if (view === "signup") {
+    document.title = "Create account · Congress Bills";
+    title.textContent = "Create account";
+    subtitle.textContent =
+      "Choose a username and password. We’ll email you a link to verify your account.";
+    signupForm.hidden = false;
+    return;
+  }
+
+  if (view === "forgot") {
+    document.title = "Forgot password · Congress Bills";
+    title.textContent = "Forgot password";
+    subtitle.textContent =
+      "Enter your email or username and we’ll send a reset link.";
+    forgotForm.hidden = false;
+    return;
+  }
+
+  if (view === "reset") {
+    document.title = "Choose a new password · Congress Bills";
+    title.textContent = "Choose a new password";
+    subtitle.textContent =
+      "Pick a new password for your account. You’ll stay signed in after saving.";
+    resetForm.hidden = false;
+    return;
+  }
+
+  if (view === "otp") {
+    document.title = "Sign in with email code · Congress Bills";
+    title.textContent = "Sign in with email code";
+    subtitle.textContent =
+      "We’ll email a one-time code. No password needed for this sign-in.";
+    otpRequestForm.hidden = false;
+    return;
+  }
+
+  if (view === "otp-verify") {
+    document.title = "Enter email code · Congress Bills";
+    title.textContent = "Enter your email code";
+    subtitle.textContent =
+      "Type the code from your inbox to finish signing in.";
+    otpVerifyForm.hidden = false;
+    const sentTo = document.getElementById("otp-sent-to");
+    if (sentTo) {
+      sentTo.hidden = !pendingOtpEmail;
+      sentTo.textContent = pendingOtpEmail
+        ? `Code sent to ${pendingOtpEmail}.`
+        : "";
+    }
+    return;
+  }
+
+  document.title = "Sign in · Congress Bills";
+  title.textContent = "Sign in";
+  subtitle.textContent =
+    "Sign in with your email or username and password, or request a one-time code by email.";
+  signinForm.hidden = false;
 }
 
 async function finishLogin(user) {
@@ -29,7 +117,8 @@ async function finishLogin(user) {
     window.location.href = next;
     return;
   }
-  window.location.href = follows === 0 ? "topics.html" : "bills-policies.html?tab=mine";
+  window.location.href =
+    follows === 0 ? "topics.html" : "bills-policies.html?tab=mine";
 }
 
 async function resolveEmail(identifier) {
@@ -53,16 +142,22 @@ async function resolveEmail(identifier) {
   return data;
 }
 
-signinForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
+function requireSupabaseClient() {
   const client = getSupabase();
   if (!client) {
     setAuthStatus(
       "Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to config.js.",
       "error"
     );
-    return;
+    return null;
   }
+  return client;
+}
+
+signinForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const client = requireSupabaseClient();
+  if (!client) return;
 
   const identifier = document.getElementById("signin-identifier").value;
   const password = document.getElementById("signin-password").value;
@@ -99,16 +194,10 @@ signinForm.addEventListener("submit", async (event) => {
   }
 });
 
-signupForm.addEventListener("submit", async (event) => {
+signupForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const client = getSupabase();
-  if (!client) {
-    setAuthStatus(
-      "Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to config.js.",
-      "error"
-    );
-    return;
-  }
+  const client = requireSupabaseClient();
+  if (!client) return;
 
   const username = document
     .getElementById("signup-username")
@@ -132,7 +221,7 @@ signupForm.addEventListener("submit", async (event) => {
     password,
     options: {
       data: { username },
-      emailRedirectTo: authRedirectUrl(),
+      emailRedirectTo: authRedirectUrl({ verified: "1" }),
     },
   });
 
@@ -142,14 +231,12 @@ signupForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  // If email confirmation is required, there is usually no session yet.
   if (!data.session) {
     setAuthStatus(
       `Account created. Check ${email} for a verification link, then come back to sign in.`,
       "success"
     );
-    signupForm.hidden = true;
-    signinForm.hidden = false;
+    showAuthView("signin");
     document.getElementById("auth-title").textContent = "Verify your email";
     document.getElementById("auth-subtitle").textContent =
       "Click the link we sent you, then sign in with your username or email and password.";
@@ -160,30 +247,193 @@ signupForm.addEventListener("submit", async (event) => {
   await finishLogin(data.user);
 });
 
+forgotForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const client = requireSupabaseClient();
+  if (!client) return;
+
+  const identifier = document.getElementById("forgot-identifier").value;
+  setAuthStatus("Sending reset link…", "loading");
+
+  try {
+    const email = await resolveEmail(identifier);
+    const { error } = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: authRedirectUrl({ reset: "1" }),
+    });
+    if (error) {
+      console.error(error);
+      setAuthStatus(error.message || "Could not send reset email.", "error");
+      return;
+    }
+    setAuthStatus(
+      `If an account exists for ${email}, a password reset link is on the way. Check your inbox and spam folder.`,
+      "success"
+    );
+  } catch (error) {
+    console.error(error);
+    setAuthStatus(error.message || "Could not send reset email.", "error");
+  }
+});
+
+resetForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const client = requireSupabaseClient();
+  if (!client) return;
+
+  const password = document.getElementById("reset-password").value;
+  const confirm = document.getElementById("reset-password-confirm").value;
+  if (password !== confirm) {
+    setAuthStatus("Passwords do not match.", "error");
+    return;
+  }
+  if (password.length < 6) {
+    setAuthStatus("Password must be at least 6 characters.", "error");
+    return;
+  }
+
+  setAuthStatus("Updating password…", "loading");
+  const { data, error } = await client.auth.updateUser({ password });
+  if (error) {
+    console.error(error);
+    setAuthStatus(error.message || "Could not update password.", "error");
+    return;
+  }
+
+  recoveryMode = false;
+  setAuthStatus("Password updated. Redirecting…", "loading");
+  const user = data.user;
+  if (user) {
+    await finishLogin(user);
+    return;
+  }
+  showAuthView("signin");
+  setAuthStatus("Password updated. Sign in with your new password.", "success");
+});
+
+async function sendSignInCode(identifier) {
+  const client = requireSupabaseClient();
+  if (!client) return false;
+
+  const email = await resolveEmail(identifier);
+  const { error } = await client.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: authRedirectUrl(),
+    },
+  });
+  if (error) {
+    console.error(error);
+    const hint = /signups not allowed|user not found|unable to validate/i.test(
+      error.message || ""
+    )
+      ? " No account found for that email — create an account first."
+      : "";
+    throw new Error((error.message || "Could not send sign-in code.") + hint);
+  }
+  pendingOtpEmail = email;
+  return true;
+}
+
+otpRequestForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const identifier = document.getElementById("otp-identifier").value;
+  setAuthStatus("Sending sign-in code…", "loading");
+  try {
+    await sendSignInCode(identifier);
+    showAuthView("otp-verify");
+    setAuthStatus(
+      `Code sent to ${pendingOtpEmail}. Enter it below to sign in.`,
+      "success"
+    );
+    document.getElementById("otp-code")?.focus();
+  } catch (error) {
+    console.error(error);
+    setAuthStatus(error.message || "Could not send sign-in code.", "error");
+  }
+});
+
+otpVerifyForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const client = requireSupabaseClient();
+  if (!client) return;
+
+  const token = String(document.getElementById("otp-code").value || "")
+    .trim()
+    .replace(/\s+/g, "");
+  if (!pendingOtpEmail) {
+    setAuthStatus("Request a new code first.", "error");
+    showAuthView("otp");
+    return;
+  }
+  if (token.length < 6) {
+    setAuthStatus("Enter the full code from your email.", "error");
+    return;
+  }
+
+  setAuthStatus("Verifying code…", "loading");
+  const { data, error } = await client.auth.verifyOtp({
+    email: pendingOtpEmail,
+    token,
+    type: "email",
+  });
+  if (error) {
+    console.error(error);
+    setAuthStatus(error.message || "That code is invalid or expired.", "error");
+    return;
+  }
+
+  const user = data.user || data.session?.user;
+  if (!user) {
+    setAuthStatus("Code accepted, but no session was returned.", "error");
+    return;
+  }
+
+  setAuthStatus("Signed in. Redirecting…", "loading");
+  await finishLogin(user);
+});
+
+otpResendBtn?.addEventListener("click", async () => {
+  if (!pendingOtpEmail) {
+    showAuthView("otp");
+    return;
+  }
+  setAuthStatus("Resending code…", "loading");
+  try {
+    await sendSignInCode(pendingOtpEmail);
+    setAuthStatus(`New code sent to ${pendingOtpEmail}.`, "success");
+  } catch (error) {
+    console.error(error);
+    setAuthStatus(error.message || "Could not resend code.", "error");
+  }
+});
+
+function hashParams() {
+  const raw = String(window.location.hash || "").replace(/^#/, "");
+  return new URLSearchParams(raw);
+}
+
 (async function initAuthPage() {
   await bootNav("auth");
 
   const params = new URLSearchParams(window.location.search);
-  const isSignup = params.get("mode") === "signup";
+  const mode = String(params.get("mode") || "").toLowerCase();
   const justVerified = params.get("verified") === "1";
+  const resetFlag = params.get("reset") === "1";
+  const hash = hashParams();
+  const hashType = String(hash.get("type") || "").toLowerCase();
 
-  if (isSignup) {
-    document.title = "Create account · Congress Bills";
-    document.getElementById("auth-title").textContent = "Create account";
-    document.getElementById("auth-subtitle").textContent =
-      "Choose a username and password. We’ll email you a link to verify your account.";
-    signinForm.hidden = true;
-    signupForm.hidden = false;
-  }
+  if (mode === "signup") showAuthView("signup");
+  else if (mode === "forgot") showAuthView("forgot");
+  else if (mode === "otp") showAuthView("otp");
+  else showAuthView("signin");
 
   if (justVerified) {
+    showAuthView("signin");
     setAuthStatus(
       "Email verified. Sign in with your username or email and password.",
       "success"
     );
-    signinForm.hidden = false;
-    signupForm.hidden = true;
-    document.getElementById("auth-title").textContent = "Sign in";
   }
 
   if (!isSupabaseConfigured()) {
@@ -194,15 +444,46 @@ signupForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  // Handle redirect from the email verification link (tokens in URL hash).
   const client = getSupabase();
-  if (client) {
-    const { data } = await client.auth.getSession();
-    if (data.session?.user) {
-      if (justVerified) {
-        setAuthStatus("Email verified. Redirecting…", "loading");
-      }
-      await finishLogin(data.session.user);
+  if (!client) return;
+
+  client.auth.onAuthStateChange(async (event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      recoveryMode = true;
+      showAuthView("reset");
+      setAuthStatus("Choose a new password to finish resetting your account.", "success");
+      return;
     }
+    if (
+      (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") &&
+      session?.user &&
+      recoveryMode
+    ) {
+      showAuthView("reset");
+    }
+  });
+
+  // Recovery / magic-link tokens arrive in the URL hash.
+  if (hashType === "recovery" || resetFlag) {
+    recoveryMode = true;
+    showAuthView("reset");
+    setAuthStatus("Choose a new password to finish resetting your account.", "success");
+  }
+
+  const { data } = await client.auth.getSession();
+  if (data.session?.user) {
+    if (recoveryMode || hashType === "recovery" || resetFlag) {
+      recoveryMode = true;
+      showAuthView("reset");
+      setAuthStatus(
+        "Choose a new password to finish resetting your account.",
+        "success"
+      );
+      return;
+    }
+    if (justVerified) {
+      setAuthStatus("Email verified. Redirecting…", "loading");
+    }
+    await finishLogin(data.session.user);
   }
 })();

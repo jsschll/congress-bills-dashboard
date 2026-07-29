@@ -5,10 +5,10 @@
 2. Authentication → Providers → Email:
    - Enable Email provider
    - Enable **Confirm email** (verification link)
-   - Disable magic link / OTP if you only want password auth
+   - Enable **Email OTP** / magic link so users can **Sign in with email code** and use **Forgot password** reset links
 3. Authentication → URL Configuration:
    - Site URL: your live site (e.g. `https://jsschll.github.io/congress-bills-dashboard/` or your Vercel URL)
-   - Redirect URLs: include `https://YOUR_DOMAIN/auth.html` and `https://YOUR_DOMAIN/auth.html?verified=1`
+   - Redirect URLs: include `https://YOUR_DOMAIN/auth.html`, `https://YOUR_DOMAIN/auth.html?verified=1`, and `https://YOUR_DOMAIN/auth.html?reset=1`
 4. SQL Editor: run [`supabase/schema.sql`](supabase/schema.sql)
    - If you already ran an older schema, also run [`supabase/migration-username-auth.sql`](supabase/migration-username-auth.sql)
    - For Bills location filters, also run [`supabase/migration-profile-home-address.sql`](supabase/migration-profile-home-address.sql) (adds `profiles.home_address`)
