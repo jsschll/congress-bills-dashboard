@@ -77,7 +77,7 @@ function createNavShell(activePage = "home") {
     <div class="app-nav__inner">
       <a class="app-nav__brand" href="index.html">Congress Bills</a>
       <div class="app-nav__links">
-        <a class="app-nav__link ${activePage === "home" ? "is-active" : ""}" href="index.html">Bills</a>
+        <a class="app-nav__link ${activePage === "home" ? "is-active" : ""}" href="index.html">Home</a>
         <a class="app-nav__link ${
           activePage === "feed" || activePage === "bills-policies" ? "is-active" : ""
         }" href="bills-policies.html">Feed</a>

@@ -246,10 +246,27 @@ filterSearch.addEventListener("input", applyFilters);
 (async function initPoliticiansPage() {
   fillStateFilter();
   await bootNav("politicians");
+
+  const addressInput = document.getElementById("address-input");
+  const addressForm = document.getElementById("address-form");
+  const prefillAddress = new URLSearchParams(window.location.search)
+    .get("address")
+    ?.trim();
+  if (prefillAddress && addressInput) {
+    addressInput.value = prefillAddress;
+  }
+
   mountAddressLookup({
     formId: "address-form",
     inputId: "address-input",
   });
+
+  // Homepage hero lands here with ?address=… already filled, then continues
+  // into the lookup so users are not asked to click Look up again.
+  if (prefillAddress && addressForm) {
+    addressForm.requestSubmit();
+    return;
+  }
 
   currentUser = (await getUser().catch(() => null)) || null;
   if (currentUser) {

@@ -3,15 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Recent Bills Dashboard</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>Congress Bills — Discover who represents you</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260729b" />
   </head>
-  <body>
+  <body class="page-home">
     <nav id="app-nav" class="app-nav" aria-label="Main">
       <div class="app-nav__inner">
         <a class="app-nav__brand" href="index.html">Congress Bills</a>
         <div class="app-nav__links">
-          <a class="app-nav__link is-active" href="index.html">Bills</a>
+          <a class="app-nav__link is-active" href="index.html">Home</a>
           <a class="app-nav__link" href="bills-policies.html">Feed</a>
           <a class="app-nav__link" href="topics.html">Topics</a>
           <a class="app-nav__link" href="politicians.html">Politicians</a>
@@ -30,85 +36,142 @@
       </div>
     </nav>
 
-    <main class="page">
-      <header class="header">
-        <div>
-          <p class="eyebrow">Congress.gov</p>
-          <h1>Recent Bills</h1>
-          <p class="subtitle">
-            Latest legislation from the 119th Congress with official CRS
-            summaries. Sign in to follow topics and get a personalized feed.
-          </p>
-        </div>
-        <div class="header__actions">
-          <a class="app-nav__button app-nav__button--ghost" href="auth.html"
-            >Sign in</a
-          >
-          <a
-            class="app-nav__button app-nav__button--primary"
-            href="auth.html?mode=signup"
-            >Sign up</a
-          >
-          <button id="refresh-btn" class="refresh-btn" type="button">
-            Refresh
-          </button>
-        </div>
-      </header>
-
-      <section class="lookup-panel" aria-labelledby="home-lookup-heading">
-        <h2 id="home-lookup-heading">Who represents you?</h2>
-        <p class="lookup-panel__hint">
-          Federal, state, county, city, and school officials for your address.
+    <section class="home-hero" aria-label="Discover your representatives">
+      <div class="home-hero__media" aria-hidden="true"></div>
+      <div class="home-hero__shade" aria-hidden="true"></div>
+      <div class="home-hero__content">
+        <p class="home-hero__brand">Congress Bills</p>
+        <h1 class="home-hero__title">
+          Discover Everyone Who Represents You — From Your HOA to the White
+          House
+        </h1>
+        <p class="home-hero__lede">
+          Enter an address to see the full map of power around you — local
+          boards, city hall, your county, statehouse, Congress, and beyond.
         </p>
-        <form id="home-address-form" class="keyword-form">
+        <form
+          id="home-address-form"
+          class="home-hero__form"
+          aria-label="Look up your representatives"
+        >
+          <label class="visually-hidden" for="home-address-input"
+            >Street address or ZIP code</label
+          >
           <input
             id="home-address-input"
-            class="search-bar__input"
+            class="home-hero__input"
             type="search"
             name="address"
-            placeholder="Enter your address or ZIP code"
+            placeholder="Street address or ZIP code"
+            autocomplete="street-address"
             required
           />
-          <button class="refresh-btn" type="submit">Find representatives</button>
+          <button class="home-hero__submit" type="submit">
+            Find my representatives
+          </button>
         </form>
+      </div>
+    </section>
+
+    <main class="page page--home">
+      <section class="home-features" aria-labelledby="home-features-heading">
+        <div class="home-features__intro">
+          <h2 id="home-features-heading">Built for clarity, not noise</h2>
+          <p>
+            Three ways Congress Bills helps you go from “Who’s in charge?” to
+            “Here’s what they’re doing.”
+          </p>
+        </div>
+        <div class="home-features__grid">
+          <article class="home-feature">
+            <p class="home-feature__index">01</p>
+            <h3>Complete Local Roster</h3>
+            <p>
+              See everyone from school boards and city councils to state
+              executives, Congress, Cabinet, and the White House — organized by
+              the level of government that touches your life.
+            </p>
+          </article>
+          <article class="home-feature">
+            <p class="home-feature__index">02</p>
+            <h3>Policy Feed</h3>
+            <p>
+              Follow topics, bills, and people you care about. Get a feed of
+              updates across federal and state action — plus suggestions that
+              match what you already track.
+            </p>
+          </article>
+          <article class="home-feature">
+            <p class="home-feature__index">03</p>
+            <h3>Local District Insights</h3>
+            <p>
+              Address-aware results surface your districts and the officials who
+              actually represent that place, so statewide noise doesn’t bury
+              neighborhood decisions.
+            </p>
+          </article>
+        </div>
       </section>
 
-      <div class="search-bar">
-        <label class="search-bar__label" for="search-input">Search bills</label>
-        <input
-          id="search-input"
-          class="search-bar__input"
-          type="search"
-          placeholder="Search Congress.gov by title or bill number (e.g. HR 5800)…"
-          autocomplete="off"
-        />
-      </div>
-
-      <p id="status" class="status" aria-live="polite">
-        Loading recent bills from Congress.gov…
-      </p>
-
       <section
-        id="bills-grid"
-        class="grid"
-        aria-label="Recent bills"
-      ></section>
+        class="home-bills"
+        aria-labelledby="home-bills-heading"
+        id="recent-federal-bills"
+      >
+        <header class="home-bills__header">
+          <div>
+            <p class="eyebrow">Congress.gov</p>
+            <h2 id="home-bills-heading">Recent Federal Bills</h2>
+            <p class="subtitle">
+              Latest legislation from the 119th Congress with official CRS
+              summaries.
+            </p>
+          </div>
+          <div class="header__actions home-bills__actions">
+            <button id="refresh-btn" class="refresh-btn" type="button">
+              Refresh
+            </button>
+          </div>
+        </header>
 
-      <p id="no-results" class="no-results" hidden>
-        No bills match your search.
-      </p>
+        <div class="search-bar">
+          <label class="search-bar__label" for="search-input">Search bills</label>
+          <input
+            id="search-input"
+            class="search-bar__input"
+            type="search"
+            placeholder="Search Congress.gov by title or bill number (e.g. HR 5800)…"
+            autocomplete="off"
+          />
+        </div>
+
+        <p id="status" class="status" aria-live="polite">
+          Loading recent bills from Congress.gov…
+        </p>
+
+        <section
+          id="bills-grid"
+          class="grid"
+          aria-label="Recent federal bills"
+        ></section>
+
+        <p id="no-results" class="no-results" hidden>
+          No bills match your search.
+        </p>
+      </section>
     </main>
 
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js"></script>
-    <script src="politicians-shared.js?v=20260728h"></script>
+    <script src="politicians-shared.js?v=20260729b"></script>
     <script src="app.js" defer></script>
     <script>
       bootNav("home");
       mountAddressLookup({
         formId: "home-address-form",
         inputId: "home-address-input",
+        destination: "politicians",
       });
     </script>
   </body>

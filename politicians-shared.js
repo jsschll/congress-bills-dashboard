@@ -2779,8 +2779,16 @@ function politiciansResultsUrl(address) {
   return `politicians-results.html?address=${encodeURIComponent(address.trim())}`;
 }
 
-/** Search forms navigate to the results page; they do not render inline. */
-function mountAddressLookup({ formId, inputId }) {
+function politiciansBrowseUrl(address) {
+  return `politicians.html?address=${encodeURIComponent(address.trim())}`;
+}
+
+/**
+ * Search forms navigate to results by default.
+ * Pass destination: "politicians" to land on the Politicians page with the
+ * address carried in the query string (auto-populated there).
+ */
+function mountAddressLookup({ formId, inputId, destination = "results" } = {}) {
   const form = document.getElementById(formId);
   const input = document.getElementById(inputId);
   if (!form || !input) return;
@@ -2789,7 +2797,10 @@ function mountAddressLookup({ formId, inputId }) {
     event.preventDefault();
     const address = input.value.trim();
     if (!address) return;
-    window.location.href = politiciansResultsUrl(address);
+    window.location.href =
+      destination === "politicians"
+        ? politiciansBrowseUrl(address)
+        : politiciansResultsUrl(address);
   });
 }
 
