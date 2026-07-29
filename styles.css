@@ -261,6 +261,12 @@
   --border: #dde3ea;
   --accent: #1e4d8c;
   --accent-soft: #e8f0fb;
+  --signal: #1f8a7a;
+  --signal-soft: rgba(31, 138, 122, 0.16);
+  --nav-bg: rgba(15, 39, 68, 0.94);
+  --nav-border: rgba(255, 255, 255, 0.08);
+  --nav-text: #f4f8fc;
+  --nav-muted: rgba(244, 248, 252, 0.72);
   --house: #2563eb;
   --senate: #7c3aed;
   --shadow: 0 10px 30px rgba(26, 35, 50, 0.08);
@@ -532,15 +538,15 @@ body {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgba(244, 246, 248, 0.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
+  background: var(--nav-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--nav-border);
 }
 
 .app-nav__inner {
   width: min(1100px, calc(100% - 2rem));
   margin: 0 auto;
-  min-height: 3.5rem;
+  min-height: 3.65rem;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -549,77 +555,150 @@ body {
 }
 
 .app-nav__brand {
-  font-weight: 800;
-  color: var(--text);
-  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: "Fraunces", "Times New Roman", serif;
+  font-weight: 700;
+  font-size: 1.05rem;
   letter-spacing: -0.02em;
+  color: var(--nav-text);
+  text-decoration: none;
+}
+
+.app-nav__brand:hover {
+  color: #fff;
+}
+
+.app-nav__logo {
+  display: inline-grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.45rem;
+  background: linear-gradient(145deg, #2aa894, var(--signal) 55%, #16685c);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.app-nav__logo svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  display: block;
+}
+
+.app-nav__brand-text {
+  line-height: 1;
 }
 
 .app-nav__links {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.15rem;
   flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .app-nav__link {
-  color: var(--muted);
+  position: relative;
+  color: var(--nav-muted);
   text-decoration: none;
   font-weight: 600;
-  padding: 0.4rem 0.7rem;
-  border-radius: 999px;
+  font-size: 0.92rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.35rem;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
-.app-nav__link.is-active,
 .app-nav__link:hover {
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-nav__link.is-active {
+  color: #fff;
+}
+
+.app-nav__link.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0.7rem;
+  right: 0.7rem;
+  bottom: 0.2rem;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--signal);
 }
 
 .app-nav__actions {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
   margin-left: auto;
 }
 
 .app-nav__button {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--nav-text);
   border-radius: 999px;
-  padding: 0.45rem 0.9rem;
+  padding: 0.45rem 0.95rem;
   font: inherit;
   font-weight: 600;
+  font-size: 0.9rem;
   text-decoration: none;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, filter 0.15s ease,
+    color 0.15s ease;
 }
 
 .app-nav__button--ghost {
+  color: var(--nav-text);
+  border-color: rgba(255, 255, 255, 0.35);
   background: transparent;
 }
 
+.app-nav__button--ghost:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+}
+
 .app-nav__button--primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--signal);
+  border-color: var(--signal);
   color: #fff;
 }
 
 .app-nav__button--primary:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.08);
 }
 
 .app-nav__hint,
 .app-nav__email {
-  color: var(--muted);
+  color: var(--nav-muted);
   font-size: 0.85rem;
 }
 
 .app-nav__account {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
+}
+
+.app-nav__email--link {
+  text-decoration: none;
+  color: var(--nav-muted);
+}
+
+.app-nav__email--link:hover {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 .notif-bell {
@@ -628,12 +707,18 @@ body {
 
 .notif-bell__button {
   position: relative;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: var(--nav-text);
   border-radius: 999px;
   width: 2.4rem;
   height: 2.4rem;
   cursor: pointer;
+}
+
+.notif-bell__button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
 .notif-bell__badge {
@@ -662,6 +747,7 @@ body {
   border-radius: 0.9rem;
   box-shadow: var(--shadow);
   padding: 0.55rem;
+  z-index: 50;
 }
 
 .notif-bell__list {
@@ -693,7 +779,7 @@ body {
 }
 
 .notif-bell__item.is-unread {
-  background: var(--accent-soft);
+  background: var(--signal-soft);
 }
 
 .notif-bell__empty,
@@ -708,7 +794,7 @@ body {
 .notif-bell__footer {
   text-align: center;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--signal);
 }
 
 .page--narrow {
@@ -1537,15 +1623,6 @@ body {
   }
 }
 
-.app-nav__email--link {
-  text-decoration: none;
-  color: inherit;
-}
-
-.app-nav__email--link:hover {
-  text-decoration: underline;
-}
-
 .page--profile {
   max-width: 1100px;
 }
@@ -2182,7 +2259,7 @@ body {
   --home-ink-soft: #1a3a5c;
   --home-foam: #f2f6fa;
   --home-mist: #d7e3ef;
-  --home-signal: #1f8a7a;
+  --home-signal: var(--signal);
   --home-font-display: "Fraunces", "Times New Roman", serif;
   --home-font-body: "Figtree", "Segoe UI", sans-serif;
   background: var(--home-foam);
@@ -2192,39 +2269,6 @@ body {
 .page-home button,
 .page-home input {
   font-family: var(--home-font-body);
-}
-
-.page-home .app-nav {
-  background: rgba(15, 39, 68, 0.92);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 20;
-}
-
-.page-home .app-nav__brand,
-.page-home .app-nav__link,
-.page-home .app-nav__email {
-  color: #f4f8fc;
-}
-
-.page-home .app-nav__link.is-active,
-.page-home .app-nav__link:hover {
-  color: #fff;
-  text-decoration: underline;
-  text-underline-offset: 0.35em;
-}
-
-.page-home .app-nav__button--ghost {
-  color: #f4f8fc;
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-.page-home .app-nav__button--primary {
-  background: var(--home-signal);
-  border-color: var(--home-signal);
-  color: #fff;
 }
 
 .home-hero {

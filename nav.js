@@ -1,3 +1,14 @@
+const NAV_LOGO_SVG = `
+  <span class="app-nav__logo" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 19h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M7 19V9.5L12 6l5 3.5V19" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M10 19v-4h4v4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M9.5 12.5h1M13.5 12.5h1M9.5 15h1M13.5 15h1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+  </span>
+`.trim();
+
 function buildLoggedOutActions(actions) {
   actions.replaceChildren();
 
@@ -17,19 +28,19 @@ function buildLoggedOutActions(actions) {
 function buildLoggedInActions(actions, { userLabel, onSignOut }) {
   actions.replaceChildren();
 
-  if (userLabel) {
-    const label = document.createElement("span");
-    label.className = "app-nav__email";
-    label.textContent = userLabel;
-    actions.append(label);
-  }
+  const profile = document.createElement("a");
+  profile.className = "app-nav__button app-nav__button--ghost";
+  profile.href = "profile.html";
+  profile.textContent = "Profile";
+  if (userLabel) profile.title = userLabel;
 
   const outBtn = document.createElement("button");
   outBtn.type = "button";
   outBtn.className = "app-nav__button app-nav__button--primary";
   outBtn.textContent = "Sign out";
   outBtn.addEventListener("click", onSignOut);
-  actions.append(outBtn);
+
+  actions.append(profile, outBtn);
 }
 
 function syncHeaderAuth(user) {
@@ -40,12 +51,17 @@ function syncHeaderAuth(user) {
   headerActions.replaceChildren();
 
   if (user) {
+    const profile = document.createElement("a");
+    profile.className = "app-nav__button app-nav__button--ghost";
+    profile.href = "profile.html";
+    profile.textContent = "Profile";
+
     const outBtn = document.createElement("button");
     outBtn.type = "button";
     outBtn.className = "app-nav__button app-nav__button--primary";
     outBtn.textContent = "Sign out";
     outBtn.addEventListener("click", () => signOut());
-    headerActions.append(outBtn);
+    headerActions.append(profile, outBtn);
   } else {
     const signIn = document.createElement("a");
     signIn.className = "app-nav__button app-nav__button--ghost";
@@ -73,18 +89,32 @@ function createNavShell(activePage = "home") {
     document.body.prepend(nav);
   }
 
+  nav.className = "app-nav";
+  nav.setAttribute("aria-label", "Main");
+
+  const link = (page, href, label) =>
+    `<a class="app-nav__link ${
+      activePage === page ? "is-active" : ""
+    }" href="${href}"${activePage === page ? ' aria-current="page"' : ""}>${label}</a>`;
+
+  const feedActive =
+    activePage === "feed" || activePage === "bills-policies" ? "is-active" : "";
+
   nav.innerHTML = `
     <div class="app-nav__inner">
-      <a class="app-nav__brand" href="index.html">Congress Bills</a>
+      <a class="app-nav__brand" href="index.html">
+        ${NAV_LOGO_SVG}
+        <span class="app-nav__brand-text">Congress Bills</span>
+      </a>
       <div class="app-nav__links">
-        <a class="app-nav__link ${activePage === "home" ? "is-active" : ""}" href="index.html">Home</a>
-        <a class="app-nav__link ${activePage === "bills" ? "is-active" : ""}" href="bills.html">Bills</a>
-        <a class="app-nav__link ${
-          activePage === "feed" || activePage === "bills-policies" ? "is-active" : ""
-        }" href="bills-policies.html">Feed</a>
-        <a class="app-nav__link ${activePage === "topics" ? "is-active" : ""}" href="topics.html">Topics</a>
-        <a class="app-nav__link ${activePage === "politicians" ? "is-active" : ""}" href="politicians.html">Politicians</a>
-        <a class="app-nav__link ${activePage === "profile" ? "is-active" : ""}" href="profile.html">Profile</a>
+        ${link("home", "index.html", "Home")}
+        ${link("bills", "bills.html", "Bills")}
+        <a class="app-nav__link ${feedActive}" href="bills-policies.html"${
+          feedActive ? ' aria-current="page"' : ""
+        }>Feed</a>
+        ${link("topics", "topics.html", "Topics")}
+        ${link("politicians", "politicians.html", "Politicians")}
+        ${link("profile", "profile.html", "Profile")}
       </div>
       <div class="app-nav__actions" id="app-nav-actions"></div>
     </div>
@@ -215,11 +245,11 @@ async function renderAppNav(activePage = "home") {
   bellWrap.append(bellBtn, panel);
 
   const userLabel = await getProfileLabel(user);
-  const label = document.createElement("a");
-  label.className = "app-nav__email app-nav__email--link";
-  label.href = "profile.html";
-  label.textContent = userLabel;
-  label.title = "Open profile";
+  const profileBtn = document.createElement("a");
+  profileBtn.className = "app-nav__button app-nav__button--ghost";
+  profileBtn.href = "profile.html";
+  profileBtn.textContent = "Profile";
+  profileBtn.title = userLabel;
 
   const outBtn = document.createElement("button");
   outBtn.type = "button";
@@ -227,7 +257,7 @@ async function renderAppNav(activePage = "home") {
   outBtn.textContent = "Sign out";
   outBtn.addEventListener("click", () => signOut());
 
-  actions.replaceChildren(bellWrap, label, outBtn);
+  actions.replaceChildren(bellWrap, profileBtn, outBtn);
 }
 
 function escapeHtml(value) {
