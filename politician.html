@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729aa" />
+    <link rel="stylesheet" href="styles.css?v=20260729ab" />
   </head>
   <body class="page-app page-politicians page-politician-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -66,11 +66,7 @@
       </section>
     </main>
 
-    <div
-      id="politician-notes-modal"
-      class="politician-notes-modal"
-      hidden
-    >
+    <div id="politician-notes-modal" class="politician-notes-modal" hidden>
       <div class="politician-notes-modal__backdrop" data-close-notes="1"></div>
       <div
         class="politician-notes-modal__panel"
@@ -80,64 +76,54 @@
       >
         <header class="politician-notes-modal__header">
           <div>
-            <h2 id="politician-notes-title">Private notes</h2>
+            <h2 id="politician-notes-title">Private note</h2>
             <p class="politician-notes-modal__lede">
-              Only you can see notes about this official.
+              One private notepad for this official. Only you can see it.
             </p>
           </div>
           <button
             type="button"
             class="politician-notes-modal__close"
             data-close-notes="1"
-            aria-label="Close notes"
+            aria-label="Close note"
           >
             ✕
           </button>
         </header>
         <p id="politician-notes-status" class="status" hidden></p>
         <div id="politician-notes-signin" class="politician-notes-signin" hidden>
-          <p>Sign in to write and save private notes on this official.</p>
+          <p>Sign in to keep a private note on this official.</p>
           <a id="politician-notes-auth-link" class="refresh-btn" href="auth.html"
             >Sign in</a
           >
         </div>
         <div id="politician-notes-editor" class="politician-notes-editor" hidden>
-          <form
-            id="politician-note-form"
-            class="profile-form profile-action-form politician-note-form"
+          <label class="politician-note-editor-label" for="politician-note-body"
+            >Your note</label
           >
-            <label class="profile-form__field">
-              <span>Title (optional)</span>
-              <input
-                id="politician-note-title"
-                type="text"
-                maxlength="120"
-                placeholder="Why this matters to me"
-              />
-            </label>
-            <label class="profile-form__field">
-              <span>Note</span>
-              <textarea
-                id="politician-note-body"
-                rows="4"
-                required
-                maxlength="4000"
-                placeholder="Positions, meetings, follow-ups, or anything you want to remember…"
-              ></textarea>
-            </label>
-            <label class="profile-form__field">
-              <span>Date</span>
-              <input id="politician-note-date" type="date" required />
-            </label>
-            <button class="refresh-btn" type="submit">Save note</button>
-          </form>
-          <div class="politician-notes-list-wrap">
-            <h3>Saved notes</h3>
-            <ul
-              id="politician-notes-list"
-              class="profile-actions-log politician-notes-list"
-              aria-live="polite"
-            ></ul>
+          <textarea
+            id="politician-note-body"
+            class="politician-note-textarea"
+            rows="10"
+            maxlength="8000"
+            placeholder="Jot thoughts, meetings, follow-ups — keep adding to this note over time…"
+          ></textarea>
+          <div class="politician-notes-modal__actions">
+            <button
+              type="button"
+              id="politician-note-save"
+              class="refresh-btn"
+            >
+              Save note
+            </button>
+            <button
+              type="button"
+              id="politician-note-clear"
+              class="politician-note-clear-btn"
+              hidden
+            >
+              Clear note
+            </button>
           </div>
         </div>
       </div>
@@ -148,6 +134,6 @@
     <script src="nav.js?v=20260729x"></script>
     <script src="engagement.js?v=20260729t"></script>
     <script src="politicians-shared.js?v=20260729u"></script>
-    <script src="politician.js?v=20260729aa" defer></script>
+    <script src="politician.js?v=20260729ab" defer></script>
   </body>
 </html>

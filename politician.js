@@ -10,18 +10,17 @@ const notesStatusEl = document.getElementById("politician-notes-status");
 const notesSigninEl = document.getElementById("politician-notes-signin");
 const notesEditorEl = document.getElementById("politician-notes-editor");
 const notesAuthLink = document.getElementById("politician-notes-auth-link");
-const notesListEl = document.getElementById("politician-notes-list");
-const noteForm = document.getElementById("politician-note-form");
-const noteTitleInput = document.getElementById("politician-note-title");
 const noteBodyInput = document.getElementById("politician-note-body");
-const noteDateInput = document.getElementById("politician-note-date");
+const noteSaveBtn = document.getElementById("politician-note-save");
+const noteClearBtn = document.getElementById("politician-note-clear");
 
 /** @type {{ id?: string, name?: string, external_key?: string } | null} */
 let activePerson = null;
-/** @type {Array<Record<string, unknown>>} */
-let politicianNotes = [];
+/** @type {{ id?: string, body?: string, updated_at?: string, action_date?: string } | null} */
+let politicianNote = null;
 /** @type {Element | null} */
 let notesModalLastFocus = null;
+let notePopoverHideTimer = 0;
 
 const CATEGORY_RULES = [
   { key: "Immigration", re: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i },
@@ -377,12 +376,46 @@ function renderOverview(person, congress) {
       )}</a>`
     );
   }
-  contactBits.push(
-    `<button type="button" id="politician-note-open" class="politician-profile-note-btn" aria-haspopup="dialog">
-      <span class="politician-profile-note-btn__icon" aria-hidden="true">📝</span>
-      <span class="politician-profile-note-btn__label">Add private note</span>
-    </button>`
-  );
+  contactBits.push(`
+    <div class="politician-profile-note-wrap" id="politician-note-wrap">
+      <button
+        type="button"
+        id="politician-note-open"
+        class="politician-profile-note-btn"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-controls="politician-note-popover"
+      >
+        <span class="politician-profile-note-btn__icon" aria-hidden="true">📝</span>
+        <span class="politician-profile-note-btn__label">Private note</span>
+      </button>
+      <div
+        id="politician-note-popover"
+        class="politician-profile-note-popover"
+        role="dialog"
+        aria-label="Private note preview"
+        hidden
+      >
+        <p class="politician-profile-note-popover__kicker">Your private note</p>
+        <div
+          id="politician-note-preview"
+          class="politician-profile-note-popover__body"
+        ></div>
+        <div class="politician-profile-note-popover__actions">
+          <button type="button" class="refresh-btn" data-note-action="open">
+            Open
+          </button>
+          <button
+            type="button"
+            class="politician-profile-note-popover__secondary"
+            data-note-action="edit"
+          >
+            Add note
+          </button>
+        </div>
+      </div>
+    </div>
+  `);
 
   overviewEl.innerHTML = `
     <div class="politician-profile-card__media">
@@ -438,7 +471,8 @@ function renderOverview(person, congress) {
     });
   }
 
-  updateNoteButtonLabel();
+  bindNotePopover();
+  refreshNoteUi();
   document.title = `${person.name || "Politician"} · Congress Bills`;
 }
 
@@ -657,27 +691,43 @@ function authNextHref() {
   return `auth.html?next=${next}`;
 }
 
-function noteButtonLabel() {
-  return politicianNotes.length
-    ? politicianNotes.length === 1
-      ? "Edit note"
-      : "Edit notes"
-    : "Add private note";
+function noteHasContent() {
+  return Boolean(String(politicianNote?.body || "").trim());
 }
 
-function updateNoteButtonLabel() {
+function refreshNoteUi() {
   const button = document.getElementById("politician-note-open");
-  if (!button) return;
-  const label = button.querySelector(".politician-profile-note-btn__label");
-  const text = noteButtonLabel();
-  if (label) label.textContent = text;
-  else button.textContent = text;
-  button.setAttribute(
-    "aria-label",
-    politicianNotes.length
-      ? `${text} for ${activePerson?.name || "this official"}`
-      : `Add a private note about ${activePerson?.name || "this official"}`
+  const label = button?.querySelector(".politician-profile-note-btn__label");
+  const preview = document.getElementById("politician-note-preview");
+  const editBtn = document.querySelector(
+    "#politician-note-popover [data-note-action='edit']"
   );
+  const text = noteHasContent() ? "Your note" : "Private note";
+  if (label) label.textContent = text;
+  if (button) {
+    button.setAttribute(
+      "aria-label",
+      noteHasContent()
+        ? `Your private note for ${activePerson?.name || "this official"}`
+        : `Private note for ${activePerson?.name || "this official"}`
+    );
+  }
+  if (preview) {
+    if (noteHasContent()) {
+      preview.textContent = String(politicianNote.body);
+      preview.classList.remove("is-empty");
+    } else {
+      preview.textContent = "No note yet. Add a private note for this official.";
+      preview.classList.add("is-empty");
+    }
+  }
+  if (editBtn) {
+    editBtn.textContent = noteHasContent() ? "Edit note" : "Add note";
+  }
+  if (noteBodyInput && notesModal && !notesModal.hidden) {
+    noteBodyInput.value = String(politicianNote?.body || "");
+  }
+  if (noteClearBtn) noteClearBtn.hidden = !noteHasContent();
 }
 
 function syncNotesModalViews(user) {
@@ -689,28 +739,81 @@ function syncNotesModalViews(user) {
   }
   if (notesSigninEl) notesSigninEl.hidden = true;
   if (notesEditorEl) notesEditorEl.hidden = false;
-  if (noteDateInput && !noteDateInput.value) {
-    noteDateInput.value = todayInputValue();
-  }
+  if (noteBodyInput) noteBodyInput.value = String(politicianNote?.body || "");
+  if (noteClearBtn) noteClearBtn.hidden = !noteHasContent();
+}
+
+function getNoteWrap() {
+  return document.getElementById("politician-note-wrap");
+}
+
+function getNotePopover() {
+  return document.getElementById("politician-note-popover");
+}
+
+function showNotePopover() {
+  const wrap = getNoteWrap();
+  const popover = getNotePopover();
+  const button = document.getElementById("politician-note-open");
+  if (!wrap || !popover) return;
+  window.clearTimeout(notePopoverHideTimer);
+  popover.hidden = false;
+  wrap.classList.add("is-open");
+  button?.setAttribute("aria-expanded", "true");
+}
+
+function hideNotePopover({ immediate = false } = {}) {
+  const run = () => {
+    const wrap = getNoteWrap();
+    const popover = getNotePopover();
+    const button = document.getElementById("politician-note-open");
+    if (!popover) return;
+    popover.hidden = true;
+    wrap?.classList.remove("is-open");
+    button?.setAttribute("aria-expanded", "false");
+  };
+  window.clearTimeout(notePopoverHideTimer);
+  if (immediate) run();
+  else notePopoverHideTimer = window.setTimeout(run, 140);
+}
+
+function bindNotePopover() {
+  const wrap = getNoteWrap();
+  if (!wrap || wrap.dataset.bound === "1") return;
+  wrap.dataset.bound = "1";
+
+  wrap.addEventListener("mouseenter", () => showNotePopover());
+  wrap.addEventListener("mouseleave", () => hideNotePopover());
+  wrap.addEventListener("focusin", () => showNotePopover());
+  wrap.addEventListener("focusout", (event) => {
+    if (!wrap.contains(event.relatedTarget)) hideNotePopover();
+  });
 }
 
 function openNotesModal() {
   if (!notesModal) return;
+  hideNotePopover({ immediate: true });
   notesModalLastFocus = document.activeElement;
   notesModal.hidden = false;
   document.body.classList.add("politician-notes-modal-open");
-  const focusTarget =
-    notesEditorEl && !notesEditorEl.hidden
-      ? noteBodyInput || noteForm?.querySelector("button, input, textarea")
-      : notesSigninEl?.querySelector("a") ||
-        notesModal.querySelector("[data-close-notes]");
-  focusTarget?.focus?.();
+  Promise.resolve(typeof getUser === "function" ? getUser() : null).then(
+    (user) => {
+      syncNotesModalViews(user);
+      const focusTarget =
+        notesEditorEl && !notesEditorEl.hidden
+          ? noteBodyInput
+          : notesSigninEl?.querySelector("a") ||
+            notesModal.querySelector("[data-close-notes]");
+      focusTarget?.focus?.();
+    }
+  );
 }
 
 function closeNotesModal() {
   if (!notesModal || notesModal.hidden) return;
   notesModal.hidden = true;
   document.body.classList.remove("politician-notes-modal-open");
+  setNotesStatus("", "loading");
   if (notesModalLastFocus && typeof notesModalLastFocus.focus === "function") {
     notesModalLastFocus.focus();
   } else {
@@ -767,46 +870,30 @@ async function ensurePoliticianId(person) {
   return null;
 }
 
-function renderPoliticianNotes() {
-  if (!notesListEl) return;
-  notesListEl.replaceChildren();
-  if (!politicianNotes.length) {
-    notesListEl.innerHTML =
-      '<li class="profile-follow-list__empty">No notes saved for this official yet.</li>';
-    updateNoteButtonLabel();
-    return;
-  }
-  for (const item of politicianNotes) {
-    const li = document.createElement("li");
-    li.className = "profile-action-item profile-action-item--note";
-    const meta = ["Note", item.action_date].filter(Boolean).join(" · ");
-    li.innerHTML = `
-      <div>
-        <strong>${escapeHtml(item.title || "Note")}</strong>
-        <span>${escapeHtml(meta)}</span>
-        <p>${escapeHtml(item.body)}</p>
-      </div>
-      <button type="button" data-delete-note="${escapeHtml(item.id)}">Delete</button>
-    `;
-    notesListEl.append(li);
-  }
-  updateNoteButtonLabel();
+function pickPrimaryNote(rows = []) {
+  if (!rows.length) return null;
+  return [...rows].sort((a, b) => {
+    const updated = String(b.updated_at || b.created_at || "").localeCompare(
+      String(a.updated_at || a.created_at || "")
+    );
+    if (updated) return updated;
+    return String(b.action_date || "").localeCompare(String(a.action_date || ""));
+  })[0];
 }
 
-async function loadPoliticianNotes(person, user) {
+async function loadPoliticianNote(person, user) {
   const client = typeof getSupabase === "function" ? getSupabase() : null;
   if (!client || !user || !person) {
-    politicianNotes = [];
-    renderPoliticianNotes();
+    politicianNote = null;
+    refreshNoteUi();
     return;
   }
 
   const politicianId = await resolveExistingPoliticianId(person);
   const name = String(person.name || "").trim();
   const byId = new Map();
-
   const selectCols =
-    "id, kind, title, body, politician_id, politician_name, action_date, created_at";
+    "id, kind, title, body, politician_id, politician_name, action_date, created_at, updated_at";
 
   if (politicianId) {
     const { data, error } = await client
@@ -814,9 +901,7 @@ async function loadPoliticianNotes(person, user) {
       .select(selectCols)
       .eq("user_id", user.id)
       .eq("kind", "note")
-      .eq("politician_id", politicianId)
-      .order("action_date", { ascending: false })
-      .order("created_at", { ascending: false });
+      .eq("politician_id", politicianId);
     if (error) throw error;
     for (const row of data || []) byId.set(row.id, row);
   }
@@ -827,21 +912,13 @@ async function loadPoliticianNotes(person, user) {
       .select(selectCols)
       .eq("user_id", user.id)
       .eq("kind", "note")
-      .eq("politician_name", name)
-      .order("action_date", { ascending: false })
-      .order("created_at", { ascending: false });
+      .eq("politician_name", name);
     if (error) throw error;
     for (const row of data || []) byId.set(row.id, row);
   }
 
-  politicianNotes = [...byId.values()].sort((a, b) => {
-    const dateCmp = String(b.action_date || "").localeCompare(
-      String(a.action_date || "")
-    );
-    if (dateCmp) return dateCmp;
-    return String(b.created_at || "").localeCompare(String(a.created_at || ""));
-  });
-  renderPoliticianNotes();
+  politicianNote = pickPrimaryNote([...byId.values()]);
+  refreshNoteUi();
 }
 
 async function savePoliticianNote(person, user) {
@@ -852,38 +929,68 @@ async function savePoliticianNote(person, user) {
   }
   const body = String(noteBodyInput?.value || "").trim();
   if (!body) {
-    setNotesStatus("Write a note before saving.", "error");
+    setNotesStatus("Write something before saving.", "error");
     return;
   }
   const politicianId = await ensurePoliticianId(person);
   const politicianName = String(person?.name || "").trim() || null;
-  const { error } = await client.from("civic_actions").insert({
-    user_id: user.id,
-    kind: "note",
-    title: String(noteTitleInput?.value || "").trim() || null,
-    body,
-    bill_id: null,
-    bill_label: null,
-    politician_id: politicianId,
-    politician_name: politicianName,
-    contact_method: null,
-    action_date: noteDateInput?.value || todayInputValue(),
-    updated_at: new Date().toISOString(),
-  });
-  if (error) throw error;
-  noteForm?.reset();
-  if (noteDateInput) noteDateInput.value = todayInputValue();
-  await loadPoliticianNotes(person, user);
+  const now = new Date().toISOString();
+
+  if (politicianNote?.id) {
+    const { error } = await client
+      .from("civic_actions")
+      .update({
+        body,
+        title: null,
+        politician_id: politicianId || politicianNote.politician_id || null,
+        politician_name: politicianName,
+        action_date: todayInputValue(),
+        updated_at: now,
+      })
+      .eq("id", politicianNote.id)
+      .eq("user_id", user.id);
+    if (error) throw error;
+  } else {
+    const { data, error } = await client
+      .from("civic_actions")
+      .insert({
+        user_id: user.id,
+        kind: "note",
+        title: null,
+        body,
+        bill_id: null,
+        bill_label: null,
+        politician_id: politicianId,
+        politician_name: politicianName,
+        contact_method: null,
+        action_date: todayInputValue(),
+        updated_at: now,
+      })
+      .select(
+        "id, kind, title, body, politician_id, politician_name, action_date, created_at, updated_at"
+      )
+      .maybeSingle();
+    if (error) throw error;
+    politicianNote = data;
+  }
+
+  await loadPoliticianNote(person, user);
   setNotesStatus("Note saved.", "success");
 }
 
-async function deletePoliticianNote(noteId, person, user) {
+async function clearPoliticianNote(person, user) {
   const client = typeof getSupabase === "function" ? getSupabase() : null;
-  if (!client || !user || !noteId) return;
-  const { error } = await client.from("civic_actions").delete().eq("id", noteId);
+  if (!client || !user || !politicianNote?.id) return;
+  const { error } = await client
+    .from("civic_actions")
+    .delete()
+    .eq("id", politicianNote.id)
+    .eq("user_id", user.id);
   if (error) throw error;
-  await loadPoliticianNotes(person, user);
-  setNotesStatus("Note deleted.", "success");
+  politicianNote = null;
+  if (noteBodyInput) noteBodyInput.value = "";
+  refreshNoteUi();
+  setNotesStatus("Note cleared.", "success");
 }
 
 async function setupNotes(person) {
@@ -892,24 +999,34 @@ async function setupNotes(person) {
   setNotesStatus("", "loading");
 
   const user = typeof getUser === "function" ? await getUser() : null;
-  syncNotesModalViews(user);
   if (!user) {
-    politicianNotes = [];
-    updateNoteButtonLabel();
+    politicianNote = null;
+    refreshNoteUi();
     return;
   }
 
   try {
-    await loadPoliticianNotes(person, user);
+    await loadPoliticianNote(person, user);
   } catch (error) {
     console.error(error);
-    setNotesStatus(error.message || "Could not load notes.", "error");
+    setNotesStatus(error.message || "Could not load note.", "error");
   }
 }
 
 overviewEl?.addEventListener("click", (event) => {
-  if (!event.target.closest("#politician-note-open")) return;
-  openNotesModal();
+  const actionBtn = event.target.closest("[data-note-action]");
+  if (actionBtn) {
+    event.preventDefault();
+    openNotesModal();
+    return;
+  }
+  const openBtn = event.target.closest("#politician-note-open");
+  if (!openBtn) return;
+  // Touch / click: toggle popover; hover already shows it on desktop.
+  const popover = getNotePopover();
+  if (popover?.hidden) showNotePopover();
+  else if (window.matchMedia("(hover: none)").matches) openNotesModal();
+  else showNotePopover();
 });
 
 notesModal?.addEventListener("click", (event) => {
@@ -919,13 +1036,19 @@ notesModal?.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && notesModal && !notesModal.hidden) {
-    closeNotesModal();
+  if (event.key === "Escape") {
+    if (notesModal && !notesModal.hidden) closeNotesModal();
+    else hideNotePopover({ immediate: true });
   }
 });
 
-noteForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
+document.addEventListener("pointerdown", (event) => {
+  const wrap = getNoteWrap();
+  if (!wrap || wrap.contains(event.target)) return;
+  hideNotePopover({ immediate: true });
+});
+
+noteSaveBtn?.addEventListener("click", async () => {
   if (!activePerson) return;
   setNotesStatus("Saving note…", "loading");
   try {
@@ -937,16 +1060,15 @@ noteForm?.addEventListener("submit", async (event) => {
   }
 });
 
-notesListEl?.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-delete-note]");
-  if (!button || !activePerson) return;
-  setNotesStatus("Deleting note…", "loading");
+noteClearBtn?.addEventListener("click", async () => {
+  if (!activePerson || !politicianNote?.id) return;
+  setNotesStatus("Clearing note…", "loading");
   try {
     const user = typeof getUser === "function" ? await getUser() : null;
-    await deletePoliticianNote(button.dataset.deleteNote, activePerson, user);
+    await clearPoliticianNote(activePerson, user);
   } catch (error) {
     console.error(error);
-    setNotesStatus(error.message || "Could not delete note.", "error");
+    setNotesStatus(error.message || "Could not clear note.", "error");
   }
 });
 
