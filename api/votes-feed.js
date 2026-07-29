@@ -195,6 +195,9 @@ function mapVoteCard(raw) {
     type && number
       ? `${String(raw.legislationType || type).toUpperCase().replace(/\./g, "")} ${number}`
       : `Roll Call ${rollCallNumber}`;
+  const voteQuestion = raw.voteQuestion || "";
+  const result = raw.result || "";
+  const voteKind = classifyVoteKind(voteQuestion, result);
   const billId =
     type && number && voteKind === "final_passage"
       ? `federal-${congress}-${type}-${number}`.toLowerCase()
