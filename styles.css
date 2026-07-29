@@ -4366,11 +4366,24 @@ a.politician-badge--match {
 }
 
 .politician-profile-card {
+  position: relative;
+  z-index: 3;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 1.25rem;
   padding: 1.25rem 1.35rem;
   align-items: start;
+  overflow: visible;
+}
+
+.politician-profile-card:has(.politician-profile-note-wrap.is-open),
+.politician-profile-card:has(.politician-profile-note-wrap:hover) {
+  z-index: 20;
+}
+
+.politician-profile-panel {
+  position: relative;
+  z-index: 1;
 }
 
 .politician-profile-card__media {
@@ -4615,6 +4628,7 @@ a.politician-badge--match {
 
 .politician-profile-note-wrap {
   position: relative;
+  z-index: 5;
   display: inline-flex;
   vertical-align: middle;
 }
@@ -4655,7 +4669,7 @@ a.politician-badge--match {
   position: absolute;
   top: calc(100% + 0.45rem);
   left: 0;
-  z-index: 40;
+  z-index: 30;
   width: min(22rem, calc(100vw - 2rem));
   padding: 0.85rem 0.9rem;
   border-radius: 0.85rem;
