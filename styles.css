@@ -2439,3 +2439,15 @@ body {
     animation: none !important;
   }
 }
+
+.home-features__more {
+  margin: 2.25rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--home-mist);
+  color: var(--muted);
+  font-size: 1.02rem;
+}
+
+.home-features__more a {
+  font-weight: 600;
+}
