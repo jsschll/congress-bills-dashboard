@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260730a" />
+    <link rel="stylesheet" href="styles.css?v=20260730b" />
   </head>
   <body class="page-app page-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -58,11 +58,36 @@
           </button>
           <div class="profile-accordion__body">
             <p class="profile-panel__lede">
-              Choose how you appear in the top menu. Upload a photo or pick a
-              color preset.
+              How you appear in the top menu.
             </p>
 
-            <div class="profile-avatar-editor">
+            <div id="profile-account-saved" class="profile-saved" hidden>
+              <div class="profile-avatar-editor__preview">
+                <span
+                  id="profile-account-saved-avatar"
+                  class="user-avatar user-avatar--xl"
+                ></span>
+                <div>
+                  <p
+                    id="profile-account-saved-name"
+                    class="profile-avatar-editor__name"
+                  ></p>
+                  <p
+                    id="profile-account-saved-meta"
+                    class="profile-form__note"
+                  ></p>
+                </div>
+              </div>
+              <button
+                id="profile-account-change"
+                class="refresh-btn"
+                type="button"
+              >
+                Change
+              </button>
+            </div>
+
+            <div id="profile-account-editor" class="profile-avatar-editor">
               <div class="profile-avatar-editor__preview">
                 <span
                   id="profile-avatar-preview"
@@ -71,7 +96,7 @@
                 <div>
                   <p id="profile-avatar-label" class="profile-avatar-editor__name"></p>
                   <p class="profile-form__note">
-                    Shown next to your name in the navigation menu.
+                    Preview of your menu name and avatar.
                   </p>
                 </div>
               </div>
@@ -89,8 +114,8 @@
                   />
                 </label>
                 <p class="profile-form__note">
-                  The menu shows your first name when a display name is set;
-                  otherwise it uses your username.
+                  Uses your first name in the menu when set; otherwise your
+                  username.
                 </p>
 
                 <fieldset class="profile-avatar-presets">
@@ -119,6 +144,14 @@
                     type="button"
                   >
                     Use initials
+                  </button>
+                  <button
+                    id="profile-account-cancel"
+                    class="profile-btn profile-btn--ghost"
+                    type="button"
+                    hidden
+                  >
+                    Cancel
                   </button>
                 </div>
               </form>
@@ -893,6 +926,6 @@
     <script src="nav.js?v=20260729x"></script>
     <script src="politicians-shared.js?v=20260729u"></script>
     <script src="engagement.js?v=20260729t"></script>
-    <script src="profile.js?v=20260730a" defer></script>
+    <script src="profile.js?v=20260730b" defer></script>
   </body>
 </html>
