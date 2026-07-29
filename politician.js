@@ -102,6 +102,48 @@ function formatRole(person) {
   return [office, person.state, district].filter(Boolean).join(" · ");
 }
 
+async function loadNationalOfficial({ id, key }) {
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client) return null;
+
+  let nationalId = "";
+  const keyMatch = String(key || "").match(/^national:(.+)$/i);
+  if (keyMatch) nationalId = keyMatch[1];
+  else if (id) nationalId = id;
+
+  if (!nationalId) return null;
+
+  const { data, error } = await client
+    .from("national_officials")
+    .select("*")
+    .eq("id", nationalId)
+    .maybeSingle();
+  if (error) {
+    console.warn(error);
+    return null;
+  }
+  if (!data) return null;
+  if (typeof mapNationalOfficial === "function") {
+    return mapNationalOfficial(data);
+  }
+  return {
+    external_key: `national:${data.id}`,
+    name: data.full_name || data.name,
+    office_title: data.title,
+    party: data.party,
+    photo_url: data.photo_url,
+    level: "federal",
+    chamber: "executive",
+    source: "national_officials",
+    metadata: {
+      office_title: data.title,
+      national_official_id: data.id,
+      department: data.department,
+      category: data.category,
+    },
+  };
+}
+
 async function loadStoredPolitician({ id, bioguide, key }) {
   const client = typeof getSupabase === "function" ? getSupabase() : null;
   if (!client) return null;
@@ -136,6 +178,11 @@ async function loadStoredPolitician({ id, bioguide, key }) {
     if (error) console.warn(error);
     if (data) return data;
   }
+
+  // President / cabinet / EOP rows often live only in national_officials
+  // (or were linked via key=national:<uuid>).
+  const national = await loadNationalOfficial({ id, key });
+  if (national) return national;
 
   return null;
 }
@@ -179,9 +226,60 @@ async function loadMatchRows(bioguide) {
   return { user, rows: data || [] };
 }
 
+function enrichExecutiveDefaults(person = {}) {
+  if (!person || typeof person !== "object") return person;
+  const title = String(
+    person.office_title || person.metadata?.office_title || ""
+  ).toLowerCase();
+  const name = String(person.name || "").toLowerCase();
+  const isPresident =
+    /\bpresident of the united states\b/.test(title) ||
+    (title === "president" && /trump/.test(name));
+  const isVice =
+    /\bvice president\b/.test(title) ||
+    (/vance/.test(name) && /vice/.test(title));
+
+  const next = { ...person, metadata: { ...(person.metadata || {}) } };
+  if (!next.website_url) {
+    if (isPresident) next.website_url = "https://www.whitehouse.gov/";
+    else if (isVice) next.website_url = "https://www.whitehouse.gov/administration/jd-vance/";
+    else if (
+      person.source === "national_officials" ||
+      person.chamber === "white_house" ||
+      person.chamber === "executive" ||
+      person.chamber === "cabinet"
+    ) {
+      next.website_url = "https://www.whitehouse.gov/";
+    }
+  }
+  if (!next.tenure) {
+    if (isPresident) {
+      next.tenure = {
+        electedYear: 2025,
+        yearsActive: Math.max(0, new Date().getFullYear() - 2025),
+        label: "Elected 2024 · Inaugurated 2025",
+      };
+      next.role_label = next.role_label || "President of the United States";
+    } else if (isVice) {
+      next.tenure = {
+        electedYear: 2025,
+        yearsActive: Math.max(0, new Date().getFullYear() - 2025),
+        label: "Elected 2024 · Inaugurated 2025",
+      };
+      next.role_label = next.role_label || "Vice President of the United States";
+    } else if (person.source === "national_officials") {
+      next.tenure = { label: "Current administration" };
+    }
+  }
+  if (!next.role_label) {
+    next.role_label = formatRole(next);
+  }
+  return next;
+}
+
 function mergePerson(stored, congress) {
   const overview = congress?.overview || {};
-  const base = { ...(stored || {}), ...overview };
+  const base = enrichExecutiveDefaults({ ...(stored || {}), ...overview });
   if (stored?.name) base.name = stored.name;
   if (stored?.party) base.party = stored.party;
   if (stored?.photo_url) base.photo_url = stored.photo_url || overview.photo_url;
@@ -211,7 +309,7 @@ function mergePerson(stored, congress) {
             : "Status unavailable",
     };
   }
-  return base;
+  return enrichExecutiveDefaults(base);
 }
 
 function renderOverview(person, congress) {
@@ -322,6 +420,11 @@ function renderOverview(person, congress) {
 
 function renderMatchScorecard({ user, rows }, person) {
   matchSection.hidden = false;
+  const isLegislator = Boolean(
+    person?.bioguide_id ||
+      person?.bioguideId ||
+      ["house", "senate"].includes(String(person?.chamber || "").toLowerCase())
+  );
   if (!user) {
     matchBody.innerHTML = `
       <p class="politician-profile-empty">
@@ -332,6 +435,22 @@ function renderMatchScorecard({ user, rows }, person) {
           person.name || "this official"
         )}.
       </p>`;
+    return;
+  }
+
+  if (!isLegislator) {
+    matchBody.innerHTML = `
+      <div class="politician-match-hero">
+        <div class="politician-match-hero__score">
+          <span class="politician-match-hero__value">—</span>
+          <span class="politician-match-hero__label">Action Match Score</span>
+        </div>
+        <p class="politician-match-hero__meta">
+          Roll-call match scores are available for U.S. House members.
+          ${escapeHtml(person.name || "This official")} doesn’t cast House floor
+          votes, so Support / Oppose comparisons aren’t tracked here yet.
+        </p>
+      </div>`;
     return;
   }
 
@@ -497,7 +616,9 @@ function renderActivity(congress) {
 }
 
 async function boot() {
-  if (typeof bootNav === "function") bootNav("politicians");
+  if (typeof bootNav === "function") {
+    await bootNav("politicians");
+  }
 
   const params = queryParams();
   if (!params.id && !params.bioguide && !params.key) {
@@ -521,7 +642,10 @@ async function boot() {
       bioguide ? loadCongressProfile(bioguide) : Promise.resolve(null),
       bioguide
         ? loadMatchRows(bioguide)
-        : Promise.resolve({ user: await getUser(), rows: [] }),
+        : Promise.resolve({
+            user: typeof getUser === "function" ? await getUser() : null,
+            rows: [],
+          }),
     ]);
 
     const person = mergePerson(stored, congress);

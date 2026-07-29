@@ -105,17 +105,35 @@ function escapePoliticianHtml(value) {
 }
 
 function politicianProfileHref(politician = {}) {
-  const id = politician.id || politician.politician_id || "";
   const bioguide =
     politician.bioguide_id || politician.bioguideId || politician.bioguide || "";
   const key = politician.external_key || "";
-  if (id) return `politician.html?id=${encodeURIComponent(id)}`;
+  const id = politician.id || politician.politician_id || "";
+  const nationalId = politician.metadata?.national_official_id || "";
+
+  // Prefer bioguide for federal legislators (Congress.gov enrichment).
   if (bioguide) {
     return `politician.html?bioguide=${encodeURIComponent(
       String(bioguide).toUpperCase()
     )}`;
   }
-  if (key) return `politician.html?key=${encodeURIComponent(key)}`;
+
+  // National executives (President, cabinet, EOP) are keyed off national_officials,
+  // not always present as a politicians-table UUID on browse cards.
+  if (
+    key ||
+    politician.source === "national_officials" ||
+    nationalId
+  ) {
+    const nationalKey =
+      key ||
+      (nationalId ? `national:${nationalId}` : "");
+    if (nationalKey) {
+      return `politician.html?key=${encodeURIComponent(nationalKey)}`;
+    }
+  }
+
+  if (id) return `politician.html?id=${encodeURIComponent(id)}`;
   return "";
 }
 
