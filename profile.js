@@ -123,6 +123,7 @@ let civicActionFilter = "all";
 let editingAddress = false;
 let editingRegistration = false;
 let editingPocketbook = false;
+let editingAccount = false;
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -315,15 +316,7 @@ function syncRegistrationView() {
 }
 
 function syncPreferenceSummaries() {
-  if (accountSummary) {
-    const name =
-      typeof profileFirstName === "function"
-        ? profileFirstName(profile, currentUser)
-        : profile.display_name || profile.username || "Account";
-    accountSummary.textContent = profile.avatar_url
-      ? `${name} · avatar set`
-      : `${name} · initials`;
-  }
+  syncAccountView();
   if (impactSummary) {
     impactSummary.textContent = impactScaleLabel(profile.impact_scale);
   }
@@ -335,6 +328,71 @@ function syncPreferenceSummaries() {
     notifySummary.textContent = parts.join(" · ");
   }
   syncPocketbookView();
+}
+
+function hasSavedAccount() {
+  return Boolean(
+    String(profile.display_name || "").trim() ||
+      String(profile.avatar_url || "").trim()
+  );
+}
+
+function accountDisplayLabel() {
+  return (
+    String(profile.display_name || "").trim() ||
+    profile.username ||
+    profile.email ||
+    currentUser?.email ||
+    "You"
+  );
+}
+
+function syncAccountView() {
+  const hasSaved = hasSavedAccount();
+  const showForm = !hasSaved || editingAccount;
+  const label = accountDisplayLabel();
+  const menuName =
+    typeof profileFirstName === "function"
+      ? profileFirstName(profile, currentUser)
+      : label;
+
+  if (accountEditor) {
+    accountEditor.hidden = !showForm;
+    accountEditor.classList.toggle("is-hidden", !showForm);
+  }
+  if (accountSaved) {
+    const showSaved = !showForm && hasSaved;
+    accountSaved.hidden = !showSaved;
+    accountSaved.classList.toggle("is-hidden", !showSaved);
+  }
+  if (accountCancelBtn) {
+    accountCancelBtn.hidden = !editingAccount || !hasSaved;
+  }
+
+  if (typeof applyAvatarElement === "function") {
+    applyAvatarElement(accountSavedAvatar, {
+      avatarUrl: profile.avatar_url || "",
+      label,
+    });
+    applyAvatarElement(headerAvatar, {
+      avatarUrl: profile.avatar_url || "",
+      label,
+    });
+  }
+  if (accountSavedName) accountSavedName.textContent = menuName;
+  if (accountSavedMeta) {
+    accountSavedMeta.textContent = profile.display_name
+      ? `Display name: ${profile.display_name}`
+      : profile.username
+        ? `Username: ${profile.username}`
+        : "Using account email";
+  }
+
+  if (accountSummary) {
+    accountSummary.textContent = hasSaved
+      ? menuName
+      : "Add a display name or avatar";
+  }
 }
 
 const IMPACT_ROLE_LABELS = {
@@ -681,6 +739,7 @@ function fillFormsFromProfile() {
   editingAddress = false;
   editingRegistration = false;
   editingPocketbook = false;
+  editingAccount = false;
   syncAddressView();
   syncRegistrationView();
   syncPreferenceSummaries();
@@ -1579,6 +1638,20 @@ impactForm?.addEventListener("submit", async (event) => {
   }
 });
 
+accountChangeBtn?.addEventListener("click", () => {
+  editingAccount = true;
+  pendingAvatarUrl = null;
+  renderAvatarPresets();
+  refreshAvatarUI();
+  syncAccountView();
+});
+
+accountCancelBtn?.addEventListener("click", () => {
+  editingAccount = false;
+  pendingAvatarUrl = null;
+  fillFormsFromProfile();
+});
+
 accountForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const displayName = String(displayNameInput?.value || "").trim();
@@ -1591,9 +1664,9 @@ accountForm?.addEventListener("submit", async (event) => {
       avatar_url: nextAvatar || null,
     });
     pendingAvatarUrl = null;
+    editingAccount = false;
     refreshAvatarUI();
     syncPreferenceSummaries();
-    // Refresh nav avatar/name without full reload.
     if (typeof renderAppNav === "function") {
       await renderAppNav("profile");
     }

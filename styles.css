@@ -2013,6 +2013,8 @@ body {
 
 .profile-form[hidden],
 .profile-form.is-hidden,
+.profile-avatar-editor[hidden],
+.profile-avatar-editor.is-hidden,
 .profile-saved[hidden],
 .profile-saved.is-hidden {
   display: none !important;
