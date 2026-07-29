@@ -5,6 +5,21 @@ const matchBody = document.getElementById("politician-match-body");
 const activitySection = document.getElementById("politician-activity");
 const recentActionsEl = document.getElementById("politician-recent-actions");
 const keyBillsEl = document.getElementById("politician-key-bills");
+const notesSection = document.getElementById("politician-notes");
+const notesStatusEl = document.getElementById("politician-notes-status");
+const notesSigninEl = document.getElementById("politician-notes-signin");
+const notesEditorEl = document.getElementById("politician-notes-editor");
+const notesAuthLink = document.getElementById("politician-notes-auth-link");
+const notesListEl = document.getElementById("politician-notes-list");
+const noteForm = document.getElementById("politician-note-form");
+const noteTitleInput = document.getElementById("politician-note-title");
+const noteBodyInput = document.getElementById("politician-note-body");
+const noteDateInput = document.getElementById("politician-note-date");
+
+/** @type {{ id?: string, name?: string, external_key?: string } | null} */
+let activePerson = null;
+/** @type {Array<Record<string, unknown>>} */
+let politicianNotes = [];
 
 const CATEGORY_RULES = [
   { key: "Immigration", re: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i },
@@ -615,6 +630,244 @@ function renderActivity(congress) {
   );
 }
 
+function todayInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function setNotesStatus(message, type = "loading") {
+  if (!notesStatusEl) return;
+  notesStatusEl.hidden = !message;
+  notesStatusEl.textContent = message || "";
+  notesStatusEl.dataset.type = type;
+}
+
+function authNextHref() {
+  const next = encodeURIComponent(
+    `${window.location.pathname}${window.location.search}`
+  );
+  return `auth.html?next=${next}`;
+}
+
+async function resolveExistingPoliticianId(person) {
+  if (person?.id && /^[0-9a-f-]{36}$/i.test(String(person.id))) {
+    return String(person.id);
+  }
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client || !person) return null;
+
+  if (person.external_key) {
+    const { data, error } = await client
+      .from("politicians")
+      .select("id")
+      .eq("external_key", person.external_key)
+      .maybeSingle();
+    if (!error && data?.id) {
+      person.id = data.id;
+      return String(data.id);
+    }
+  }
+
+  const bioguide = String(person.bioguide_id || "").trim();
+  if (bioguide) {
+    const { data, error } = await client
+      .from("politicians")
+      .select("id")
+      .ilike("bioguide_id", bioguide)
+      .limit(1)
+      .maybeSingle();
+    if (!error && data?.id) {
+      person.id = data.id;
+      return String(data.id);
+    }
+  }
+
+  return null;
+}
+
+async function ensurePoliticianId(person) {
+  const existing = await resolveExistingPoliticianId(person);
+  if (existing) return existing;
+  if (typeof upsertPoliticianRecord !== "function") return null;
+  if (!person?.external_key || !person?.name) return null;
+  const record = await upsertPoliticianRecord(person);
+  if (record?.id) {
+    person.id = record.id;
+    return String(record.id);
+  }
+  return null;
+}
+
+function renderPoliticianNotes() {
+  if (!notesListEl) return;
+  notesListEl.replaceChildren();
+  if (!politicianNotes.length) {
+    notesListEl.innerHTML =
+      '<li class="profile-follow-list__empty">No notes saved for this official yet.</li>';
+    return;
+  }
+  for (const item of politicianNotes) {
+    const li = document.createElement("li");
+    li.className = "profile-action-item profile-action-item--note";
+    const meta = ["Note", item.action_date].filter(Boolean).join(" · ");
+    li.innerHTML = `
+      <div>
+        <strong>${escapeHtml(item.title || "Note")}</strong>
+        <span>${escapeHtml(meta)}</span>
+        <p>${escapeHtml(item.body)}</p>
+      </div>
+      <button type="button" data-delete-note="${escapeHtml(item.id)}">Delete</button>
+    `;
+    notesListEl.append(li);
+  }
+}
+
+async function loadPoliticianNotes(person, user) {
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client || !user || !person) {
+    politicianNotes = [];
+    renderPoliticianNotes();
+    return;
+  }
+
+  const politicianId = await resolveExistingPoliticianId(person);
+  const name = String(person.name || "").trim();
+  const byId = new Map();
+
+  const selectCols =
+    "id, kind, title, body, politician_id, politician_name, action_date, created_at";
+
+  if (politicianId) {
+    const { data, error } = await client
+      .from("civic_actions")
+      .select(selectCols)
+      .eq("user_id", user.id)
+      .eq("kind", "note")
+      .eq("politician_id", politicianId)
+      .order("action_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    for (const row of data || []) byId.set(row.id, row);
+  }
+
+  if (name) {
+    const { data, error } = await client
+      .from("civic_actions")
+      .select(selectCols)
+      .eq("user_id", user.id)
+      .eq("kind", "note")
+      .eq("politician_name", name)
+      .order("action_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    for (const row of data || []) byId.set(row.id, row);
+  }
+
+  politicianNotes = [...byId.values()].sort((a, b) => {
+    const dateCmp = String(b.action_date || "").localeCompare(
+      String(a.action_date || "")
+    );
+    if (dateCmp) return dateCmp;
+    return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+  });
+  renderPoliticianNotes();
+}
+
+async function savePoliticianNote(person, user) {
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client || !user) {
+    window.location.href = authNextHref();
+    return;
+  }
+  const body = String(noteBodyInput?.value || "").trim();
+  if (!body) {
+    setNotesStatus("Write a note before saving.", "error");
+    return;
+  }
+  const politicianId = await ensurePoliticianId(person);
+  const politicianName = String(person?.name || "").trim() || null;
+  const { error } = await client.from("civic_actions").insert({
+    user_id: user.id,
+    kind: "note",
+    title: String(noteTitleInput?.value || "").trim() || null,
+    body,
+    bill_id: null,
+    bill_label: null,
+    politician_id: politicianId,
+    politician_name: politicianName,
+    contact_method: null,
+    action_date: noteDateInput?.value || todayInputValue(),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+  noteForm?.reset();
+  if (noteDateInput) noteDateInput.value = todayInputValue();
+  await loadPoliticianNotes(person, user);
+  setNotesStatus("Note saved.", "success");
+}
+
+async function deletePoliticianNote(noteId, person, user) {
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client || !user || !noteId) return;
+  const { error } = await client.from("civic_actions").delete().eq("id", noteId);
+  if (error) throw error;
+  await loadPoliticianNotes(person, user);
+  setNotesStatus("Note deleted.", "success");
+}
+
+async function setupNotesPanel(person) {
+  if (!notesSection || !person) return;
+  notesSection.hidden = false;
+  activePerson = person;
+
+  if (notesAuthLink) notesAuthLink.href = authNextHref();
+  if (noteDateInput && !noteDateInput.value) {
+    noteDateInput.value = todayInputValue();
+  }
+
+  const user = typeof getUser === "function" ? await getUser() : null;
+  if (!user) {
+    if (notesSigninEl) notesSigninEl.hidden = false;
+    if (notesEditorEl) notesEditorEl.hidden = true;
+    setNotesStatus("", "loading");
+    return;
+  }
+
+  if (notesSigninEl) notesSigninEl.hidden = true;
+  if (notesEditorEl) notesEditorEl.hidden = false;
+  try {
+    await loadPoliticianNotes(person, user);
+  } catch (error) {
+    console.error(error);
+    setNotesStatus(error.message || "Could not load notes.", "error");
+  }
+}
+
+noteForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!activePerson) return;
+  setNotesStatus("Saving note…", "loading");
+  try {
+    const user = typeof getUser === "function" ? await getUser() : null;
+    await savePoliticianNote(activePerson, user);
+  } catch (error) {
+    console.error(error);
+    setNotesStatus(error.message || "Could not save note.", "error");
+  }
+});
+
+notesListEl?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-delete-note]");
+  if (!button || !activePerson) return;
+  setNotesStatus("Deleting note…", "loading");
+  try {
+    const user = typeof getUser === "function" ? await getUser() : null;
+    await deletePoliticianNote(button.dataset.deleteNote, activePerson, user);
+  } catch (error) {
+    console.error(error);
+    setNotesStatus(error.message || "Could not delete note.", "error");
+  }
+});
+
 async function boot() {
   if (typeof bootNav === "function") {
     await bootNav("politicians");
@@ -655,6 +908,7 @@ async function boot() {
     }
 
     renderOverview(person, congress);
+    await setupNotesPanel(person);
     renderMatchScorecard(matchPayload, person);
     renderActivity(congress);
     setStatus("", "loading");

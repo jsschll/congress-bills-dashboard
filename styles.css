@@ -4612,6 +4612,45 @@ a.politician-badge--match {
   font-size: 0.82rem;
 }
 
+.politician-notes-editor {
+  display: grid;
+  gap: 1.15rem;
+}
+
+.politician-note-form {
+  margin: 0;
+}
+
+.politician-notes-list-wrap h3 {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+  color: #f8fafc;
+}
+
+.politician-notes-signin {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid #334155;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.politician-notes-signin p {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.politician-notes-signin .refresh-btn {
+  text-decoration: none;
+}
+
+.politician-notes-panel .status {
+  margin: 0;
+}
+
 @media (max-width: 800px) {
   .politician-profile-card {
     grid-template-columns: 1fr;
