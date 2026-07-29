@@ -1911,6 +1911,19 @@ function renderPoliticianCard(
   levelBadge.textContent = levelLabel(activeLevel);
   badges.append(levelBadge);
 
+  const bioguide = politician.bioguide_id || politician.bioguideId || "";
+  const matchScore =
+    typeof window.PolicyEngagement?.getMatchScoreForBioguide === "function"
+      ? window.PolicyEngagement.getMatchScoreForBioguide(bioguide)
+      : null;
+  if (matchScore != null) {
+    const matchBadge = document.createElement("span");
+    matchBadge.className = "politician-badge politician-badge--match";
+    matchBadge.textContent = `${matchScore}% Match`;
+    matchBadge.title = "Based on your Support/Oppose stances vs House roll calls";
+    badges.append(matchBadge);
+  }
+
   if (courtName && courtName !== officeTitle) {
     const courtBadge = document.createElement("span");
     courtBadge.className = "politician-badge politician-badge--soft";

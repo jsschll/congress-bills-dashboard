@@ -1017,6 +1017,10 @@ function renderBillCard(item) {
       }
     });
 
+  if (window.PolicyImpact?.mount) {
+    window.PolicyImpact.mount(card, item);
+  }
+
   if (window.PolicyEngagement?.mount) {
     window.PolicyEngagement.mount(card, item);
   }
@@ -1540,6 +1544,13 @@ locationForm?.addEventListener("submit", async (event) => {
       await window.PolicyEngagement.init();
       const header = document.querySelector(".page--policy-feed .header > div");
       window.PolicyEngagement.renderHeaderScore(header);
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+  if (window.PolicyImpact?.loadBaselines) {
+    try {
+      await window.PolicyImpact.loadBaselines();
     } catch (error) {
       console.warn(error);
     }

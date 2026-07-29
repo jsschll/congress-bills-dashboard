@@ -11,10 +11,18 @@ const addressChangeBtn = document.getElementById("profile-address-change");
 const addressCancelBtn = document.getElementById("profile-address-cancel");
 const addressSummary = document.getElementById("profile-address-summary");
 const impactSummary = document.getElementById("profile-impact-summary");
+const pocketbookSummary = document.getElementById("profile-pocketbook-summary");
+const alignmentSummary = document.getElementById("profile-alignment-summary");
+const alignmentChart = document.getElementById("profile-alignment-chart");
 const notifySummary = document.getElementById("profile-notify-summary");
 const followsSummary = document.getElementById("profile-follows-summary");
 const electionsSummary = document.getElementById("profile-elections-summary");
 const impactForm = document.getElementById("profile-impact-form");
+const pocketbookForm = document.getElementById("profile-pocketbook-form");
+const propertyValueInput = document.getElementById("profile-property-value");
+const incomeInput = document.getElementById("profile-income");
+const filingStatusInput = document.getElementById("profile-filing-status");
+const vehicleCountInput = document.getElementById("profile-vehicle-count");
 const notifyForm = document.getElementById("profile-notify-form");
 const notifyCritical = document.getElementById("notify-critical");
 const notifyDigest = document.getElementById("notify-digest");
@@ -64,7 +72,7 @@ const VOTER_INFO_FALLBACK =
 const ACCORDION_STORAGE_KEY = "profileAccordionState";
 
 const PROFILE_SELECT =
-  "username, email, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status";
+  "username, email, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status, estimated_property_value, estimated_income, filing_status, vehicle_count";
 
 let currentUser = null;
 let profile = {
@@ -77,6 +85,10 @@ let profile = {
   notify_digest: "weekly",
   notify_neighborhood: false,
   voter_registration_status: "",
+  estimated_property_value: 350000,
+  estimated_income: 75000,
+  filing_status: "single",
+  vehicle_count: 1,
 };
 let followedBillOptions = [];
 let followedPoliticianOptions = [];
@@ -286,6 +298,110 @@ function syncPreferenceSummaries() {
     if (profile.notify_neighborhood) parts.push("Neighborhood on");
     notifySummary.textContent = parts.join(" · ");
   }
+  if (pocketbookSummary) {
+    const property = Number(profile.estimated_property_value) || 0;
+    const income = Number(profile.estimated_income) || 0;
+    pocketbookSummary.textContent = `Property $${Math.round(
+      property / 1000
+    )}k · Income $${Math.round(income / 1000)}k · ${
+      profile.vehicle_count || 0
+    } vehicles`;
+  }
+}
+
+function renderAlignmentChart(payload) {
+  if (!alignmentChart) return;
+  const politicians = payload?.politicians || [];
+  const levelMap = new Map(
+    (payload?.levels || []).map((row) => [
+      String(row.level || "federal").toLowerCase(),
+      row,
+    ])
+  );
+  const levels = ["local", "state", "federal"].map((level) => {
+    const row = levelMap.get(level);
+    return {
+      level,
+      score: row?.score ?? null,
+      compared: row?.compared || 0,
+      matched_count: row?.matched_count || 0,
+    };
+  });
+  const hasData =
+    politicians.length > 0 || levels.some((row) => row.compared > 0);
+  if (!hasData) {
+    alignmentChart.innerHTML =
+      "<p class=\"profile-follow-list__empty\">Support or oppose federal bills on Feed/Search to build your match scores against House roll calls. Local and state match will expand as those roll calls are added.</p>";
+    if (alignmentSummary) alignmentSummary.textContent = "No roll-call matches yet";
+    return;
+  }
+
+  const levelBars = levels
+    .map((row) => {
+      const score = row.score == null ? 0 : Number(row.score);
+      const label = String(row.level || "federal");
+      const scoreLabel =
+        row.compared === 0
+          ? "—"
+          : row.score == null
+            ? "—"
+            : `${score}%`;
+      return `<div class="profile-alignment-chart__row">
+        <div class="profile-alignment-chart__label">${escapeProfileHtml(
+          label
+        )}</div>
+        <div class="profile-alignment-chart__track"><span style="width:${
+          row.compared === 0 ? 0 : score
+        }%"></span></div>
+        <div class="profile-alignment-chart__score">${escapeProfileHtml(
+          scoreLabel
+        )}</div>
+      </div>`;
+    })
+    .join("");
+
+  const people = politicians
+    .slice(0, 8)
+    .map((row) => {
+      const score = row.score == null ? "—" : `${row.score}%`;
+      return `<li><strong>${escapeProfileHtml(
+        row.politician_name || row.bioguide_id
+      )}</strong> <span>${escapeProfileHtml(String(score))} · ${escapeProfileHtml(
+        String(row.matched_count || 0)
+      )}/${escapeProfileHtml(String(row.compared || 0))} votes</span></li>`;
+    })
+    .join("");
+
+  alignmentChart.innerHTML = `
+    <div class="profile-alignment-chart__levels">${levelBars || ""}</div>
+    ${
+      people
+        ? `<ul class="profile-alignment-chart__people">${people}</ul>`
+        : ""
+    }
+  `;
+  const top =
+    levels.find((row) => row.score != null) || politicians[0];
+  if (alignmentSummary) {
+    alignmentSummary.textContent = top?.score != null
+      ? `Top match ${top.score}%`
+      : "Building from your stances";
+  }
+}
+
+async function loadAlignmentBreakdown() {
+  const client = getSupabase();
+  if (!client || !currentUser) return;
+  const { data, error } = await client.rpc("get_user_rep_match_scores");
+  if (error) {
+    console.warn(error);
+    if (alignmentChart) {
+      alignmentChart.innerHTML =
+        "<p class=\"profile-follow-list__empty\">Run migration-pocketbook-and-votes.sql in Supabase to enable alignment scoring.</p>";
+    }
+    return;
+  }
+  renderAlignmentChart(data);
 }
 
 function fillFormsFromProfile() {
@@ -314,6 +430,17 @@ function fillFormsFromProfile() {
     notifyNeighborhood.checked = Boolean(profile.notify_neighborhood);
   }
 
+  if (propertyValueInput) {
+    propertyValueInput.value = profile.estimated_property_value ?? 350000;
+  }
+  if (incomeInput) incomeInput.value = profile.estimated_income ?? 75000;
+  if (filingStatusInput) {
+    filingStatusInput.value = profile.filing_status || "single";
+  }
+  if (vehicleCountInput) {
+    vehicleCountInput.value = profile.vehicle_count ?? 1;
+  }
+
   const registration = profile.voter_registration_status || "";
   const registrationInput = registrationForm?.querySelector(
     `input[name="voter_registration_status"][value="${registration}"]`
@@ -336,7 +463,7 @@ async function loadProfileRow(userId) {
     .maybeSingle();
 
   if (error) {
-    // Older DBs may not have preference columns yet — fall back to basics.
+    // Older DBs may not have preference/pocketbook columns yet — fall back to basics.
     const fallback = await client
       .from("profiles")
       .select("username, email, home_address")
@@ -353,6 +480,10 @@ async function loadProfileRow(userId) {
       notify_digest: "weekly",
       notify_neighborhood: false,
       voter_registration_status: "",
+      estimated_property_value: 350000,
+      estimated_income: 75000,
+      filing_status: "single",
+      vehicle_count: 1,
     };
   }
 
@@ -366,6 +497,11 @@ async function loadProfileRow(userId) {
     notify_digest: data?.notify_digest || "weekly",
     notify_neighborhood: Boolean(data?.notify_neighborhood),
     voter_registration_status: data?.voter_registration_status || "",
+    estimated_property_value:
+      data?.estimated_property_value ?? 350000,
+    estimated_income: data?.estimated_income ?? 75000,
+    filing_status: data?.filing_status || "single",
+    vehicle_count: data?.vehicle_count ?? 1,
   };
 }
 
@@ -1187,6 +1323,28 @@ impactForm?.addEventListener("submit", async (event) => {
   }
 });
 
+pocketbookForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setProfileStatus("Saving pocketbook baselines…", "loading");
+  try {
+    await saveProfilePatch({
+      estimated_property_value: Number(propertyValueInput?.value) || null,
+      estimated_income: Number(incomeInput?.value) || null,
+      filing_status: filingStatusInput?.value || "single",
+      vehicle_count: Number(vehicleCountInput?.value) || 0,
+    });
+    syncPreferenceSummaries();
+    setProfileStatus("Pocketbook baselines saved.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(
+      error.message ||
+        "Could not save baselines. Run the pocketbook migration in Supabase if columns are missing.",
+      "error"
+    );
+  }
+});
+
 notifyForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   setProfileStatus("Saving notification preferences…", "loading");
@@ -1364,6 +1522,7 @@ registrationForm?.addEventListener("submit", async (event) => {
     await Promise.all([
       loadFollows().then(() => renderBallotCues()),
       loadRepresentation(),
+      loadAlignmentBreakdown(),
       loadCivicActions().catch((error) => {
         console.warn(error);
         if (actionsLog) {

@@ -1,5 +1,12 @@
 (async function initPoliticiansResultsPage() {
   await bootNav("politicians");
+  if (window.PolicyEngagement?.init) {
+    try {
+      await window.PolicyEngagement.init();
+    } catch (error) {
+      console.warn(error);
+    }
+  }
 
   const addressInput = document.getElementById("address-input");
   const currentAddress = new URLSearchParams(window.location.search)

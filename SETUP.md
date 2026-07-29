@@ -18,6 +18,7 @@
    - For notification delivery categories/email tracking, also run [`supabase/migration-notification-delivery.sql`](supabase/migration-notification-delivery.sql)
    - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
    - For Support/Oppose stances + community stats on Feed/Search cards, run [`supabase/migration-bill-stances.sql`](supabase/migration-bill-stances.sql)
+   - For pocketbook baselines + Who Voted With Me / match scores, run [`supabase/migration-pocketbook-and-votes.sql`](supabase/migration-pocketbook-and-votes.sql)
 6. Project Settings → API: copy Project URL and the **anon / publishable** key
 
 ## 2. Local config

@@ -7,12 +7,14 @@
   const LOOKUP_PATH = "/api/lookup-representatives";
   const LOOKUP_FALLBACK =
     "https://congress-bills-dashboard.vercel.app/api/lookup-representatives";
+  const VOTE_MATCH_PATH = "/api/bill-vote-match";
 
   const state = {
     ready: false,
     userId: null,
     stances: new Map(),
     alignment: null,
+    matchScores: null,
     geo: null,
     reps: [],
     homeAddress: "",
@@ -196,6 +198,117 @@
     state.alignment = data;
   }
 
+  async function loadMatchScores(client) {
+    const { data, error } = await client.rpc("get_user_rep_match_scores");
+    if (error) {
+      // Migration may not be applied yet.
+      console.warn(error);
+      state.matchScores = { politicians: [], levels: [] };
+      return;
+    }
+    state.matchScores = data || { politicians: [], levels: [] };
+  }
+
+  function houseRepBioguides() {
+    return (state.reps || [])
+      .filter(isHouseRep)
+      .map((person) => person.bioguide_id || person.bioguideId)
+      .filter(Boolean)
+      .map((id) => String(id).toUpperCase());
+  }
+
+  async function fetchVoteMatch(item, stance) {
+    const params = new URLSearchParams();
+    params.set("billId", item.id);
+    if (stance) params.set("stance", stance);
+    const bios = houseRepBioguides();
+    if (bios.length) params.set("bioguides", bios.join(","));
+    if (typeof API_KEY === "string" && API_KEY.trim()) {
+      params.set("api_key", API_KEY.trim());
+    }
+    try {
+      const response = await fetch(`${VOTE_MATCH_PATH}?${params.toString()}`);
+      return await response.json();
+    } catch (error) {
+      console.warn(error);
+      return null;
+    }
+  }
+
+  async function persistVoteMatches(client, user, item, stance, payload) {
+    if (!payload?.hasRollCall || !Array.isArray(payload.members)) return;
+    for (const member of payload.members) {
+      if (!member.bioguideId) continue;
+      const rep = (state.reps || []).find(
+        (person) =>
+          String(person.bioguide_id || "").toUpperCase() ===
+          String(member.bioguideId).toUpperCase()
+      );
+      const { error } = await client.from("stance_vote_matches").upsert(
+        {
+          user_id: user.id,
+          bill_id: item.id,
+          bioguide_id: String(member.bioguideId).toUpperCase(),
+          politician_name:
+            member.name || rep?.full_name || rep?.name || member.bioguideId,
+          politician_level: "federal",
+          user_stance: stance,
+          member_vote: member.voteCast || null,
+          matched: member.matched,
+          roll_call_number: payload.rollCallNumber || null,
+          congress: payload.congress || null,
+          session_number: payload.sessionNumber || null,
+          vote_result: payload.result || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,bill_id,bioguide_id" }
+      );
+      if (error) console.warn(error);
+    }
+    await loadMatchScores(client);
+  }
+
+  function renderWhoVotedHtml(stance, payload) {
+    if (!stance) {
+      return `<p class="policy-engage__vote-empty">Tap Support or Oppose to compare with House roll call votes.</p>`;
+    }
+    if (!payload?.hasRollCall) {
+      return `<p class="policy-engage__vote-empty">${escapeHtml(
+        payload?.message ||
+          "No House roll call yet. Your stance is saved — we’ll compare when Congress votes."
+      )}</p>`;
+    }
+    const tallies = payload.tallies || {};
+    const members = (payload.members || []).filter((row) => row.voteCast);
+    const lines = members
+      .map((row) => {
+        const matchLabel =
+          row.matched === true
+            ? "matched you"
+            : row.matched === false
+              ? "voted differently"
+              : "no comparable vote";
+        return `<li><strong>${escapeHtml(row.name || row.bioguideId)}</strong> voted <em>${escapeHtml(
+          row.voteCast
+        )}</em> — ${escapeHtml(matchLabel)}</li>`;
+      })
+      .join("");
+    return `
+      <p class="policy-engage__vote-summary">
+        House roll call #${escapeHtml(String(payload.rollCallNumber))} ·
+        Yea ${escapeHtml(String(tallies.yea || 0))} / Nay ${escapeHtml(
+          String(tallies.nay || 0)
+        )}
+        ${payload.result ? ` · ${escapeHtml(payload.result)}` : ""}
+      </p>
+      ${
+        lines
+          ? `<ul class="policy-engage__vote-list">${lines}</ul>`
+          : `<p class="policy-engage__vote-empty">Add your address on Profile to compare with your House representative.</p>`
+      }
+    `;
+  }
+
   async function init() {
     const client = typeof getSupabase === "function" ? getSupabase() : null;
     const user = typeof getUser === "function" ? await getUser() : null;
@@ -209,6 +322,7 @@
       await Promise.all([
         loadUserStances(client, user),
         loadAlignment(client),
+        loadMatchScores(client),
         refreshGeoAndReps(),
       ]);
     } catch (error) {
@@ -467,6 +581,7 @@ Sincerely,
     if (!state.geo && state.homeAddress) await refreshGeoAndReps();
 
     const current = state.stances.get(item.id);
+    let activeStance = null;
     if (current === nextStance) {
       const { error } = await client
         .from("bill_stances")
@@ -475,6 +590,12 @@ Sincerely,
         .eq("bill_id", item.id);
       if (error) throw error;
       state.stances.delete(item.id);
+      await client
+        .from("stance_vote_matches")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("bill_id", item.id);
+      activeStance = null;
     } else {
       const { error } = await client.from("bill_stances").upsert(
         {
@@ -489,13 +610,25 @@ Sincerely,
       );
       if (error) throw error;
       state.stances.set(item.id, nextStance);
+      activeStance = nextStance;
     }
 
     await loadAlignment(client);
-    await refreshMountedCard(item, roots);
+    let votePayload = null;
+    if (activeStance && String(item.level || "").toLowerCase() === "federal") {
+      if (roots.voteBody) {
+        roots.voteBody.innerHTML =
+          `<p class="policy-engage__vote-empty">Checking House roll call…</p>`;
+      }
+      votePayload = await fetchVoteMatch(item, activeStance);
+      await persistVoteMatches(client, user, item, activeStance, votePayload);
+    } else {
+      await loadMatchScores(client);
+    }
+    await refreshMountedCard(item, roots, votePayload);
   }
 
-  async function refreshMountedCard(item, roots) {
+  async function refreshMountedCard(item, roots, votePayload = null) {
     const supportBtn = roots.supportBtn;
     const opposeBtn = roots.opposeBtn;
     const communityBody = roots.communityBody;
@@ -508,8 +641,21 @@ Sincerely,
     const stats = await fetchCommunity(item.id);
     communityBody.innerHTML = renderCommunityHtml(stats);
     if (alignmentEl) {
-      alignmentEl.outerHTML = alignmentChipHtml() || `<span class="policy-engage__alignment is-empty"></span>`;
+      alignmentEl.outerHTML =
+        alignmentChipHtml() ||
+        `<span class="policy-engage__alignment is-empty"></span>`;
       roots.alignmentEl = roots.root.querySelector(".policy-engage__alignment");
+    }
+    if (roots.voteBody) {
+      if (votePayload) {
+        roots.voteBody.innerHTML = renderWhoVotedHtml(mine, votePayload);
+      } else if (mine) {
+        roots.voteBody.innerHTML = `<p class="policy-engage__vote-empty">Loading roll-call comparison…</p>`;
+        const payload = await fetchVoteMatch(item, mine);
+        roots.voteBody.innerHTML = renderWhoVotedHtml(mine, payload);
+      } else {
+        roots.voteBody.innerHTML = renderWhoVotedHtml(null, null);
+      }
     }
   }
 
@@ -522,12 +668,18 @@ Sincerely,
     wrap.innerHTML = `
       <div class="policy-engage__actions">
         <div class="policy-engage__stances" role="group" aria-label="Your stance">
-          <button type="button" class="policy-engage__stance policy-engage__stance--support" data-stance="support" aria-pressed="false">Support</button>
-          <button type="button" class="policy-engage__stance policy-engage__stance--oppose" data-stance="oppose" aria-pressed="false">Oppose</button>
+          <button type="button" class="policy-engage__stance policy-engage__stance--support" data-stance="support" aria-pressed="false">Support 👍</button>
+          <button type="button" class="policy-engage__stance policy-engage__stance--oppose" data-stance="oppose" aria-pressed="false">Oppose 👎</button>
         </div>
         <button type="button" class="refresh-btn policy-engage__take-action">Take Action</button>
         ${alignmentChipHtml() || '<span class="policy-engage__alignment is-empty" hidden></span>'}
       </div>
+      <details class="policy-engage__votes" open>
+        <summary>Who Voted With Me?</summary>
+        <div class="policy-engage__vote-body">
+          <p class="policy-engage__vote-empty">Tap Support or Oppose to compare with House roll call votes.</p>
+        </div>
+      </details>
       <details class="policy-engage__community">
         <summary>Community Stances</summary>
         <div class="policy-engage__community-body">
@@ -544,6 +696,7 @@ Sincerely,
       supportBtn: wrap.querySelector('[data-stance="support"]'),
       opposeBtn: wrap.querySelector('[data-stance="oppose"]'),
       communityBody: wrap.querySelector(".policy-engage__community-body"),
+      voteBody: wrap.querySelector(".policy-engage__vote-body"),
       alignmentEl: wrap.querySelector(".policy-engage__alignment"),
     };
 
@@ -584,6 +737,12 @@ Sincerely,
       const stats = await fetchCommunity(item.id);
       roots.communityBody.innerHTML = renderCommunityHtml(stats);
     });
+
+    if (mine) {
+      fetchVoteMatch(item, mine).then((payload) => {
+        roots.voteBody.innerHTML = renderWhoVotedHtml(mine, payload);
+      });
+    }
   }
 
   function renderHeaderScore(target) {
@@ -615,5 +774,14 @@ Sincerely,
     renderHeaderScore,
     openTakeAction,
     getState: () => state,
+    getMatchScoreForBioguide(bioguideId) {
+      const id = String(bioguideId || "").toUpperCase();
+      const rows = state.matchScores?.politicians || [];
+      const row = rows.find(
+        (entry) => String(entry.bioguide_id || "").toUpperCase() === id
+      );
+      return row?.score ?? null;
+    },
+    getMatchScores: () => state.matchScores,
   };
 })(window);

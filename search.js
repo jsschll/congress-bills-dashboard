@@ -146,7 +146,7 @@ function renderCard(item) {
     window.PolicyEngagement?.mount &&
     (item.docType === "bill" || item.docType === "law")
   ) {
-    window.PolicyEngagement.mount(article, {
+    const mapped = {
       id: item.id,
       billNumber: item.billNumber,
       title: item.title,
@@ -159,7 +159,11 @@ function renderCard(item) {
       primarySponsor: { name: item.meta?.chamber || "Congress", title: "" },
       allSteps: [],
       deltaSummary: { added: [], changed: [], removed: [] },
-    });
+    };
+    if (window.PolicyImpact?.mount) {
+      window.PolicyImpact.mount(article, mapped);
+    }
+    window.PolicyEngagement.mount(article, mapped);
   }
 
   return article;
@@ -323,6 +327,13 @@ function bootFromUrl() {
       await window.PolicyEngagement.init();
       const header = document.querySelector(".page--search .header > div");
       window.PolicyEngagement.renderHeaderScore(header);
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+  if (window.PolicyImpact?.loadBaselines) {
+    try {
+      await window.PolicyImpact.loadBaselines();
     } catch (error) {
       console.warn(error);
     }

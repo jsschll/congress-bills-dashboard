@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729k" />
+    <link rel="stylesheet" href="styles.css?v=20260729s" />
   </head>
   <body class="page-app page-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -183,6 +183,86 @@
         <section
           class="profile-panel"
           data-accordion
+          data-accordion-key="pocketbook"
+          aria-labelledby="profile-pocketbook-title"
+        >
+          <button
+            type="button"
+            class="profile-accordion__trigger"
+            aria-expanded="true"
+          >
+            <span class="profile-accordion__titles">
+              <span
+                id="profile-pocketbook-title"
+                class="profile-accordion__title"
+                >Pocketbook baselines</span
+              >
+              <span
+                id="profile-pocketbook-summary"
+                class="profile-accordion__summary"
+              ></span>
+            </span>
+            <span class="profile-accordion__icon" aria-hidden="true"></span>
+          </button>
+          <div class="profile-accordion__body">
+            <p class="profile-panel__lede">
+              Saved values auto-fill Impact calculators on Feed and Search
+              cards.
+            </p>
+            <form id="profile-pocketbook-form" class="profile-form">
+              <label class="profile-form__field">
+                Estimated property value
+                <input
+                  id="profile-property-value"
+                  name="estimated_property_value"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  placeholder="350000"
+                />
+              </label>
+              <label class="profile-form__field">
+                Estimated household income
+                <input
+                  id="profile-income"
+                  name="estimated_income"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  placeholder="75000"
+                />
+              </label>
+              <label class="profile-form__field">
+                Filing status
+                <select id="profile-filing-status" name="filing_status">
+                  <option value="single">Single</option>
+                  <option value="married_joint">Married filing jointly</option>
+                  <option value="married_separate">
+                    Married filing separately
+                  </option>
+                  <option value="head">Head of household</option>
+                </select>
+              </label>
+              <label class="profile-form__field">
+                Vehicle count
+                <input
+                  id="profile-vehicle-count"
+                  name="vehicle_count"
+                  type="number"
+                  min="0"
+                  max="12"
+                  step="1"
+                  placeholder="1"
+                />
+              </label>
+              <button class="refresh-btn" type="submit">Save baselines</button>
+            </form>
+          </div>
+        </section>
+
+        <section
+          class="profile-panel"
+          data-accordion
           data-accordion-key="notifications"
           aria-labelledby="profile-notify-title"
         >
@@ -269,6 +349,41 @@
             officials.
           </p>
           <div id="profile-reps" class="profile-reps" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section
+        class="profile-panel profile-panel--wide"
+        data-accordion
+        data-accordion-key="alignment"
+        aria-labelledby="profile-alignment-title"
+      >
+        <button
+          type="button"
+          class="profile-accordion__trigger"
+          aria-expanded="true"
+        >
+          <span class="profile-accordion__titles">
+            <span id="profile-alignment-title" class="profile-accordion__title"
+              >Political Alignment Breakdown</span
+            >
+            <span
+              id="profile-alignment-summary"
+              class="profile-accordion__summary"
+            ></span>
+          </span>
+          <span class="profile-accordion__icon" aria-hidden="true"></span>
+        </button>
+        <div class="profile-accordion__body">
+          <p class="profile-panel__lede">
+            Match rates between your Support/Oppose stances and House roll call
+            votes for representatives you’ve been compared against.
+          </p>
+          <div
+            id="profile-alignment-chart"
+            class="profile-alignment-chart"
+            aria-live="polite"
+          ></div>
         </div>
       </section>
 
@@ -599,7 +714,8 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260729m"></script>
-    <script src="politicians-shared.js?v=20260729f"></script>
-    <script src="profile.js?v=20260729j" defer></script>
+    <script src="politicians-shared.js?v=20260729r"></script>
+    <script src="engagement.js?v=20260729r"></script>
+    <script src="profile.js?v=20260729r" defer></script>
   </body>
 </html>
