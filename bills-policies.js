@@ -98,6 +98,7 @@ let filterState = {
   locationOn: false,
   addressQuery: "",
   resolved: null,
+  locationFallback: null,
 };
 
 function tabFromQuery() {
@@ -190,13 +191,13 @@ function coverageSummaryText(coverage = {}) {
   const federal = String(coverage.Federal || "").toLowerCase();
   const state = String(coverage.State || "").toLowerCase();
   if (federal.includes("ready") || federal.includes("planned")) {
-    return "Federal live updates are temporarily limited. City and District sample items are shown for now.";
+    return "Federal live updates are temporarily limited. Local sample items are shown for now.";
   }
   if (state.includes("live")) {
-    return "Federal and state feeds are live. City and District currently use curated sample items.";
+    return "Federal and state feeds are live. County, City, and District currently use curated samples. With “Affects my location,” local items come first; broader levels fill in when needed.";
   }
   if (state.includes("ready") || state.includes("planned")) {
-    return "Federal feed is live. State bills are limited right now. City and District use curated samples.";
+    return "Federal feed is live. State bills are limited right now. County, City, and District use curated samples.";
   }
   return "Showing available bill and policy updates across covered levels.";
 }
@@ -244,6 +245,25 @@ function normalizeCityName(value) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+function normalizeCountyName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+county$/i, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const LOCATION_FEED_MIN = 5;
+const LOCAL_LEVELS = new Set(["City", "District"]);
+const LOCATION_LEVEL_RANK = {
+  City: 0,
+  District: 0,
+  County: 1,
+  State: 2,
+  Federal: 3,
+};
 
 function populateStateOptions() {
   if (!stateFilterSelect) return;
@@ -299,6 +319,22 @@ function updateFilterStatusLine() {
     parts.push(city && state ? `${city}, ${state}` : city || state || "location set");
   } else if (filterState.locationOn && filterState.addressQuery) {
     parts.push(`looking up ${filterState.addressQuery}`);
+  }
+
+  const fallback = filterState.locationFallback;
+  if (fallback?.used) {
+    const localLabel =
+      fallback.localCount === 1
+        ? "1 local policy"
+        : `${fallback.localCount} local policies`;
+    const broader = fallback.appendedLevels.join(", ");
+    parts.push(
+      fallback.localCount
+        ? `showing ${localLabel} first, then ${broader}`
+        : `few local policies found — showing ${broader} that also affect your area`
+    );
+  } else if (filterState.locationOn && filterState.resolved) {
+    parts.push("local policies first");
   }
 
   if (!parts.length) {
@@ -417,6 +453,7 @@ async function fetchBillsFeedPayload(limit = 16, stateCode = "") {
     coverage: {
       Federal: "live (client fallback)",
       State: "coming soon",
+      County: "sample (curated)",
       City: "sample (curated)",
       District: "sample (curated)",
     },
@@ -474,42 +511,190 @@ function citiesMatch(left, right) {
   return a === b || a.includes(b) || b.includes(a);
 }
 
-function matchesLocationFilter(item, resolved, stateCode) {
-  // Location mode requires a resolved place — never pass everything through.
-  if (!resolved?.state && !resolved?.city) return false;
+function countiesMatch(left, right) {
+  const a = normalizeCountyName(left);
+  const b = normalizeCountyName(right);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
 
-  // National laws still affect every location.
-  if (item.level === "Federal") return true;
+function isLocalPolicyLevel(level) {
+  return LOCAL_LEVELS.has(String(level || ""));
+}
+
+/** Match an item to a location tier: local | county | state | federal. */
+function itemMatchesLocationTier(item, resolved, stateCode, tier) {
+  if (!resolved?.state && !resolved?.city && !resolved?.county) return false;
 
   const itemState = String(item.stateCode || "").toUpperCase();
   const resolvedState = String(resolved.state || stateCode || "").toUpperCase();
-  if (resolvedState && itemState && itemState !== resolvedState) return false;
 
-  if (item.level === "State") {
+  if (tier === "federal") return item.level === "Federal";
+
+  if (
+    resolvedState &&
+    itemState &&
+    itemState !== resolvedState &&
+    item.level !== "Federal"
+  ) {
+    return false;
+  }
+
+  if (tier === "state") {
+    return (
+      item.level === "State" &&
+      Boolean(resolvedState) &&
+      itemState === resolvedState
+    );
+  }
+
+  if (tier === "county") {
+    if (item.level !== "County") return false;
+    const resolvedCounty = normalizeCountyName(resolved.county);
+    if (resolvedCounty) {
+      return (
+        countiesMatch(item.countyName, resolved.county) ||
+        countiesMatch(item.jurisdiction, resolved.county) ||
+        countiesMatch(item.cityName, resolved.county)
+      );
+    }
+    // ZIP-only / missing county: keep same-state county samples available.
     return Boolean(resolvedState) && itemState === resolvedState;
   }
 
-  // City / District: only items for the resolved city (not every city in the state).
+  // local = City + District for the resolved city
+  if (!isLocalPolicyLevel(item.level)) return false;
   const resolvedCity = normalizeCityName(resolved.city);
   if (!resolvedCity) return false;
+  return (
+    citiesMatch(item.cityName, resolved.city) ||
+    citiesMatch(item.jurisdiction, resolved.city)
+  );
+}
 
-  if (citiesMatch(item.cityName, resolved.city)) return true;
-  if (citiesMatch(item.jurisdiction, resolved.city)) return true;
-  return false;
+/**
+ * Location mode: local policies first. If fewer than LOCATION_FEED_MIN,
+ * append County → State → Federal so the feed is never empty.
+ */
+function applyLocationFeedWithFallback(items, resolved, stateCode) {
+  const pool = items.filter((item) => matchesStateFilter(item, stateCode));
+  const pick = (tier) =>
+    pool.filter((item) =>
+      itemMatchesLocationTier(item, resolved, stateCode, tier)
+    );
+
+  const local = pick("local");
+  const selected = [];
+  const seen = new Set();
+  const appendedLevels = [];
+
+  function takeAll(batch, tierLabel) {
+    let added = 0;
+    for (const item of batch) {
+      if (!item?.id || seen.has(item.id)) continue;
+      seen.add(item.id);
+      selected.push(item);
+      added += 1;
+    }
+    if (added && tierLabel) appendedLevels.push(tierLabel);
+  }
+
+  takeAll(local, null);
+
+  if (selected.length < LOCATION_FEED_MIN) {
+    for (const [tier, label] of [
+      ["county", "County"],
+      ["state", "State"],
+      ["federal", "Federal"],
+    ]) {
+      if (selected.length >= LOCATION_FEED_MIN) break;
+      takeAll(pick(tier), label);
+    }
+  }
+
+  // Absolute safety net: still empty → pull any state/federal for the place.
+  if (!selected.length) {
+    takeAll(pick("county"), "County");
+    takeAll(pick("state"), "State");
+    takeAll(pick("federal"), "Federal");
+  }
+
+  filterState.locationFallback = {
+    used: appendedLevels.length > 0,
+    localCount: local.length,
+    appendedLevels: [...new Set(appendedLevels)],
+    minTarget: LOCATION_FEED_MIN,
+  };
+
+  return selected.sort((a, b) => {
+    const rankA = LOCATION_LEVEL_RANK[a.level] ?? 9;
+    const rankB = LOCATION_LEVEL_RANK[b.level] ?? 9;
+    if (rankA !== rankB) return rankA - rankB;
+    return (
+      new Date(b.lastUpdated || 0).getTime() -
+      new Date(a.lastUpdated || 0).getTime()
+    );
+  });
+}
+
+function matchesLocationFilter(item, resolved, stateCode) {
+  // Kept for callers that need a simple boolean; location feed uses the
+  // tiered fallback builder above.
+  return (
+    itemMatchesLocationTier(item, resolved, stateCode, "local") ||
+    itemMatchesLocationTier(item, resolved, stateCode, "county") ||
+    itemMatchesLocationTier(item, resolved, stateCode, "state") ||
+    itemMatchesLocationTier(item, resolved, stateCode, "federal")
+  );
 }
 
 function applyGeoFilters(items) {
   const stateCode = filterState.stateCode || "";
-  if (filterState.locationOn && !filterState.resolved?.state && !filterState.resolved?.city) {
+  filterState.locationFallback = null;
+
+  if (
+    filterState.locationOn &&
+    !filterState.resolved?.state &&
+    !filterState.resolved?.city &&
+    !filterState.resolved?.county
+  ) {
     return [];
   }
-  return items.filter((item) => {
-    if (!matchesStateFilter(item, stateCode)) return false;
-    if (filterState.locationOn) {
-      return matchesLocationFilter(item, filterState.resolved, stateCode);
-    }
-    return true;
-  });
+
+  if (filterState.locationOn) {
+    return applyLocationFeedWithFallback(
+      items,
+      filterState.resolved,
+      stateCode
+    );
+  }
+
+  return items.filter((item) => matchesStateFilter(item, stateCode));
+}
+
+function locationEmptyStateHtml({ forMyFeed = false } = {}) {
+  const needsLocation =
+    filterState.locationOn &&
+    !filterState.resolved?.state &&
+    !filterState.resolved?.city &&
+    !filterState.resolved?.county;
+
+  if (needsLocation) {
+    return forMyFeed
+      ? `<h2>Add your location</h2><p>Enter an address or ZIP and click Apply to see followed items that affect your area. If few local policies are available, we add County, State, and Federal bills automatically.</p>`
+      : `<h2>Add your location</h2><p>Enter an address or ZIP and click Apply to see bills that affect your area. If fewer than ${LOCATION_FEED_MIN} local policies match, we automatically add County, State, and Federal bills so your feed is not empty.</p>`;
+  }
+
+  const fallback = filterState.locationFallback;
+  if (filterState.locationOn && fallback?.used === false && !rawItems.length) {
+    return `<h2>No bill updates available</h2><p>We looked for local policies first, then County, State, and Federal coverage for your area. Check back shortly.</p>`;
+  }
+
+  if (filterState.locationOn && rawItems.length > 0 && !allItems.length) {
+    return `<h2>No matches for this location yet</h2><p>We prioritize City and District policies for your address. When fewer than ${LOCATION_FEED_MIN} local items are available, County, State, and Federal bills are added automatically — none matched right now. Try another address or clear “Affects my location.”</p>`;
+  }
+
+  return null;
 }
 
 function parseCityStateFromLabel(label = "") {
@@ -1028,12 +1213,9 @@ async function renderMyFeed() {
 
   if (!nodes.length) {
     policyFeedEmpty.hidden = false;
-    const needsLocation =
-      filterState.locationOn &&
-      !filterState.resolved?.state &&
-      !filterState.resolved?.city;
-    if (needsLocation) {
-      policyFeedEmpty.innerHTML = `<h2>Add your location</h2><p>Enter an address or ZIP and click Apply to see followed items that affect your area.</p>`;
+    const locationHtml = locationEmptyStateHtml({ forMyFeed: true });
+    if (locationHtml) {
+      policyFeedEmpty.innerHTML = locationHtml;
     } else {
       policyFeedEmpty.innerHTML = `<h2>Nothing in your feed yet</h2><p>Follow topics, politicians, and bills to see new and updated actions here. <a href="topics.html">Manage topics</a></p>`;
     }
@@ -1089,14 +1271,13 @@ function renderActiveTab() {
 
   if (!items.length) {
     policyFeedEmpty.hidden = false;
-    const needsLocation =
-      filterState.locationOn && !filterState.resolved?.state && !filterState.resolved?.city;
-    const filteredOut = rawItems.length > 0;
-    if (needsLocation) {
-      policyFeedEmpty.innerHTML = `<h2>Add your location</h2><p>Enter an address or ZIP and click Apply to see bills that affect your area.</p>`;
+    const locationHtml = locationEmptyStateHtml({ forMyFeed: false });
+    if (locationHtml) {
+      policyFeedEmpty.innerHTML = locationHtml;
     } else {
+      const filteredOut = rawItems.length > 0;
       policyFeedEmpty.innerHTML = filteredOut
-        ? `<h2>No matches for these filters</h2><p>Try another state or clear “Affects my location.” City and district coverage is still limited to sample areas.</p>`
+        ? `<h2>No matches for these filters</h2><p>Try another state or clear “Affects my location.” Local coverage is limited; when few City/District items match we automatically add County, State, and Federal bills.</p>`
         : `<h2>No bill updates available</h2><p>Check back shortly for new legislative activity.</p>`;
     }
     return;
@@ -1217,6 +1398,7 @@ locationToggle?.addEventListener("change", async () => {
   filterState.locationOn = Boolean(locationToggle.checked);
   if (!filterState.locationOn) {
     filterState.resolved = null;
+    filterState.locationFallback = null;
   }
   syncFilterControls();
   if (
