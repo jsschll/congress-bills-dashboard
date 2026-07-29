@@ -92,8 +92,8 @@ module.exports = async function handler(req, res) {
         user: prompt.user,
       },
       fallbackExample: heuristicFormat(
-        "Homeowner Energy Freedom Act repeals the Department of Energy high-efficiency electric home rebate program and related grants.",
-        "Homeowner Energy Freedom Act"
+        "This bill directs the Department of Transportation to update rail safety inspection rules and report compliance to Congress.",
+        "Rail Safety Improvement Act"
       ),
     });
   } catch (error) {

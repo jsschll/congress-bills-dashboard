@@ -870,6 +870,21 @@ function formatVoteMeta(item) {
   return parts.join(" · ");
 }
 
+function voteCardCopy(item = {}) {
+  const summary =
+    String(item.shortPitch || "").trim() ||
+    "This is a recent congressional roll-call vote on the linked measure.";
+  const yeaMeans =
+    String(item.yeaMeans || "").trim() ||
+    "A Yea vote supports advancing this measure as written on this roll call.";
+  const nayMeans =
+    String(item.nayMeans || "").trim() ||
+    "A Nay vote supports rejecting this measure on this roll call.";
+  const yeaLabel = String(item.yeaLabel || "").trim() || "Support Bill";
+  const nayLabel = String(item.nayLabel || "").trim() || "Oppose Bill";
+  return { summary, yeaMeans, nayMeans, yeaLabel, nayLabel };
+}
+
 function renderVotesList(target, votes, emptyMessage, person) {
   if (!target) return;
   target.replaceChildren();
@@ -890,6 +905,7 @@ function renderVotesList(target, votes, emptyMessage, person) {
     const cast = item.voteCast || "—";
     const subject = item.subjectCategory || item.policyArea || "";
     const kind = voteKindLabel(item.voteKind);
+    const copy = voteCardCopy(item);
     card.innerHTML = `
       <header class="politician-vote-card__header">
         <span class="politician-vote-cast ${voteCastClass(cast)}" title="${escapeHtml(
@@ -919,24 +935,16 @@ function renderVotesList(target, votes, emptyMessage, person) {
       </header>
       <section class="politician-vote-card__summary" aria-label="What was proposed">
         <h4>What’s proposed</h4>
-        <p>${escapeHtml(
-          item.shortPitch ||
-            item.voteQuestion ||
-            "Recent House roll-call vote."
-        )}</p>
+        <p>${escapeHtml(copy.summary)}</p>
       </section>
       <div class="politician-vote-card__meanings" aria-label="What Yea and Nay mean">
         <div class="politician-vote-card__meaning is-yea">
           <strong>Yea means</strong>
-          <p>${escapeHtml(
-            item.yeaMeans || "Support this roll-call question."
-          )}</p>
+          <p>${escapeHtml(copy.yeaMeans)}</p>
         </div>
         <div class="politician-vote-card__meaning is-nay">
           <strong>Nay means</strong>
-          <p>${escapeHtml(
-            item.nayMeans || "Oppose this roll-call question."
-          )}</p>
+          <p>${escapeHtml(copy.nayMeans)}</p>
         </div>
       </div>
       <a class="bill-card__link" href="${escapeHtml(
@@ -946,12 +954,10 @@ function renderVotesList(target, votes, emptyMessage, person) {
 
     if (window.PolicyEngagement?.mountVote) {
       window.PolicyEngagement.mountVote(card, item, {
-        supportLabel: item.yeaLabel || "Yea",
-        opposeLabel: item.nayLabel || "Nay",
+        supportLabel: copy.yeaLabel,
+        opposeLabel: copy.nayLabel,
         compareBioguides: bioguide ? [bioguide] : [],
-        whoVotedHint: `Tap ${item.yeaLabel || "Yea"} or ${
-          item.nayLabel || "Nay"
-        } to compare with ${personName}.`,
+        whoVotedHint: `Tap ${copy.yeaLabel} or ${copy.nayLabel} to compare with ${personName}.`,
         onStanceChange: async () => {
           if (!bioguide) return;
           const payload = await loadMatchRows(bioguide);

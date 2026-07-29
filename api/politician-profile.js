@@ -1,6 +1,13 @@
 const CONGRESS_API = "https://api.congress.gov/v3";
 const CONGRESS = 119;
-const { formatBillSummary } = require("../lib/format-bill-summary");
+const {
+  formatBillSummary,
+  isProceduralLegislation,
+  classifyVoteKind,
+  completeSentences,
+  DEFAULT_YEA_LABEL,
+  DEFAULT_NAY_LABEL,
+} = require("../lib/format-bill-summary");
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -82,35 +89,7 @@ function stripHtml(html) {
 }
 
 function toSentences(text, max = 2) {
-  const protectedText = String(text || "").replace(
-    /\b(No|Nos|Mr|Mrs|Ms|Dr|Sen|Rep|vs|etc|U\.S)\./gi,
-    "$1\u2024"
-  );
-  const parts = protectedText
-    .split(/(?<=[.!?])\s+/)
-    .map((part) => part.replace(/\u2024/g, ".").trim())
-    .filter(Boolean);
-  return parts.slice(0, max).join(" ");
-}
-
-function classifyVoteKind(voteQuestion = "", result = "") {
-  const q = `${voteQuestion} ${result}`.toLowerCase();
-  if (
-    /\bon passage\b|\bfinal passage\b|agreeing to the (conference )?report|concurring in the senate amendment|concurring in senate amendment/.test(
-      q
-    )
-  ) {
-    return "final_passage";
-  }
-  if (/\bamendment\b|\bamdt\b/.test(q)) return "amendment";
-  if (
-    /motion to (adjourn|table|reconsider|recommit)|previous question|suspend the rules|election of speaker|approve the journal|quorum call|ordering a second|committee of the whole/.test(
-      q
-    )
-  ) {
-    return "procedural";
-  }
-  return "other";
+  return completeSentences(text, { maxSentences: max, maxChars: 480 });
 }
 
 function mapSubjectCategory(policyArea = "") {
@@ -152,29 +131,13 @@ function plainEnglishForVote(vote, summaryText = "") {
 }
 
 function yeaNayMeans(vote) {
-  const bill = vote.billNumber || "this measure";
-  const kind = vote.voteKind;
-  if (kind === "final_passage") {
-    return {
-      yeaMeans: `Pass ${bill} — advance the measure as written.`,
-      nayMeans: `Reject ${bill} — vote against final passage.`,
-    };
-  }
-  if (kind === "amendment") {
-    return {
-      yeaMeans: `Adopt the amendment to ${bill}.`,
-      nayMeans: `Reject the amendment to ${bill}.`,
-    };
-  }
-  if (vote.hasLinkedBill || (vote.legislationType && vote.legislationNumber)) {
-    return {
-      yeaMeans: `Support ${bill} on this roll call.`,
-      nayMeans: `Oppose ${bill} on this roll call.`,
-    };
-  }
   return {
-    yeaMeans: "Record a Yea on this House roll call.",
-    nayMeans: "Record a Nay on this House roll call.",
+    yeaMeans:
+      "A Yea vote supports advancing this measure as written on this roll call.",
+    nayMeans:
+      "A Nay vote supports rejecting this measure on this roll call.",
+    yeaLabel: DEFAULT_YEA_LABEL,
+    nayLabel: DEFAULT_NAY_LABEL,
   };
 }
 
@@ -430,17 +393,39 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
     return [];
   }
 
-  // Skip pure procedural noise; keep chronological so "Recent Votes" is recent.
+  // Skip resolutions + procedural noise; keep chronological so "Recent Votes" is recent.
   const ranked = votes
     .map((vote) => {
       const voteQuestion = vote.voteQuestion || "";
       const result = vote.result || "";
+      const legislationType = String(vote.legislationType || "")
+        .toLowerCase()
+        .replace(/\./g, "");
+      const billNumber =
+        legislationType && vote.legislationNumber
+          ? `${legislationType}${vote.legislationNumber}`
+          : "";
       return {
         raw: vote,
-        voteKind: classifyVoteKind(voteQuestion, result),
+        voteKind: classifyVoteKind(voteQuestion, result, {
+          legislationType,
+          billNumber,
+          title: vote.legislationTitle || "",
+        }),
       };
     })
-    .filter((row) => row.voteKind !== "procedural")
+    .filter(
+      (row) =>
+        row.voteKind !== "procedural" &&
+        !isProceduralLegislation({
+          legislationType: row.raw.legislationType,
+          billNumber: row.raw.legislationType
+            ? `${row.raw.legislationType} ${row.raw.legislationNumber || ""}`
+            : "",
+          voteQuestion: row.raw.voteQuestion,
+          title: row.raw.legislationTitle,
+        })
+    )
     .sort((a, b) =>
       String(b.raw.startDate || b.raw.date || "").localeCompare(
         String(a.raw.startDate || a.raw.date || "")
@@ -508,8 +493,8 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             shortPitch: "",
             yeaMeans: "",
             nayMeans: "",
-            yeaLabel: "Yea",
-            nayLabel: "Nay",
+            yeaLabel: DEFAULT_YEA_LABEL,
+            nayLabel: DEFAULT_NAY_LABEL,
             officialUrl:
               type && number
                 ? `https://www.congress.gov/bill/${congress}th-congress/${type}/${number}`
@@ -532,6 +517,8 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
           const meanings = yeaNayMeans(base);
           base.yeaMeans = meanings.yeaMeans;
           base.nayMeans = meanings.nayMeans;
+          base.yeaLabel = meanings.yeaLabel;
+          base.nayLabel = meanings.nayLabel;
           base.shortPitch = plainEnglishForVote(base);
           return base;
         } catch {

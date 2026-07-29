@@ -1157,6 +1157,17 @@ function renderVoteCard(item) {
   card.className = "vote-feed-card policy-bill-card";
   const subject = item.subjectCategory || item.policyArea || "";
   const kind = voteKindLabel(item.voteKind);
+  const summary =
+    String(item.shortPitch || "").trim() ||
+    "This is a recent congressional roll-call vote on the linked measure.";
+  const yeaLabel = String(item.yeaLabel || "").trim() || "Support Bill";
+  const nayLabel = String(item.nayLabel || "").trim() || "Oppose Bill";
+  const yeaMeans =
+    String(item.yeaMeans || "").trim() ||
+    "A Yea vote supports advancing this measure as written on this roll call.";
+  const nayMeans =
+    String(item.nayMeans || "").trim() ||
+    "A Nay vote supports rejecting this measure on this roll call.";
   card.innerHTML = `
     <div class="policy-bill-card__header">
       <div>
@@ -1182,33 +1193,34 @@ function renderVoteCard(item) {
       </div>
     </div>
     <section class="policy-bill-card__summary" aria-label="Plain English summary">
-      <h3 class="policy-bill-card__summary-label">In plain English</h3>
-      <p class="policy-bill-card__pitch">${escapePolicyHtml(
-        item.shortPitch ||
-          item.voteQuestion ||
-          "Recent House roll-call vote."
-      )}</p>
-      ${
-        item.voteQuestion &&
-        item.shortPitch &&
-        item.voteQuestion !== item.shortPitch
-          ? `<p class="vote-feed-card__question">${escapePolicyHtml(
-              item.voteQuestion
-            )}</p>`
-          : ""
-      }
+      <h3 class="policy-bill-card__summary-label">What’s proposed</h3>
+      <p class="policy-bill-card__pitch">${escapePolicyHtml(summary)}</p>
     </section>
+    <div class="vote-feed-card__meanings" aria-label="What Yea and Nay mean">
+      <div class="vote-feed-card__meaning is-yea">
+        <strong>Yea means</strong>
+        <p>${escapePolicyHtml(yeaMeans)}</p>
+      </div>
+      <div class="vote-feed-card__meaning is-nay">
+        <strong>Nay means</strong>
+        <p>${escapePolicyHtml(nayMeans)}</p>
+      </div>
+    </div>
     <a class="bill-card__link" href="${escapePolicyHtml(
       item.clerkUrl || item.officialUrl || "#"
     )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
   `;
 
   if (window.PolicyEngagement?.mountVote) {
-    window.PolicyEngagement.mountVote(card, item);
+    window.PolicyEngagement.mountVote(card, item, {
+      supportLabel: yeaLabel,
+      opposeLabel: nayLabel,
+      whoVotedHint: `Tap ${yeaLabel} or ${nayLabel} to compare with House members.`,
+    });
   } else if (window.PolicyEngagement?.mount) {
     window.PolicyEngagement.mount(card, item, {
-      supportLabel: "Yea",
-      opposeLabel: "Nay",
+      supportLabel: yeaLabel,
+      opposeLabel: nayLabel,
       prompt: "How would you vote?",
       showTakeAction: false,
     });
