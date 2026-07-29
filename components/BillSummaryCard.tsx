@@ -13,6 +13,11 @@ export type BillSummaryCardProps = {
   memberVote?: string | null;
   result?: string | null;
   dateLabel?: string | null;
+  /** Structured backend fields — preferred over generated fallbacks. */
+  yeaMeans?: string | null;
+  nayMeans?: string | null;
+  yeaLabel?: string | null;
+  nayLabel?: string | null;
   /** When provided, Yea/Nay become interactive. */
   onVote?: (stance: "yea" | "nay") => void | Promise<void>;
   userStance?: "yea" | "nay" | null;
@@ -29,6 +34,29 @@ const FALLBACK_CARD: BillSummaryCard = {
   source: "heuristic",
 };
 
+function isGenericMeans(text = ""): boolean {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return true;
+  return (
+    /^a yea vote supports advancing this measure/.test(value) ||
+    /^a nay vote supports rejecting this measure/.test(value) ||
+    /^you support advancing this measure/.test(value) ||
+    /^you support rejecting this measure/.test(value) ||
+    /^support this (roll-call|roll call|measure|bill)/.test(value) ||
+    /^oppose this (roll-call|roll call|measure|bill)/.test(value)
+  );
+}
+
+function isBannedMeansTemplate(text = ""): boolean {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return false;
+  return (
+    /you support ending this program described in this measure/.test(value) ||
+    /you support keeping this program in place/.test(value) ||
+    /you support ending .+ described in this measure/.test(value)
+  );
+}
+
 function voteTone(vote?: string | null) {
   const value = String(vote || "").toLowerCase();
   if (value === "yea" || value === "aye" || value === "yes") return "yea";
@@ -38,8 +66,61 @@ function voteTone(vote?: string | null) {
 }
 
 /**
- * Sample React card for the plain-English vote summary schema.
- * Falls back cleanly when LLM output is missing.
+ * Apply VoteCard prop rules:
+ * - generic/missing means → Support Measure / Oppose Measure labels
+ * - never invent banned “ending this program” templates; only keep if
+ *   explicitly passed as structured props
+ */
+function resolveCardProps(
+  base: BillSummaryCard,
+  props: Pick<
+    BillSummaryCardProps,
+    "yeaMeans" | "nayMeans" | "yeaLabel" | "nayLabel"
+  >
+): BillSummaryCard {
+  const structuredYea = props.yeaMeans != null;
+  const structuredNay = props.nayMeans != null;
+
+  let yea_means = String(
+    structuredYea ? props.yeaMeans : base.yea_means || ""
+  ).trim();
+  let nay_means = String(
+    structuredNay ? props.nayMeans : base.nay_means || ""
+  ).trim();
+
+  if (isBannedMeansTemplate(yea_means) && !structuredYea) yea_means = "";
+  if (isBannedMeansTemplate(nay_means) && !structuredNay) nay_means = "";
+
+  const meansAreGeneric =
+    isGenericMeans(yea_means) ||
+    isGenericMeans(nay_means) ||
+    isBannedMeansTemplate(yea_means) ||
+    isBannedMeansTemplate(nay_means);
+
+  let yea_label = String(
+    props.yeaLabel != null ? props.yeaLabel : base.yea_label || ""
+  ).trim();
+  let nay_label = String(
+    props.nayLabel != null ? props.nayLabel : base.nay_label || ""
+  ).trim();
+
+  if (meansAreGeneric) {
+    yea_label = DEFAULT_YEA_LABEL;
+    nay_label = DEFAULT_NAY_LABEL;
+  }
+
+  return {
+    ...base,
+    summary: base.summary || FALLBACK_CARD.summary,
+    yea_means: yea_means || FALLBACK_CARD.yea_means,
+    nay_means: nay_means || FALLBACK_CARD.nay_means,
+    yea_label: yea_label || DEFAULT_YEA_LABEL,
+    nay_label: nay_label || DEFAULT_NAY_LABEL,
+  };
+}
+
+/**
+ * Sample React VoteCard for the plain-English summary schema.
  */
 export function BillSummaryCardView({
   rawSummary,
@@ -48,11 +129,23 @@ export function BillSummaryCardView({
   memberVote,
   result,
   dateLabel,
+  yeaMeans,
+  nayMeans,
+  yeaLabel: yeaLabelProp,
+  nayLabel: nayLabelProp,
   onVote,
   userStance = null,
   className = "",
 }: BillSummaryCardProps) {
-  const [card, setCard] = useState<BillSummaryCard>(FALLBACK_CARD);
+  const structured = {
+    yeaMeans,
+    nayMeans,
+    yeaLabel: yeaLabelProp,
+    nayLabel: nayLabelProp,
+  };
+  const [card, setCard] = useState<BillSummaryCard>(
+    resolveCardProps(FALLBACK_CARD, structured)
+  );
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<"yea" | "nay" | null>(null);
@@ -61,23 +154,27 @@ export function BillSummaryCardView({
     let cancelled = false;
     setLoading(true);
     setError("");
+
     formatBillSummary(rawSummary, billTitle)
       .then((next) => {
-        if (!cancelled) setCard(next);
+        if (!cancelled) setCard(resolveCardProps(next, structured));
       })
       .catch((err: Error) => {
         if (!cancelled) {
           setError(err.message || "Could not load summary.");
-          setCard(FALLBACK_CARD);
+          setCard(resolveCardProps(FALLBACK_CARD, structured));
         }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [rawSummary, billTitle]);
+    // structured fields are primitive props listed below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawSummary, billTitle, yeaMeans, nayMeans, yeaLabelProp, nayLabelProp]);
 
   async function handleVote(stance: "yea" | "nay") {
     if (!onVote) return;

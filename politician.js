@@ -871,18 +871,23 @@ function formatVoteMeta(item) {
 }
 
 function voteCardCopy(item = {}) {
-  const summary =
-    String(item.shortPitch || "").trim() ||
-    "This is a recent congressional roll-call vote on the linked measure.";
-  const yeaMeans =
-    String(item.yeaMeans || "").trim() ||
-    "A Yea vote supports advancing this measure as written on this roll call.";
-  const nayMeans =
-    String(item.nayMeans || "").trim() ||
-    "A Nay vote supports rejecting this measure on this roll call.";
-  const yeaLabel = String(item.yeaLabel || "").trim() || "Support Bill";
-  const nayLabel = String(item.nayLabel || "").trim() || "Oppose Bill";
-  return { summary, yeaMeans, nayMeans, yeaLabel, nayLabel };
+  if (typeof resolveVoteCardCopy === "function") {
+    return resolveVoteCardCopy(item);
+  }
+  return {
+    summary:
+      String(item.shortPitch || "").trim() ||
+      "This is a recent congressional roll-call vote on the linked measure.",
+    yeaMeans:
+      String(item.yeaMeans || "").trim() ||
+      "A Yea vote supports advancing this measure as written on this roll call.",
+    nayMeans:
+      String(item.nayMeans || "").trim() ||
+      "A Nay vote supports rejecting this measure on this roll call.",
+    yeaLabel: "Support Measure",
+    nayLabel: "Oppose Measure",
+    meansAreGeneric: true,
+  };
 }
 
 function renderVotesList(target, votes, emptyMessage, person) {
