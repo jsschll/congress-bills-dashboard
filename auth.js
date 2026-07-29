@@ -122,7 +122,7 @@ async function finishLogin(user) {
 }
 
 /** Reject sessions created by accidental magic-link signup (empty profile). */
-async function requireRegisteredProfile(user, { allowMissingUsername = false } = {}) {
+async function requireRegisteredProfile(user) {
   const client = getSupabase();
   if (!client || !user?.id) return null;
 
@@ -137,7 +137,7 @@ async function requireRegisteredProfile(user, { allowMissingUsername = false } =
     throw new Error("Could not load your profile. Try signing in again.");
   }
 
-  if (profile?.username || allowMissingUsername) return profile;
+  if (profile?.username) return profile;
 
   await client.auth.signOut();
   throw new Error(
