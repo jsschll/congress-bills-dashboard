@@ -694,6 +694,9 @@ function renderMatchScorecard({ user, rows }, person) {
         and Support or Oppose bills on Feed/Search to build your Action Match Score with ${escapeHtml(
           person.name || "this official"
         )}.
+      </p>
+      <p class="politician-quick-match">
+        <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
       </p>`;
     return;
   }
@@ -741,6 +744,20 @@ function renderMatchScorecard({ user, rows }, person) {
     </li>`;
   };
 
+  const needsQuickMatch = compared.length < 5;
+  const quickMatchCta = needsQuickMatch
+    ? `<p class="politician-quick-match">
+        <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
+        <span class="politician-quick-match__hint">${
+          compared.length === 0
+            ? "Answer 5–10 recent key votes to populate your Action Match Score."
+            : `You’ve compared ${compared.length} vote${
+                compared.length === 1 ? "" : "s"
+              }. A few more key votes will firm up this score.`
+        }</span>
+      </p>`
+    : "";
+
   matchBody.innerHTML = `
     <div class="politician-match-hero">
       <div class="politician-match-hero__score ${
@@ -763,10 +780,12 @@ function renderMatchScorecard({ user, rows }, person) {
             ? `${matched.length} of ${compared.length} comparable House roll calls match your stance.`
             : roleKind === "senate"
               ? "No comparable House roll calls for this senator yet. Action Match currently uses House floor votes linked to bills you Support or Oppose."
-              : "No comparable roll calls yet. Support or Oppose federal bills that have House votes."
+              : "No comparable roll calls yet. Support or Oppose federal bills that have House votes — or take the Quick Match quiz."
         }
       </p>
     </div>
+
+    ${quickMatchCta}
 
     <div class="politician-match-categories" aria-label="Category breakdown">
       ${

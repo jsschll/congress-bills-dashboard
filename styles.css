@@ -5374,3 +5374,106 @@ body.politician-notes-modal-open {
     flex-direction: column;
   }
 }
+
+/* Votes feed (Action Match) */
+.votes-feed-filters {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+}
+
+.votes-feed-lead {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.votes-subject-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.votes-subject-chip {
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.votes-subject-chip:hover {
+  border-color: rgba(31, 138, 122, 0.55);
+  background: rgba(31, 138, 122, 0.12);
+  color: #6ee7b7;
+}
+
+.votes-subject-chip.is-active {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #fff;
+}
+
+.votes-quiz-banner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(31, 138, 122, 0.45);
+  background: rgba(31, 138, 122, 0.14);
+  color: #d1fae5;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.votes-feed-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.vote-feed-card__subject {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(30, 41, 59, 0.75);
+  color: #cbd5e1;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.vote-feed-card__question {
+  margin: 0.55rem 0 0;
+  color: #94a3b8;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.vote-feed-card .policy-engage__prompt {
+  margin: 0 0 0.55rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.politician-quick-match {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.85rem 0 0;
+  justify-items: start;
+}
+
+.politician-quick-match .refresh-btn {
+  text-decoration: none;
+}
+
+.politician-quick-match__hint {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
