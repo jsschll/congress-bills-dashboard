@@ -1765,6 +1765,29 @@ body {
   align-items: center;
 }
 
+.profile-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color, #d0d7de);
+  background: #fff;
+  color: #111827;
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.profile-btn--ghost {
+  background: transparent;
+}
+
+.profile-btn--ghost:hover {
+  background: #f3f4f6;
+}
+
 .profile-registration-block {
   border-top: 1px solid var(--border-color, #d0d7de);
   padding-top: 0.85rem;
