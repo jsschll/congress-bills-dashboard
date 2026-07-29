@@ -4427,6 +4427,7 @@ a.politician-badge--match {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.55rem;
+  overflow: visible;
 }
 
 .politician-profile-contact__link {
