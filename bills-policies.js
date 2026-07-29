@@ -11,6 +11,13 @@ const feedManageTopics = document.getElementById("feed-manage-topics");
 const tabAllFeed = document.getElementById("tab-all-feed");
 const tabMyFeed = document.getElementById("tab-my-feed");
 const tabForYouFeed = document.getElementById("tab-foryou-feed");
+const tabVotesFeed = document.getElementById("tab-votes-feed");
+const votesFeedPanel = document.getElementById("votes-feed-panel");
+const votesFeedList = document.getElementById("votes-feed-list");
+const votesFeedEmpty = document.getElementById("votes-feed-empty");
+const votesFeedStatus = document.getElementById("votes-feed-status");
+const votesQuizBanner = document.getElementById("votes-quiz-banner");
+const votesSubjectChips = document.getElementById("votes-subject-chips");
 const stateFilterSelect = document.getElementById("policy-state-filter");
 const locationToggle = document.getElementById("policy-location-toggle");
 const locationForm = document.getElementById("policy-location-form");
@@ -87,6 +94,10 @@ let followedBillIds = new Set();
 let cachedNotifications = [];
 let notificationsLoaded = false;
 let forYouLoaded = false;
+let votesLoaded = false;
+let votesItems = [];
+let votesSubject = "";
+let votesQuizMode = false;
 let feedPreferences = {
   topics: [],
   billIds: [],
@@ -116,6 +127,9 @@ function tabFromQuery() {
   ) {
     return "foryou";
   }
+  if (tab === "votes" || tab === "vote" || tab === "rollcall" || tab === "quiz") {
+    return "votes";
+  }
   if (tab === "all") return "all";
   return "all";
 }
@@ -125,6 +139,15 @@ function syncTabQuery(tabName) {
   if (tabName === "all") url.searchParams.delete("tab");
   else url.searchParams.set("tab", tabName);
   if (tabName !== "mine") url.searchParams.delete("n");
+  if (tabName !== "votes") {
+    url.searchParams.delete("quiz");
+    url.searchParams.delete("subject");
+  } else {
+    if (votesQuizMode) url.searchParams.set("quiz", "1");
+    else url.searchParams.delete("quiz");
+    if (votesSubject) url.searchParams.set("subject", votesSubject);
+    else url.searchParams.delete("subject");
+  }
   window.history.replaceState({}, "", url);
 }
 
@@ -1108,6 +1131,161 @@ function setForYouStatus(message, type = "loading") {
   forYouStatus.dataset.type = type;
 }
 
+function setVotesFeedStatus(message, type = "loading") {
+  if (!votesFeedStatus) return;
+  votesFeedStatus.hidden = !message;
+  votesFeedStatus.textContent = message;
+  votesFeedStatus.dataset.type = type;
+}
+
+function voteKindLabel(kind) {
+  if (kind === "final_passage") return "Final passage";
+  if (kind === "amendment") return "Amendment";
+  return "House vote";
+}
+
+function formatVoteResultMeta(item) {
+  const parts = [];
+  if (item.result) parts.push(item.result);
+  if (item.date) parts.push(formatShortDate(item.date));
+  if (item.rollCallNumber) parts.push(`Roll Call ${item.rollCallNumber}`);
+  return parts.join(" · ");
+}
+
+function renderVoteCard(item) {
+  const card = document.createElement("article");
+  card.className = "vote-feed-card policy-bill-card";
+  const subject = item.subjectCategory || item.policyArea || "";
+  const kind = voteKindLabel(item.voteKind);
+  card.innerHTML = `
+    <div class="policy-bill-card__header">
+      <div>
+        <div class="policy-bill-card__badges">
+          <span class="policy-bill-card__level">${escapePolicyHtml(kind)}</span>
+          <span class="policy-bill-card__bill-number">${escapePolicyHtml(
+            item.billNumber || `Roll Call ${item.rollCallNumber || ""}`
+          )}</span>
+          ${
+            subject
+              ? `<span class="vote-feed-card__subject">${escapePolicyHtml(
+                  subject
+                )}</span>`
+              : ""
+          }
+        </div>
+        <h2 class="policy-bill-card__title">${escapePolicyHtml(
+          item.title || item.voteQuestion || "House roll-call vote"
+        )}</h2>
+        <p class="policy-bill-card__meta">${escapePolicyHtml(
+          formatVoteResultMeta(item)
+        )}</p>
+      </div>
+    </div>
+    <section class="policy-bill-card__summary" aria-label="Plain English summary">
+      <h3 class="policy-bill-card__summary-label">In plain English</h3>
+      <p class="policy-bill-card__pitch">${escapePolicyHtml(
+        item.shortPitch ||
+          item.voteQuestion ||
+          "Recent House roll-call vote."
+      )}</p>
+      ${
+        item.voteQuestion &&
+        item.shortPitch &&
+        item.voteQuestion !== item.shortPitch
+          ? `<p class="vote-feed-card__question">${escapePolicyHtml(
+              item.voteQuestion
+            )}</p>`
+          : ""
+      }
+    </section>
+    <a class="bill-card__link" href="${escapePolicyHtml(
+      item.clerkUrl || item.officialUrl || "#"
+    )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
+  `;
+
+  if (window.PolicyEngagement?.mountVote) {
+    window.PolicyEngagement.mountVote(card, item);
+  } else if (window.PolicyEngagement?.mount) {
+    window.PolicyEngagement.mount(card, item, {
+      supportLabel: "Yea",
+      opposeLabel: "Nay",
+      prompt: "How would you vote?",
+      showTakeAction: false,
+    });
+  }
+
+  return card;
+}
+
+async function fetchVotesFeed({ force = false } = {}) {
+  if (votesLoaded && !force) return votesItems;
+  const params = new URLSearchParams();
+  params.set("limit", votesQuizMode ? "8" : "16");
+  if (votesQuizMode) params.set("kind", "final_passage");
+  if (votesSubject) params.set("subject", votesSubject);
+  if (typeof API_KEY === "string" && API_KEY.trim()) {
+    params.set("api_key", API_KEY.trim());
+  }
+  setVotesFeedStatus("Loading recent House votes…", "loading");
+  const response = await fetch(`/api/votes-feed?${params.toString()}`);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Could not load votes feed.");
+  }
+  votesItems = payload.items || [];
+  votesLoaded = true;
+  return votesItems;
+}
+
+function renderVotesFeed() {
+  if (!votesFeedList) return;
+  votesFeedList.replaceChildren();
+  if (votesQuizBanner) {
+    votesQuizBanner.hidden = !votesQuizMode;
+  }
+  if (!votesItems.length) {
+    if (votesFeedEmpty) {
+      votesFeedEmpty.hidden = false;
+      votesFeedEmpty.innerHTML = votesSubject
+        ? `<h2>No votes in this subject</h2><p>Try another subject chip or clear the filter.</p>`
+        : `<h2>No recent roll calls</h2><p>Check back after the House records new final-passage or amendment votes.</p>`;
+    }
+    setVotesFeedStatus("", "success");
+    return;
+  }
+  if (votesFeedEmpty) votesFeedEmpty.hidden = true;
+  votesFeedList.append(...votesItems.map(renderVoteCard));
+  setVotesFeedStatus(
+    `${votesItems.length} recent House vote${votesItems.length === 1 ? "" : "s"}${
+      votesQuizMode ? " · Quick Match" : ""
+    }`,
+    "success"
+  );
+}
+
+async function loadVotesTab({ force = false } = {}) {
+  try {
+    await fetchVotesFeed({ force });
+    renderVotesFeed();
+  } catch (error) {
+    console.error(error);
+    if (votesFeedEmpty) {
+      votesFeedEmpty.hidden = false;
+      votesFeedEmpty.innerHTML = `<h2>Could not load votes</h2><p>${escapePolicyHtml(
+        error.message || "Try again shortly."
+      )}</p>`;
+    }
+    setVotesFeedStatus(error.message || "Could not load votes.", "error");
+  }
+}
+
+function syncVotesSubjectChips() {
+  votesSubjectChips?.querySelectorAll(".votes-subject-chip").forEach((chip) => {
+    const value = String(chip.dataset.subject || "");
+    chip.classList.toggle("is-active", value === votesSubject);
+  });
+}
+
 function notificationBillKey(item = {}) {
   return `${item.bill_congress || ""}-${item.bill_type || ""}-${
     item.bill_number || ""
@@ -1413,12 +1591,15 @@ function setActiveTab(tabName) {
   tabAllFeed?.classList.toggle("is-active", tabName === "all");
   tabMyFeed?.classList.toggle("is-active", tabName === "mine");
   tabForYouFeed?.classList.toggle("is-active", tabName === "foryou");
+  tabVotesFeed?.classList.toggle("is-active", tabName === "votes");
 
   const isForYou = tabName === "foryou";
-  if (policyFeedFilters) policyFeedFilters.hidden = isForYou;
-  if (policyFeedPanel) policyFeedPanel.hidden = isForYou;
+  const isVotes = tabName === "votes";
+  if (policyFeedFilters) policyFeedFilters.hidden = isForYou || isVotes;
+  if (policyFeedPanel) policyFeedPanel.hidden = isForYou || isVotes;
   if (forYouFeedPanel) forYouFeedPanel.hidden = !isForYou;
-  if (feedManageTopics) feedManageTopics.hidden = tabName === "all";
+  if (votesFeedPanel) votesFeedPanel.hidden = !isVotes;
+  if (feedManageTopics) feedManageTopics.hidden = tabName === "all" || isVotes;
 
   // Coverage badges are most useful on All News.
   if (policyFeedCoverage) {
@@ -1429,7 +1610,7 @@ function setActiveTab(tabName) {
 }
 
 function renderActiveTab() {
-  if (activeTab === "foryou") return;
+  if (activeTab === "foryou" || activeTab === "votes") return;
   if (activeTab === "mine") {
     renderMyFeed();
     return;
@@ -1476,6 +1657,8 @@ async function activateTab(tabName, { force = false } = {}) {
     await loadForYouSuggestions({ force });
   } else if (tabName === "mine") {
     await renderMyFeed();
+  } else if (tabName === "votes") {
+    await loadVotesTab({ force });
   } else {
     renderActiveTab();
   }
@@ -1559,6 +1742,21 @@ tabForYouFeed?.addEventListener("click", () => {
   activateTab("foryou");
 });
 
+tabVotesFeed?.addEventListener("click", () => {
+  votesQuizMode = false;
+  activateTab("votes");
+});
+
+votesSubjectChips?.addEventListener("click", (event) => {
+  const chip = event.target.closest(".votes-subject-chip");
+  if (!chip) return;
+  votesSubject = String(chip.dataset.subject || "");
+  syncVotesSubjectChips();
+  syncTabQuery("votes");
+  votesLoaded = false;
+  loadVotesTab({ force: true });
+});
+
 stateFilterSelect?.addEventListener("change", async () => {
   filterState.stateCode = String(stateFilterSelect.value || "").toUpperCase();
   await refreshWithFilters();
@@ -1631,11 +1829,23 @@ locationForm?.addEventListener("submit", async (event) => {
 
   syncFilterControls();
 
+  const params = new URLSearchParams(window.location.search);
+  votesQuizMode =
+    params.get("quiz") === "1" ||
+    String(params.get("tab") || "").toLowerCase() === "quiz";
+  votesSubject = String(params.get("subject") || "").trim().toLowerCase();
+  syncVotesSubjectChips();
+
   const initialTab = tabFromQuery();
 
   try {
-    await loadBillsPoliciesPage();
-    await activateTab(initialTab, { force: true });
+    if (initialTab === "votes") {
+      setActiveTab("votes");
+      await loadVotesTab({ force: true });
+    } else {
+      await loadBillsPoliciesPage();
+      await activateTab(initialTab, { force: true });
+    }
   } catch (error) {
     console.error(error);
     setPolicyFeedStatus(error.message || "Could not load page.", "error");

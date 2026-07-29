@@ -228,7 +228,25 @@
     const params = new URLSearchParams();
     params.set("billId", item.id);
     if (stance) params.set("stance", stance);
-    const bios = houseRepBioguides();
+    if (item.rollCallNumber) {
+      params.set("rollCallNumber", String(item.rollCallNumber));
+    }
+    if (item.sessionNumber) {
+      params.set("sessionNumber", String(item.sessionNumber));
+    }
+    if (item.congress) {
+      params.set("congress", String(item.congress));
+    }
+    const fromItem = Array.isArray(item.compareBioguides)
+      ? item.compareBioguides
+      : [];
+    const bios = [
+      ...new Set(
+        [...houseRepBioguides(), ...fromItem]
+          .map((id) => String(id || "").toUpperCase())
+          .filter(Boolean)
+      ),
+    ];
     if (bios.length) params.set("bioguides", bios.join(","));
     if (typeof API_KEY === "string" && API_KEY.trim()) {
       params.set("api_key", API_KEY.trim());
@@ -637,6 +655,17 @@ Sincerely,
       await loadMatchScores(client);
     }
     await refreshMountedCard(item, roots, votePayload);
+    if (typeof roots.onStanceChange === "function") {
+      try {
+        await roots.onStanceChange({
+          item,
+          stance: activeStance,
+          votePayload,
+        });
+      } catch (error) {
+        console.warn(error);
+      }
+    }
   }
 
   async function refreshMountedCard(item, roots, votePayload = null) {
@@ -649,8 +678,10 @@ Sincerely,
     opposeBtn.classList.toggle("is-active", mine === "oppose");
     supportBtn.setAttribute("aria-pressed", String(mine === "support"));
     opposeBtn.setAttribute("aria-pressed", String(mine === "oppose"));
-    const stats = await fetchCommunity(item.id);
-    communityBody.innerHTML = renderCommunityHtml(stats);
+    if (communityBody) {
+      const stats = await fetchCommunity(item.id);
+      communityBody.innerHTML = renderCommunityHtml(stats);
+    }
     if (alignmentEl) {
       alignmentEl.outerHTML =
         alignmentChipHtml() ||
@@ -670,33 +701,62 @@ Sincerely,
     }
   }
 
-  function mount(card, item) {
+  function mount(card, item, options = {}) {
     if (!card || !item?.id) return;
     if (card.querySelector(".policy-engage")) return;
+
+    const supportLabel = options.supportLabel || "Support 👍";
+    const opposeLabel = options.opposeLabel || "Oppose 👎";
+    const prompt = options.prompt || "";
+    const showTakeAction = options.showTakeAction !== false;
+    const showCommunity = options.showCommunity !== false;
+    const whoVotedHint =
+      options.whoVotedHint ||
+      "Tap Support or Oppose to compare with House roll call votes.";
+    if (Array.isArray(options.compareBioguides) && options.compareBioguides.length) {
+      item.compareBioguides = options.compareBioguides;
+    }
 
     const wrap = document.createElement("section");
     wrap.className = "policy-engage";
     wrap.innerHTML = `
+      ${
+        prompt
+          ? `<p class="policy-engage__prompt">${escapeHtml(prompt)}</p>`
+          : ""
+      }
       <div class="policy-engage__actions">
         <div class="policy-engage__stances" role="group" aria-label="Your stance">
-          <button type="button" class="policy-engage__stance policy-engage__stance--support" data-stance="support" aria-pressed="false">Support 👍</button>
-          <button type="button" class="policy-engage__stance policy-engage__stance--oppose" data-stance="oppose" aria-pressed="false">Oppose 👎</button>
+          <button type="button" class="policy-engage__stance policy-engage__stance--support" data-stance="support" aria-pressed="false">${escapeHtml(
+            supportLabel
+          )}</button>
+          <button type="button" class="policy-engage__stance policy-engage__stance--oppose" data-stance="oppose" aria-pressed="false">${escapeHtml(
+            opposeLabel
+          )}</button>
         </div>
-        <button type="button" class="refresh-btn policy-engage__take-action">Take Action</button>
+        ${
+          showTakeAction
+            ? `<button type="button" class="refresh-btn policy-engage__take-action">Take Action</button>`
+            : ""
+        }
         ${alignmentChipHtml() || '<span class="policy-engage__alignment is-empty" hidden></span>'}
       </div>
       <details class="policy-engage__votes" open>
         <summary>Who Voted With Me?</summary>
         <div class="policy-engage__vote-body">
-          <p class="policy-engage__vote-empty">Tap Support or Oppose to compare with House roll call votes.</p>
+          <p class="policy-engage__vote-empty">${escapeHtml(whoVotedHint)}</p>
         </div>
       </details>
-      <details class="policy-engage__community">
+      ${
+        showCommunity
+          ? `<details class="policy-engage__community">
         <summary>Community Stances</summary>
         <div class="policy-engage__community-body">
           <p class="policy-engage__community-empty">Loading community split…</p>
         </div>
-      </details>
+      </details>`
+          : ""
+      }
     `;
 
     // Keep engagement actions at the bottom of the card.
@@ -709,6 +769,7 @@ Sincerely,
       communityBody: wrap.querySelector(".policy-engage__community-body"),
       voteBody: wrap.querySelector(".policy-engage__vote-body"),
       alignmentEl: wrap.querySelector(".policy-engage__alignment"),
+      onStanceChange: options.onStanceChange || null,
     };
 
     const mine = state.stances.get(item.id);
@@ -733,20 +794,24 @@ Sincerely,
         alert(error.message || "Could not save stance.");
       }
     });
-    wrap.querySelector(".policy-engage__take-action").addEventListener("click", () => {
-      openTakeAction(item).catch((error) => {
-        console.error(error);
-        alert(error.message || "Could not open Take Action.");
+    wrap
+      .querySelector(".policy-engage__take-action")
+      ?.addEventListener("click", () => {
+        openTakeAction(item).catch((error) => {
+          console.error(error);
+          alert(error.message || "Could not open Take Action.");
+        });
       });
-    });
 
     const details = wrap.querySelector(".policy-engage__community");
     let loaded = false;
-    details.addEventListener("toggle", async () => {
+    details?.addEventListener("toggle", async () => {
       if (!details.open || loaded) return;
       loaded = true;
       const stats = await fetchCommunity(item.id);
-      roots.communityBody.innerHTML = renderCommunityHtml(stats);
+      if (roots.communityBody) {
+        roots.communityBody.innerHTML = renderCommunityHtml(stats);
+      }
     });
 
     if (mine) {
@@ -754,6 +819,18 @@ Sincerely,
         roots.voteBody.innerHTML = renderWhoVotedHtml(mine, payload);
       });
     }
+  }
+
+  function mountVote(card, item, options = {}) {
+    return mount(card, item, {
+      supportLabel: "Yea",
+      opposeLabel: "Nay",
+      prompt: "How would you vote?",
+      showTakeAction: false,
+      showCommunity: false,
+      whoVotedHint: "Tap Yea or Nay to compare with House members.",
+      ...options,
+    });
   }
 
   function renderHeaderScore(target) {
@@ -782,6 +859,7 @@ Sincerely,
   global.PolicyEngagement = {
     init,
     mount,
+    mountVote,
     renderHeaderScore,
     openTakeAction,
     getState: () => state,

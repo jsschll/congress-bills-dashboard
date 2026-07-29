@@ -177,13 +177,43 @@ module.exports = async function handler(req, res) {
     return json(res, 400, { error: "stance must be support or oppose" });
   }
 
+  const preferredRoll = Number(req.query.rollCallNumber || req.query.roll || 0);
+  const preferredSession = Number(req.query.sessionNumber || req.query.session || 0);
+
   try {
-    const voteRefs = await findHouseVotesForBill(
+    let voteRefs = await findHouseVotesForBill(
       apiKey,
       parsed.congress || CONGRESS,
       parsed.type,
       parsed.number
     );
+
+    if (preferredRoll) {
+      const preferred = {
+        congress: parsed.congress || CONGRESS,
+        sessionNumber: preferredSession || 1,
+        rollCallNumber: preferredRoll,
+        source: "request",
+      };
+      voteRefs = [
+        preferred,
+        ...(preferredSession
+          ? []
+          : [
+              { ...preferred, sessionNumber: 1 },
+              { ...preferred, sessionNumber: 2 },
+            ]),
+        ...voteRefs,
+      ];
+      // Dedupe after prepend
+      const seen = new Set();
+      voteRefs = voteRefs.filter((vote) => {
+        const key = `${vote.congress}-${vote.sessionNumber}-${vote.rollCallNumber}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return Boolean(vote.rollCallNumber);
+      });
+    }
 
     if (!voteRefs.length) {
       return json(res, 200, {

@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729ag" />
+    <link rel="stylesheet" href="styles.css?v=20260729ai" />
   </head>
   <body class="page-app page-feed">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -54,6 +54,14 @@
           data-tab="foryou"
         >
           For You
+        </button>
+        <button
+          id="tab-votes-feed"
+          class="policy-feed-tabs__button"
+          type="button"
+          data-tab="votes"
+        >
+          Votes
         </button>
       </section>
 
@@ -119,13 +127,82 @@
           <div id="foryou-list" class="feed-stream"></div>
         </section>
       </div>
+
+      <div id="votes-feed-panel" hidden>
+        <section
+          id="votes-feed-filters"
+          class="policy-feed-filters votes-feed-filters"
+          aria-label="Filter votes"
+        >
+          <p class="votes-feed-lead">
+            How would you vote? Compare Yea / Nay with the House. Procedural
+            votes are filtered out; plain-English summaries explain each roll
+            call.
+          </p>
+          <div
+            id="votes-subject-chips"
+            class="votes-subject-chips"
+            role="group"
+            aria-label="Subject"
+          >
+            <button type="button" class="votes-subject-chip is-active" data-subject="">
+              All subjects
+            </button>
+            <button type="button" class="votes-subject-chip" data-subject="healthcare">
+              Healthcare
+            </button>
+            <button type="button" class="votes-subject-chip" data-subject="defense">
+              Defense
+            </button>
+            <button type="button" class="votes-subject-chip" data-subject="economy">
+              Economy
+            </button>
+            <button type="button" class="votes-subject-chip" data-subject="tech">
+              Tech
+            </button>
+            <button type="button" class="votes-subject-chip" data-subject="energy">
+              Energy
+            </button>
+            <button
+              type="button"
+              class="votes-subject-chip"
+              data-subject="civil_rights"
+            >
+              Civil rights
+            </button>
+            <button
+              type="button"
+              class="votes-subject-chip"
+              data-subject="immigration"
+            >
+              Immigration
+            </button>
+          </div>
+        </section>
+        <p id="votes-quiz-banner" class="votes-quiz-banner" hidden>
+          Quick Match: answer a few recent key votes — your Action Match scores
+          update across politician profiles.
+        </p>
+        <p id="votes-feed-status" class="status" hidden></p>
+        <section
+          id="votes-feed-empty"
+          class="policy-feed-empty"
+          hidden
+          aria-live="polite"
+        ></section>
+        <section
+          id="votes-feed-list"
+          class="votes-feed-list"
+          aria-live="polite"
+        ></section>
+      </div>
     </main>
 
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260729ag"></script>
-    <script src="engagement.js?v=20260729t"></script>
+    <script src="engagement.js?v=20260729u"></script>
     <script src="impact.js?v=20260729z"></script>
-    <script src="bills-policies.js?v=20260729ag" defer></script>
+    <script src="bills-policies.js?v=20260729ah" defer></script>
   </body>
 </html>
