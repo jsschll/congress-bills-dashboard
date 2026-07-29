@@ -1,5 +1,14 @@
 const profileStatus = document.getElementById("profile-status");
 const profileHeading = document.getElementById("profile-heading");
+const accountSummary = document.getElementById("profile-account-summary");
+const accountForm = document.getElementById("profile-account-form");
+const displayNameInput = document.getElementById("profile-display-name");
+const avatarPreview = document.getElementById("profile-avatar-preview");
+const headerAvatar = document.getElementById("profile-header-avatar");
+const avatarLabel = document.getElementById("profile-avatar-label");
+const avatarPresetList = document.getElementById("profile-avatar-preset-list");
+const avatarFileInput = document.getElementById("profile-avatar-file");
+const avatarClearBtn = document.getElementById("profile-avatar-clear");
 const addressForm = document.getElementById("profile-address-form");
 const addressInput = document.getElementById("profile-address-input");
 const addressLabel = document.getElementById("profile-address-label");
@@ -72,12 +81,14 @@ const VOTER_INFO_FALLBACK =
 const ACCORDION_STORAGE_KEY = "profileAccordionState";
 
 const PROFILE_SELECT =
-  "username, email, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status, estimated_property_value, estimated_income, filing_status, vehicle_count";
+  "username, email, display_name, avatar_url, home_address, location_precision, impact_scale, notify_critical, notify_digest, notify_neighborhood, voter_registration_status, estimated_property_value, estimated_income, filing_status, vehicle_count";
 
 let currentUser = null;
 let profile = {
   username: "",
   email: "",
+  display_name: "",
+  avatar_url: "",
   home_address: "",
   location_precision: "street",
   impact_scale: "state",
@@ -90,6 +101,7 @@ let profile = {
   filing_status: "single",
   vehicle_count: 1,
 };
+let pendingAvatarUrl = null;
 let followedBillOptions = [];
 let followedPoliticianOptions = [];
 let civicActions = [];
@@ -288,6 +300,15 @@ function syncRegistrationView() {
 }
 
 function syncPreferenceSummaries() {
+  if (accountSummary) {
+    const name =
+      typeof profileFirstName === "function"
+        ? profileFirstName(profile, currentUser)
+        : profile.display_name || profile.username || "Account";
+    accountSummary.textContent = profile.avatar_url
+      ? `${name} · avatar set`
+      : `${name} · initials`;
+  }
   if (impactSummary) {
     impactSummary.textContent = impactScaleLabel(profile.impact_scale);
   }
@@ -406,12 +427,78 @@ async function loadAlignmentBreakdown() {
   renderAlignmentChart(data);
 }
 
+function accountLabel() {
+  return (
+    profile.display_name ||
+    profile.username ||
+    profile.email ||
+    currentUser?.email ||
+    "You"
+  );
+}
+
+function refreshAvatarUI() {
+  const avatarUrl =
+    pendingAvatarUrl !== null ? pendingAvatarUrl : profile.avatar_url || "";
+  const label = accountLabel();
+  if (typeof applyAvatarElement === "function") {
+    applyAvatarElement(avatarPreview, { avatarUrl, label });
+    applyAvatarElement(headerAvatar, { avatarUrl, label });
+  }
+  if (avatarLabel) {
+    avatarLabel.textContent =
+      typeof profileFirstName === "function"
+        ? profileFirstName(
+            { ...profile, display_name: displayNameInput?.value || profile.display_name },
+            currentUser
+          )
+        : label;
+  }
+  if (avatarPresetList) {
+    avatarPresetList.querySelectorAll("[data-preset]").forEach((btn) => {
+      const active =
+        typeof avatarPresetId === "function" &&
+        avatarPresetId(avatarUrl) === btn.dataset.preset;
+      btn.classList.toggle("is-active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    });
+  }
+}
+
+function renderAvatarPresets() {
+  if (!avatarPresetList || typeof AVATAR_PRESETS === "undefined") return;
+  avatarPresetList.replaceChildren();
+  for (const preset of AVATAR_PRESETS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "profile-avatar-presets__swatch";
+    button.dataset.preset = preset.id;
+    button.title = preset.label;
+    button.setAttribute("aria-label", `${preset.label} avatar`);
+    button.style.background = `linear-gradient(135deg, ${preset.from}, ${preset.to})`;
+    button.textContent =
+      typeof profileInitials === "function"
+        ? profileInitials(accountLabel())
+        : "?";
+    button.addEventListener("click", () => {
+      pendingAvatarUrl = `preset:${preset.id}`;
+      refreshAvatarUI();
+    });
+    avatarPresetList.append(button);
+  }
+}
+
 function fillFormsFromProfile() {
   if (profileHeading) {
     profileHeading.textContent = profile.username
       ? `${profile.username}'s profile`
       : "Profile";
   }
+  if (displayNameInput) displayNameInput.value = profile.display_name || "";
+  pendingAvatarUrl = null;
+  renderAvatarPresets();
+  refreshAvatarUI();
+
   if (addressInput) addressInput.value = profile.home_address || "";
   const precision = profile.location_precision === "zip" ? "zip" : "street";
   const precisionInput = addressForm?.querySelector(
@@ -475,6 +562,8 @@ async function loadProfileRow(userId) {
     return {
       username: fallback.data?.username || "",
       email: fallback.data?.email || "",
+      display_name: "",
+      avatar_url: "",
       home_address: fallback.data?.home_address || "",
       location_precision: "street",
       impact_scale: "state",
@@ -492,6 +581,8 @@ async function loadProfileRow(userId) {
   return {
     username: data?.username || "",
     email: data?.email || "",
+    display_name: data?.display_name || "",
+    avatar_url: data?.avatar_url || "",
     home_address: data?.home_address || "",
     location_precision: data?.location_precision || "street",
     impact_scale: data?.impact_scale || "state",
@@ -1339,6 +1430,65 @@ impactForm?.addEventListener("submit", async (event) => {
   }
 });
 
+accountForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const displayName = String(displayNameInput?.value || "").trim();
+  const nextAvatar =
+    pendingAvatarUrl !== null ? pendingAvatarUrl : profile.avatar_url || "";
+  setProfileStatus("Saving account…", "loading");
+  try {
+    await saveProfilePatch({
+      display_name: displayName || null,
+      avatar_url: nextAvatar || null,
+    });
+    pendingAvatarUrl = null;
+    refreshAvatarUI();
+    syncPreferenceSummaries();
+    // Refresh nav avatar/name without full reload.
+    if (typeof renderAppNav === "function") {
+      await renderAppNav("profile");
+    }
+    setProfileStatus("Account settings saved.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(
+      error.message ||
+        "Could not save account. Run migration-profile-avatar.sql in Supabase if columns are missing.",
+      "error"
+    );
+  }
+});
+
+displayNameInput?.addEventListener("input", () => {
+  refreshAvatarUI();
+});
+
+avatarFileInput?.addEventListener("change", async () => {
+  const file = avatarFileInput.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    setProfileStatus("Choose an image file.", "error");
+    return;
+  }
+  setProfileStatus("Uploading avatar…", "loading");
+  try {
+    const url = await uploadProfileAvatar(currentUser.id, file);
+    pendingAvatarUrl = url;
+    refreshAvatarUI();
+    setProfileStatus("Avatar ready — click Save account to keep it.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(error.message || "Could not upload avatar.", "error");
+  } finally {
+    avatarFileInput.value = "";
+  }
+});
+
+avatarClearBtn?.addEventListener("click", () => {
+  pendingAvatarUrl = "";
+  refreshAvatarUI();
+});
+
 pocketbookForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   setProfileStatus("Saving pocketbook baselines…", "loading");
@@ -1548,6 +1698,9 @@ registrationForm?.addEventListener("submit", async (event) => {
       loadElectionCenter(),
     ]);
     setProfileStatus("", "success");
+    if (window.location.hash === "#account" || window.location.hash === "#settings") {
+      document.getElementById("account")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   } catch (error) {
     console.error(error);
     setProfileStatus(error.message || "Could not load profile.", "error");

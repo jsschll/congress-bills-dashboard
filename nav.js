@@ -25,25 +25,7 @@ function buildLoggedOutActions(actions) {
   actions.append(signIn, signUp);
 }
 
-function buildLoggedInActions(actions, { userLabel, onSignOut }) {
-  actions.replaceChildren();
-
-  const profile = document.createElement("a");
-  profile.className = "app-nav__button app-nav__button--ghost";
-  profile.href = "profile.html";
-  profile.textContent = "Profile";
-  if (userLabel) profile.title = userLabel;
-
-  const outBtn = document.createElement("button");
-  outBtn.type = "button";
-  outBtn.className = "app-nav__button app-nav__button--primary";
-  outBtn.textContent = "Sign out";
-  outBtn.addEventListener("click", onSignOut);
-
-  actions.append(profile, outBtn);
-}
-
-function syncHeaderAuth(user) {
+function syncHeaderAuth(user, profile = null) {
   const headerActions = document.querySelector(".header__actions");
   if (!headerActions) return;
 
@@ -51,17 +33,11 @@ function syncHeaderAuth(user) {
   headerActions.replaceChildren();
 
   if (user) {
-    const profile = document.createElement("a");
-    profile.className = "app-nav__button app-nav__button--ghost";
-    profile.href = "profile.html";
-    profile.textContent = "Profile";
-
-    const outBtn = document.createElement("button");
-    outBtn.type = "button";
-    outBtn.className = "app-nav__button app-nav__button--primary";
-    outBtn.textContent = "Sign out";
-    outBtn.addEventListener("click", () => signOut());
-    headerActions.append(profile, outBtn);
+    const menu = buildUserMenuControl(user, profile, {
+      compact: true,
+      onSignOut: () => signOut(),
+    });
+    headerActions.append(menu);
   } else {
     const signIn = document.createElement("a");
     signIn.className = "app-nav__button app-nav__button--ghost";
@@ -125,53 +101,142 @@ function createNavShell(activePage = "home") {
   return { nav, actions };
 }
 
-async function getProfileLabel(user) {
+async function getNavProfile(user) {
   const client = getSupabase();
-  if (!client || !user) return user?.email || "Signed in";
+  if (!client || !user) {
+    return {
+      username: "",
+      email: user?.email || "",
+      display_name: "",
+      avatar_url: "",
+    };
+  }
 
-  const { data } = await client
+  const { data, error } = await client
     .from("profiles")
-    .select("username, email")
+    .select("username, email, display_name, avatar_url")
     .eq("id", user.id)
     .maybeSingle();
 
-  return data?.username || data?.email || user.email || "Signed in";
+  if (error) {
+    // Older DBs may not have avatar columns yet.
+    const fallback = await client
+      .from("profiles")
+      .select("username, email")
+      .eq("id", user.id)
+      .maybeSingle();
+    return {
+      username: fallback.data?.username || "",
+      email: fallback.data?.email || user.email || "",
+      display_name: "",
+      avatar_url: "",
+    };
+  }
+
+  return {
+    username: data?.username || "",
+    email: data?.email || user.email || "",
+    display_name: data?.display_name || "",
+    avatar_url: data?.avatar_url || "",
+  };
 }
 
-async function renderAppNav(activePage = "home") {
-  const { actions } = createNavShell(activePage);
+function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}) {
+  const wrap = document.createElement("div");
+  wrap.className = "user-menu";
 
-  let user = null;
-  try {
-    user = await getUser();
-  } catch (error) {
-    console.error(error);
-  }
+  const firstName = profileFirstName(profile, user);
+  const label =
+    profile.display_name ||
+    profile.username ||
+    profile.email ||
+    user?.email ||
+    "Account";
 
-  syncHeaderAuth(user);
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "user-menu__trigger";
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("aria-haspopup", "menu");
+  trigger.setAttribute("aria-label", `Account menu for ${firstName}`);
 
-  if (!user) {
-    buildLoggedOutActions(actions);
-    if (!isSupabaseConfigured()) {
-      const hint = document.createElement("span");
-      hint.className = "app-nav__hint";
-      hint.textContent = "Add SUPABASE_ANON_KEY in config.js";
-      actions.prepend(hint);
+  const avatar = document.createElement("span");
+  avatar.className = "user-avatar user-avatar--nav";
+  applyAvatarElement(avatar, {
+    avatarUrl: profile.avatar_url,
+    label: label,
+  });
+
+  const name = document.createElement("span");
+  name.className = "user-menu__name";
+  name.textContent = firstName;
+
+  const caret = document.createElement("span");
+  caret.className = "user-menu__caret";
+  caret.setAttribute("aria-hidden", "true");
+  caret.textContent = "▾";
+
+  trigger.append(avatar, name, caret);
+
+  const panel = document.createElement("div");
+  panel.className = "user-menu__panel";
+  panel.setAttribute("role", "menu");
+  panel.hidden = true;
+
+  const mkItem = (tag, { href, text, danger = false, onClick } = {}) => {
+    const item = document.createElement(tag);
+    item.className = `user-menu__item${danger ? " user-menu__item--danger" : ""}`;
+    item.setAttribute("role", "menuitem");
+    item.textContent = text;
+    if (href) item.href = href;
+    if (onClick) {
+      item.type = "button";
+      item.addEventListener("click", onClick);
     }
-    return;
-  }
+    return item;
+  };
 
-  actions.replaceChildren();
+  panel.append(
+    mkItem("a", { href: "profile.html#account", text: "Settings" }),
+    mkItem("a", { href: "profile.html", text: "Profile" }),
+    mkItem("button", {
+      text: "Sign out",
+      danger: true,
+      onClick: () => {
+        if (typeof onSignOut === "function") onSignOut();
+        else signOut();
+      },
+    })
+  );
 
-  let unreadCount = 0;
-  let notifications = [];
-  try {
-    notifications = await fetchNotifications({ limit: 8 });
-    unreadCount = notifications.filter((item) => !item.read_at).length;
-  } catch (error) {
-    console.error(error);
-  }
+  const close = () => {
+    panel.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+  };
 
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const open = panel.hidden;
+    // Close notification panels if open
+    document.querySelectorAll(".notif-bell__panel").forEach((el) => {
+      el.hidden = true;
+    });
+    document.querySelectorAll(".notif-bell__button").forEach((el) => {
+      el.setAttribute("aria-expanded", "false");
+    });
+    panel.hidden = !open;
+    trigger.setAttribute("aria-expanded", String(open));
+  });
+
+  document.addEventListener("click", close);
+  panel.addEventListener("click", (event) => event.stopPropagation());
+
+  wrap.append(trigger, panel);
+  if (compact) wrap.classList.add("user-menu--compact");
+  return wrap;
+}
+
+function buildNotificationBell(notifications, unreadCount) {
   const bellWrap = document.createElement("div");
   bellWrap.className = "notif-bell";
 
@@ -181,7 +246,12 @@ async function renderAppNav(activePage = "home") {
   bellBtn.setAttribute("aria-label", "Notifications");
   bellBtn.setAttribute("aria-expanded", "false");
   bellBtn.innerHTML = `
-    <span class="notif-bell__icon" aria-hidden="true">🔔</span>
+    <span class="notif-bell__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+        <path d="M12 3a5 5 0 0 0-5 5v2.1c0 .7-.2 1.4-.6 2L5.2 14.5A1 1 0 0 0 6 16h12a1 1 0 0 0 .8-1.5L17.6 12.1c-.4-.6-.6-1.3-.6-2V8a5 5 0 0 0-5-5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M10 17a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+    </span>
     ${
       unreadCount
         ? `<span class="notif-bell__badge">${unreadCount > 9 ? "9+" : unreadCount}</span>`
@@ -232,6 +302,12 @@ async function renderAppNav(activePage = "home") {
   bellBtn.addEventListener("click", (event) => {
     event.stopPropagation();
     const open = panel.hidden;
+    document.querySelectorAll(".user-menu__panel").forEach((el) => {
+      el.hidden = true;
+    });
+    document.querySelectorAll(".user-menu__trigger").forEach((el) => {
+      el.setAttribute("aria-expanded", "false");
+    });
     panel.hidden = !open;
     bellBtn.setAttribute("aria-expanded", String(open));
   });
@@ -243,21 +319,49 @@ async function renderAppNav(activePage = "home") {
   panel.addEventListener("click", (event) => event.stopPropagation());
 
   bellWrap.append(bellBtn, panel);
+  return bellWrap;
+}
 
-  const userLabel = await getProfileLabel(user);
-  const profileBtn = document.createElement("a");
-  profileBtn.className = "app-nav__button app-nav__button--ghost";
-  profileBtn.href = "profile.html";
-  profileBtn.textContent = "Profile";
-  profileBtn.title = userLabel;
+async function renderAppNav(activePage = "home") {
+  const { actions } = createNavShell(activePage);
 
-  const outBtn = document.createElement("button");
-  outBtn.type = "button";
-  outBtn.className = "app-nav__button app-nav__button--primary";
-  outBtn.textContent = "Sign out";
-  outBtn.addEventListener("click", () => signOut());
+  let user = null;
+  try {
+    user = await getUser();
+  } catch (error) {
+    console.error(error);
+  }
 
-  actions.replaceChildren(bellWrap, profileBtn, outBtn);
+  if (!user) {
+    syncHeaderAuth(null);
+    buildLoggedOutActions(actions);
+    if (!isSupabaseConfigured()) {
+      const hint = document.createElement("span");
+      hint.className = "app-nav__hint";
+      hint.textContent = "Add SUPABASE_ANON_KEY in config.js";
+      actions.prepend(hint);
+    }
+    return;
+  }
+
+  const profile = await getNavProfile(user);
+  syncHeaderAuth(user, profile);
+
+  let unreadCount = 0;
+  let notifications = [];
+  try {
+    notifications = await fetchNotifications({ limit: 8 });
+    unreadCount = notifications.filter((item) => !item.read_at).length;
+  } catch (error) {
+    console.error(error);
+  }
+
+  const bellWrap = buildNotificationBell(notifications, unreadCount);
+  const userMenu = buildUserMenuControl(user, profile, {
+    onSignOut: () => signOut(),
+  });
+
+  actions.replaceChildren(bellWrap, userMenu);
 }
 
 function escapeHtml(value) {

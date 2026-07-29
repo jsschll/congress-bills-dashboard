@@ -126,3 +126,136 @@ function formatShortDate(value) {
     day: "numeric",
   });
 }
+
+const AVATAR_PRESETS = [
+  { id: "slate", label: "Slate", from: "#334155", to: "#0f172a" },
+  { id: "emerald", label: "Emerald", from: "#059669", to: "#064e3b" },
+  { id: "ocean", label: "Ocean", from: "#2563eb", to: "#1e3a8a" },
+  { id: "amber", label: "Amber", from: "#d97706", to: "#78350f" },
+  { id: "rose", label: "Rose", from: "#e11d48", to: "#881337" },
+  { id: "violet", label: "Violet", from: "#7c3aed", to: "#4c1d95" },
+];
+
+function avatarPresetId(avatarUrl = "") {
+  const match = String(avatarUrl || "").match(/^preset:([a-z0-9_-]+)$/i);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function findAvatarPreset(id) {
+  return AVATAR_PRESETS.find((preset) => preset.id === id) || null;
+}
+
+function profileInitials(label = "") {
+  const parts = String(label || "")
+    .trim()
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+}
+
+function profileFirstName(profile = {}, user = null) {
+  const display = String(profile.display_name || "").trim();
+  if (display) return display.split(/\s+/)[0];
+  const username = String(profile.username || "").trim();
+  if (username) return username;
+  const email = String(profile.email || user?.email || "").trim();
+  if (email.includes("@")) return email.split("@")[0];
+  return "Account";
+}
+
+function resolveAvatarUrl(avatarUrl = "") {
+  const value = String(avatarUrl || "").trim();
+  if (!value) return "";
+  if (/^preset:/i.test(value)) return "";
+  return value;
+}
+
+function applyAvatarElement(el, { avatarUrl = "", label = "" } = {}) {
+  if (!el) return;
+  const presetId = avatarPresetId(avatarUrl);
+  const preset = findAvatarPreset(presetId);
+  const imageUrl = resolveAvatarUrl(avatarUrl);
+  const initials = profileInitials(label);
+
+  el.classList.add("user-avatar");
+  el.replaceChildren();
+
+  if (imageUrl) {
+    const img = document.createElement("img");
+    img.className = "user-avatar__img";
+    img.src = imageUrl;
+    img.alt = "";
+    img.addEventListener("error", () => {
+      el.replaceChildren();
+      el.style.background = "linear-gradient(135deg, #334155, #0f172a)";
+      el.textContent = initials;
+      el.removeAttribute("data-avatar-image");
+    });
+    el.style.background = "";
+    el.dataset.avatarImage = "1";
+    el.append(img);
+    return;
+  }
+
+  el.removeAttribute("data-avatar-image");
+  if (preset) {
+    el.style.background = `linear-gradient(135deg, ${preset.from}, ${preset.to})`;
+  } else {
+    el.style.background = "linear-gradient(135deg, #334155, #0f172a)";
+  }
+  el.textContent = initials;
+}
+
+async function compressImageFile(file, { maxSize = 256, quality = 0.82 } = {}) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close?.();
+  const blob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", quality)
+  );
+  if (!blob) throw new Error("Could not process image.");
+  return blob;
+}
+
+async function uploadProfileAvatar(userId, file) {
+  const client = getSupabase();
+  if (!client || !userId) throw new Error("Not signed in.");
+  const blob = await compressImageFile(file);
+  const path = `${userId}/avatar.jpg`;
+
+  try {
+    const { error } = await client.storage
+      .from("avatars")
+      .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+    if (error) throw error;
+    const { data } = client.storage.from("avatars").getPublicUrl(path);
+    const publicUrl = data?.publicUrl;
+    if (!publicUrl) throw new Error("Missing public avatar URL.");
+    return `${publicUrl}?v=${Date.now()}`;
+  } catch (error) {
+    // Fallback when storage bucket/policies are not configured yet.
+    console.warn("Avatar storage upload failed; using inline image.", error);
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Could not read image."));
+      reader.readAsDataURL(blob);
+    });
+    if (!dataUrl || dataUrl.length > 180000) {
+      throw new Error(
+        "Image is too large to save without Storage. Run migration-profile-avatar.sql in Supabase, then try again."
+      );
+    }
+    return dataUrl;
+  }
+}
+

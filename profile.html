@@ -10,14 +10,14 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729t" />
+    <link rel="stylesheet" href="styles.css?v=20260729v" />
   </head>
   <body class="page-app page-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
     <main class="page page--profile">
-      <header class="header">
-        <div>
+      <header class="header profile-header">
+        <div class="profile-header__intro">
           <p class="eyebrow">Your civic profile</p>
           <h1 id="profile-heading">Profile</h1>
           <p class="subtitle">
@@ -25,11 +25,107 @@
             follow.
           </p>
         </div>
+        <div class="profile-header__avatar-wrap" aria-hidden="true">
+          <span id="profile-header-avatar" class="user-avatar user-avatar--lg"></span>
+        </div>
       </header>
 
       <p id="profile-status" class="status" hidden></p>
 
       <section class="profile-grid">
+        <section
+          id="account"
+          class="profile-panel"
+          data-accordion
+          data-accordion-key="account"
+          aria-labelledby="profile-account-title"
+        >
+          <button
+            type="button"
+            class="profile-accordion__trigger"
+            aria-expanded="true"
+          >
+            <span class="profile-accordion__titles">
+              <span id="profile-account-title" class="profile-accordion__title"
+                >Account & avatar</span
+              >
+              <span
+                id="profile-account-summary"
+                class="profile-accordion__summary"
+              ></span>
+            </span>
+            <span class="profile-accordion__icon" aria-hidden="true"></span>
+          </button>
+          <div class="profile-accordion__body">
+            <p class="profile-panel__lede">
+              Choose how you appear in the top menu. Upload a photo or pick a
+              color preset.
+            </p>
+
+            <div class="profile-avatar-editor">
+              <div class="profile-avatar-editor__preview">
+                <span
+                  id="profile-avatar-preview"
+                  class="user-avatar user-avatar--xl"
+                ></span>
+                <div>
+                  <p id="profile-avatar-label" class="profile-avatar-editor__name"></p>
+                  <p class="profile-form__note">
+                    Shown next to your name in the navigation menu.
+                  </p>
+                </div>
+              </div>
+
+              <form id="profile-account-form" class="profile-form">
+                <label class="profile-form__field">
+                  Display name
+                  <input
+                    id="profile-display-name"
+                    name="display_name"
+                    type="text"
+                    maxlength="80"
+                    autocomplete="nickname"
+                    placeholder="First name or preferred name"
+                  />
+                </label>
+                <p class="profile-form__note">
+                  The menu shows your first name when a display name is set;
+                  otherwise it uses your username.
+                </p>
+
+                <fieldset class="profile-avatar-presets">
+                  <legend>Avatar presets</legend>
+                  <div
+                    id="profile-avatar-preset-list"
+                    class="profile-avatar-presets__grid"
+                  ></div>
+                </fieldset>
+
+                <label class="profile-form__field">
+                  Upload photo
+                  <input
+                    id="profile-avatar-file"
+                    name="avatar_file"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                  />
+                </label>
+
+                <div class="profile-form__actions">
+                  <button class="refresh-btn" type="submit">Save account</button>
+                  <button
+                    id="profile-avatar-clear"
+                    class="profile-btn profile-btn--ghost"
+                    type="button"
+                  >
+                    Use initials
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
         <section
           class="profile-panel"
           data-accordion
@@ -713,9 +809,9 @@
 
     <script src="config.js"></script>
     <script src="shared.js"></script>
-    <script src="nav.js?v=20260729m"></script>
+    <script src="nav.js?v=20260729v"></script>
     <script src="politicians-shared.js?v=20260729u"></script>
     <script src="engagement.js?v=20260729t"></script>
-    <script src="profile.js?v=20260729t" defer></script>
+    <script src="profile.js?v=20260729v" defer></script>
   </body>
 </html>
