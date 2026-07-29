@@ -1139,16 +1139,16 @@ function setVotesFeedStatus(message, type = "loading") {
 }
 
 function voteKindLabel(kind) {
-  if (kind === "final_passage") return "Final passage";
-  if (kind === "amendment") return "Amendment";
-  return "House vote";
+  if (kind === "final_passage") return "Pass or fail";
+  if (kind === "amendment") return "Change to bill";
+  return "Yes/No vote";
 }
 
 function formatVoteResultMeta(item) {
   const parts = [];
   if (item.result) parts.push(item.result);
   if (item.date) parts.push(formatShortDate(item.date));
-  if (item.rollCallNumber) parts.push(`Roll Call ${item.rollCallNumber}`);
+  if (item.rollCallNumber) parts.push(`Vote #${item.rollCallNumber}`);
   return parts.join(" · ");
 }
 
@@ -1163,15 +1163,15 @@ function renderVoteCard(item) {
       : {
           summary:
             String(item.shortPitch || "").trim() ||
-            "This is a recent congressional roll-call vote on the linked measure.",
+            "Congress took a recorded Yes/No vote on this bill or change.",
           yeaMeans:
             String(item.yeaMeans || "").trim() ||
-            "A Yea vote supports advancing this measure as written on this roll call.",
+            "Voting Yes means you want this to move forward as written.",
           nayMeans:
             String(item.nayMeans || "").trim() ||
-            "A Nay vote supports rejecting this measure on this roll call.",
-          yeaLabel: "Support Measure",
-          nayLabel: "Oppose Measure",
+            "Voting No means you want to stop this.",
+          yeaLabel: "Yes, support it",
+          nayLabel: "No, oppose it",
         };
   card.innerHTML = `
     <div class="policy-bill-card__header">
@@ -1179,7 +1179,7 @@ function renderVoteCard(item) {
         <div class="policy-bill-card__badges">
           <span class="policy-bill-card__level">${escapePolicyHtml(kind)}</span>
           <span class="policy-bill-card__bill-number">${escapePolicyHtml(
-            item.billNumber || `Roll Call ${item.rollCallNumber || ""}`
+            item.billNumber || `Vote ${item.rollCallNumber || ""}`
           )}</span>
           ${
             subject
@@ -1190,30 +1190,30 @@ function renderVoteCard(item) {
           }
         </div>
         <h2 class="policy-bill-card__title">${escapePolicyHtml(
-          item.title || item.voteQuestion || "House roll-call vote"
+          item.title || item.voteQuestion || "House Yes/No vote"
         )}</h2>
         <p class="policy-bill-card__meta">${escapePolicyHtml(
           formatVoteResultMeta(item)
         )}</p>
       </div>
     </div>
-    <section class="policy-bill-card__summary" aria-label="Plain English summary">
-      <h3 class="policy-bill-card__summary-label">What’s proposed</h3>
+    <section class="policy-bill-card__summary" aria-label="What this vote is about">
+      <h3 class="policy-bill-card__summary-label">What this vote is about</h3>
       <p class="policy-bill-card__pitch">${escapePolicyHtml(copy.summary)}</p>
     </section>
-    <div class="vote-feed-card__meanings" aria-label="What Yea and Nay mean">
+    <div class="vote-feed-card__meanings" aria-label="What Yes and No mean">
       <div class="vote-feed-card__meaning is-yea">
-        <strong>Yea means</strong>
+        <strong>Voting Yes means</strong>
         <p>${escapePolicyHtml(copy.yeaMeans)}</p>
       </div>
       <div class="vote-feed-card__meaning is-nay">
-        <strong>Nay means</strong>
+        <strong>Voting No means</strong>
         <p>${escapePolicyHtml(copy.nayMeans)}</p>
       </div>
     </div>
     <a class="bill-card__link" href="${escapePolicyHtml(
       item.clerkUrl || item.officialUrl || "#"
-    )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
+    )}" target="_blank" rel="noopener noreferrer">See the official vote record</a>
   `;
 
   if (window.PolicyEngagement?.mountVote) {

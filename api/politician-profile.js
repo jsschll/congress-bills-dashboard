@@ -5,8 +5,11 @@ const {
   isProceduralLegislation,
   classifyVoteKind,
   completeSentences,
+  plainVoteFallback,
   DEFAULT_YEA_LABEL,
   DEFAULT_NAY_LABEL,
+  DEFAULT_YEA_MEANS,
+  DEFAULT_NAY_MEANS,
 } = require("../lib/format-bill-summary");
 const {
   fetchRecentSenateVotesForMember,
@@ -115,39 +118,13 @@ function mapSubjectCategory(policyArea = "") {
 function plainEnglishForVote(vote, summaryText = "") {
   const crs = toSentences(summaryText, 2);
   if (crs) return crs;
-  const kind = vote.voteKind;
-  const chamberLabel =
-    String(vote.jurisdiction || "").toLowerCase().includes("senate") ||
-    String(vote.chamber || "").toLowerCase() === "senate"
-      ? "Senate"
-      : "House";
-  const bill = vote.billNumber || "this measure";
-  const title =
-    vote.title && vote.title !== vote.voteQuestion ? ` (${vote.title})` : "";
-  if (kind === "final_passage") {
-    return `This was a final ${chamberLabel} vote on whether to pass ${bill}${title}.`;
-  }
-  if (kind === "amendment") {
-    return `This ${chamberLabel} vote was on an amendment to ${bill}${title}.`;
-  }
-  const question = String(vote.voteQuestion || "").trim();
-  if (question) {
-    return `${chamberLabel} roll call on: ${question.replace(/\.$/, "")}.`;
-  }
-  if (vote.hasLinkedBill || (vote.legislationType && vote.legislationNumber)) {
-    return `${chamberLabel} roll-call vote on ${bill}${title}. Yea supports the measure on this question; Nay opposes it.`;
-  }
-  return `Recent ${chamberLabel} roll-call vote${
-    vote.result ? ` — result: ${vote.result}` : ""
-  }.`;
+  return plainVoteFallback(vote);
 }
 
-function yeaNayMeans(vote) {
+function yeaNayMeans() {
   return {
-    yeaMeans:
-      "A Yea vote supports advancing this measure as written on this roll call.",
-    nayMeans:
-      "A Nay vote supports rejecting this measure on this roll call.",
+    yeaMeans: DEFAULT_YEA_MEANS,
+    nayMeans: DEFAULT_NAY_MEANS,
     yeaLabel: DEFAULT_YEA_LABEL,
     nayLabel: DEFAULT_NAY_LABEL,
   };
@@ -527,7 +504,7 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             status: null,
             deltaSummary: { added: [], changed: [], removed: [] },
           };
-          const meanings = yeaNayMeans(base);
+          const meanings = yeaNayMeans();
           base.yeaMeans = meanings.yeaMeans;
           base.nayMeans = meanings.nayMeans;
           base.yeaLabel = meanings.yeaLabel;
@@ -586,7 +563,10 @@ async function enrichVoteCards(found, apiKey) {
           const card = await formatBillSummary(
             summary || vote.shortPitch || vote.voteQuestion || "",
             vote.title || vote.billNumber || "",
-            { forceHeuristic: absoluteIndex >= llmBudget }
+            {
+              forceHeuristic: absoluteIndex >= llmBudget,
+              voteMeta: vote,
+            }
           );
           vote.shortPitch = card.summary;
           vote.yeaMeans = card.yea_means;

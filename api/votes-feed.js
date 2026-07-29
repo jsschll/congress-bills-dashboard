@@ -6,8 +6,11 @@ const {
   isProceduralLegislation,
   classifyVoteKind,
   completeSentences,
+  plainVoteFallback,
   DEFAULT_YEA_LABEL,
   DEFAULT_NAY_LABEL,
+  DEFAULT_YEA_MEANS,
+  DEFAULT_NAY_MEANS,
 } = require("../lib/format-bill-summary");
 
 function json(res, status, body) {
@@ -128,23 +131,7 @@ function subjectMatches(vote, subjectQuery) {
 function plainEnglishForVote(vote, summaryText = "") {
   const crs = completeSentences(summaryText, { maxSentences: 2, maxChars: 480 });
   if (crs) return crs;
-  const kind = vote.voteKind;
-  const bill = vote.billNumber || "this measure";
-  const title = vote.title ? ` (${vote.title})` : "";
-  if (kind === "final_passage") {
-    return `This was a final House vote on whether to pass ${bill}${title}.`;
-  }
-  if (kind === "amendment") {
-    return `This House vote was on an amendment to ${bill}${title}.`;
-  }
-  const question = String(vote.voteQuestion || "").trim();
-  if (question) {
-    return completeSentences(`House roll call on: ${question}`, {
-      maxSentences: 1,
-      maxChars: 320,
-    });
-  }
-  return `Recent House roll-call vote on ${bill}.`;
+  return plainVoteFallback({ ...vote, chamber: "house" });
 }
 
 async function fetchBillSummary(congress, type, number, apiKey) {
@@ -346,7 +333,10 @@ module.exports = async function handler(req, res) {
             const card = await formatBillSummary(
               summary || vote.voteQuestion || "",
               vote.title || vote.billNumber || "",
-              { forceHeuristic: absoluteIndex >= llmBudget }
+              {
+                forceHeuristic: absoluteIndex >= llmBudget,
+                voteMeta: vote,
+              }
             );
             vote.shortPitch = card.summary;
             vote.yeaMeans = card.yea_means;
@@ -368,6 +358,8 @@ module.exports = async function handler(req, res) {
     // Keep remaining unenriched votes behind the enriched ones if needed.
     const remaining = cards.slice(enrichCount).map((vote) => {
       vote.shortPitch = plainEnglishForVote(vote);
+      vote.yeaMeans = vote.yeaMeans || DEFAULT_YEA_MEANS;
+      vote.nayMeans = vote.nayMeans || DEFAULT_NAY_MEANS;
       vote.yeaLabel = vote.yeaLabel || DEFAULT_YEA_LABEL;
       vote.nayLabel = vote.nayLabel || DEFAULT_NAY_LABEL;
       return vote;
