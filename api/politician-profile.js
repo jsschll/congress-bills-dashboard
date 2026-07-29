@@ -1,5 +1,6 @@
 const CONGRESS_API = "https://api.congress.gov/v3";
 const CONGRESS = 119;
+const { formatBillSummary } = require("../lib/format-bill-summary");
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -507,6 +508,8 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             shortPitch: "",
             yeaMeans: "",
             nayMeans: "",
+            yeaLabel: "Yea",
+            nayLabel: "Nay",
             officialUrl:
               type && number
                 ? `https://www.congress.gov/bill/${congress}th-congress/${type}/${number}`
@@ -542,37 +545,50 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
     }
   }
 
-  // Enrich a capped set with CRS summary + policy area for plain English.
+  // Enrich a capped set with CRS summary + plain-English card.
   // Keep this small so the profile API stays fast on Vercel.
   const enrichCount = Math.min(found.length, 8);
+  const llmBudget = env("OPENAI_API_KEY", "OPENAI_KEY", "AI_API_KEY") ? 3 : 0;
   const chunkEnrich = 4;
   for (let i = 0; i < enrichCount; i += chunkEnrich) {
     const chunk = found.slice(i, i + chunkEnrich);
     await Promise.all(
-      chunk.map(async (vote) => {
-        if (!vote.hasLinkedBill) return;
+      chunk.map(async (vote, chunkIndex) => {
+        const absoluteIndex = i + chunkIndex;
         try {
-          const [summary, policyArea] = await Promise.all([
-            fetchBillSummary(
-              vote.congress,
-              vote.legislationType,
-              vote.legislationNumber,
-              apiKey
-            ),
-            fetchBillPolicyArea(
-              vote.congress,
-              vote.legislationType,
-              vote.legislationNumber,
-              apiKey
-            ),
-          ]);
-          vote.policyArea = policyArea || null;
-          vote.subjectCategory = mapSubjectCategory(policyArea);
-          vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
-          vote.shortPitch = plainEnglishForVote(vote, summary);
-          const meanings = yeaNayMeans(vote);
-          vote.yeaMeans = meanings.yeaMeans;
-          vote.nayMeans = meanings.nayMeans;
+          let summary = "";
+          if (vote.hasLinkedBill) {
+            const [crsSummary, policyArea] = await Promise.all([
+              fetchBillSummary(
+                vote.congress,
+                vote.legislationType,
+                vote.legislationNumber,
+                apiKey
+              ),
+              fetchBillPolicyArea(
+                vote.congress,
+                vote.legislationType,
+                vote.legislationNumber,
+                apiKey
+              ),
+            ]);
+            summary = crsSummary || "";
+            vote.policyArea = policyArea || null;
+            vote.subjectCategory = mapSubjectCategory(policyArea);
+            vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
+          }
+
+          const card = await formatBillSummary(
+            summary || vote.shortPitch || vote.voteQuestion || "",
+            vote.title || vote.billNumber || "",
+            { forceHeuristic: absoluteIndex >= llmBudget }
+          );
+          vote.shortPitch = card.summary;
+          vote.yeaMeans = card.yea_means;
+          vote.nayMeans = card.nay_means;
+          vote.yeaLabel = card.yea_label;
+          vote.nayLabel = card.nay_label;
+          vote.summarySource = card.source;
         } catch (error) {
           console.warn(error);
         }

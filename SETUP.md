@@ -42,6 +42,7 @@ Set these for Production/Preview (Project Settings → Environment Variables, th
 - `RESEND_API_KEY` — required for notification **email** delivery and for **auth email codes** / password-reset codes (Forgot password + Sign in with email code). Get a key at [resend.com](https://resend.com)
 - `NOTIFY_FROM_EMAIL` — optional verified sender, e.g. `Congress Bills <alerts@yourdomain.com>` (defaults to Resend onboarding sender). Must be allowed by your Resend domain.
 - `SITE_URL` — optional canonical site URL used in email links
+- `OPENAI_API_KEY` — optional. When set, `/api/format-bill-summary` and politician Recent Votes use an LLM to write plain-English summary / Yea–Nay cards (`lib/format-bill-summary.js`). Without it, a local heuristic formatter is used. Optional overrides: `OPENAI_MODEL` (default `gpt-4o-mini`), `OPENAI_BASE_URL` for OpenAI-compatible providers.
 
 Cron jobs (`vercel.json`):
 - `/api/watch-bills` daily at 00:00 UTC — topic matches, critical floor-vote alerts, neighborhood municipal samples

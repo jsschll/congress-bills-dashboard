@@ -1,0 +1,170 @@
+/* Sample styles for components/BillSummaryCard.tsx
+ * Mirror of the vanilla .politician-vote-card look — import when using React.
+ */
+
+.bill-summary-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid #334155;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  font-family: "Figtree", system-ui, sans-serif;
+}
+
+.bill-summary-card__header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.bill-summary-card__cast {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.4rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.bill-summary-card__cast.is-yea {
+  color: #6ee7b7;
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.bill-summary-card__cast.is-nay {
+  color: #fca5a5;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.bill-summary-card__bill {
+  display: inline-flex;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.bill-summary-card__title {
+  margin: 0.35rem 0 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: #f1f5f9;
+}
+
+.bill-summary-card__meta,
+.bill-summary-card__status,
+.bill-summary-card__error {
+  margin: 0.35rem 0 0;
+  color: #94a3b8;
+  font-size: 0.86rem;
+}
+
+.bill-summary-card__error {
+  color: #fca5a5;
+}
+
+.bill-summary-card__summary h4,
+.bill-summary-card__meaning strong {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.bill-summary-card__summary p,
+.bill-summary-card__meaning p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.bill-summary-card__meanings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.bill-summary-card__meaning {
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.7rem;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.bill-summary-card__meaning.is-yea {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.bill-summary-card__meaning.is-nay {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.bill-summary-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid #334155;
+}
+
+.bill-summary-card__prompt {
+  flex: 1 1 100%;
+  margin: 0;
+  font-weight: 600;
+}
+
+.bill-summary-card__btn {
+  border: 1px solid #334155;
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+}
+
+.bill-summary-card__btn.is-yea.is-active,
+.bill-summary-card__btn.is-yea:hover {
+  color: #ecfdf5;
+  background: rgba(16, 185, 129, 0.28);
+  border-color: rgba(52, 211, 153, 0.55);
+}
+
+.bill-summary-card__btn.is-nay.is-active,
+.bill-summary-card__btn.is-nay:hover {
+  color: #fef2f2;
+  background: rgba(239, 68, 68, 0.28);
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+.bill-summary-card__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .bill-summary-card__meanings {
+    grid-template-columns: 1fr;
+  }
+
+  .bill-summary-card__header {
+    grid-template-columns: 1fr;
+  }
+}
