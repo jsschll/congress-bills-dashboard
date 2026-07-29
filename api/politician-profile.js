@@ -53,6 +53,143 @@ function normalizeVoteCast(voteCast = "") {
   return voteCast || null;
 }
 
+function stripHtml(html) {
+  return String(html || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toSentences(text, max = 2) {
+  const protectedText = String(text || "").replace(
+    /\b(No|Nos|Mr|Mrs|Ms|Dr|Sen|Rep|vs|etc|U\.S)\./gi,
+    "$1\u2024"
+  );
+  const parts = protectedText
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.replace(/\u2024/g, ".").trim())
+    .filter(Boolean);
+  return parts.slice(0, max).join(" ");
+}
+
+function classifyVoteKind(voteQuestion = "", result = "") {
+  const q = `${voteQuestion} ${result}`.toLowerCase();
+  if (
+    /\bon passage\b|\bfinal passage\b|agreeing to the (conference )?report|concurring in the senate amendment|concurring in senate amendment/.test(
+      q
+    )
+  ) {
+    return "final_passage";
+  }
+  if (/\bamendment\b|\bamdt\b/.test(q)) return "amendment";
+  if (
+    /motion to (adjourn|table|reconsider|recommit)|previous question|suspend the rules|election of speaker|approve the journal|quorum call|ordering a second|committee of the whole/.test(
+      q
+    )
+  ) {
+    return "procedural";
+  }
+  return "other";
+}
+
+function mapSubjectCategory(policyArea = "") {
+  const value = String(policyArea || "").toLowerCase();
+  if (!value) return "Other";
+  if (/health|medicare|medicaid|drug/.test(value)) return "Healthcare";
+  if (/armed forces|defense|foreign|national security|intelligence/.test(value)) {
+    return "Defense";
+  }
+  if (/tax|finance|economy|budget|appropriations|commerce|labor/.test(value)) {
+    return "Economy";
+  }
+  if (/science|technology|communications|space/.test(value)) return "Tech";
+  if (/energy/.test(value)) return "Energy";
+  if (/civil rights|civil liberties|discrimination/.test(value)) return "Civil rights";
+  if (/immigration|border/.test(value)) return "Immigration";
+  return "Other";
+}
+
+function yeaNayMeans(vote) {
+  const bill = vote.billNumber || "this measure";
+  const kind = vote.voteKind;
+  if (kind === "final_passage") {
+    return {
+      yeaMeans: `Pass ${bill} — advance the measure as written.`,
+      nayMeans: `Reject ${bill} — vote against final passage.`,
+    };
+  }
+  if (kind === "amendment") {
+    return {
+      yeaMeans: `Adopt the amendment to ${bill}.`,
+      nayMeans: `Reject the amendment to ${bill}.`,
+    };
+  }
+  return {
+    yeaMeans: "Record a Yea on this House roll call.",
+    nayMeans: "Record a Nay on this House roll call.",
+  };
+}
+
+function plainEnglishForVote(vote, summaryText = "") {
+  const crs = toSentences(summaryText, 2);
+  if (crs) return crs;
+  const kind = vote.voteKind;
+  const bill = vote.billNumber || "this measure";
+  const title = vote.title && vote.title !== vote.voteQuestion ? ` (${vote.title})` : "";
+  if (kind === "final_passage") {
+    return `This was a final House vote on whether to pass ${bill}${title}.`;
+  }
+  if (kind === "amendment") {
+    return `This House vote was on an amendment to ${bill}${title}.`;
+  }
+  const question = String(vote.voteQuestion || "").trim();
+  if (question) return `House roll call on: ${question.replace(/\.$/, "")}.`;
+  return `Recent House roll-call vote on ${bill}.`;
+}
+
+async function fetchBillSummary(congress, type, number, apiKey) {
+  if (!type || !number) return "";
+  try {
+    const url = `${CONGRESS_API}/bill/${congress}/${type}/${number}/summaries?format=json&api_key=${encodeURIComponent(
+      apiKey
+    )}`;
+    const data = await fetchJson(url);
+    const summaries = data.summaries || [];
+    if (!summaries.length) return "";
+    const best = summaries.reduce((current, item) => {
+      const currentText = stripHtml(current?.text || "");
+      const itemText = stripHtml(item?.text || "");
+      if (!current) return item;
+      if (itemText.length > currentText.length) return item;
+      return current;
+    }, null);
+    return stripHtml(best?.text || "");
+  } catch {
+    return "";
+  }
+}
+
+async function fetchBillPolicyArea(congress, type, number, apiKey) {
+  if (!type || !number) return "";
+  try {
+    const url = `${CONGRESS_API}/bill/${congress}/${type}/${number}/subjects?format=json&api_key=${encodeURIComponent(
+      apiKey
+    )}`;
+    const data = await fetchJson(url);
+    return (
+      data?.subjects?.policyArea?.name ||
+      data?.policyArea?.name ||
+      data?.subjects?.legislativeSubjects?.[0]?.name ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+}
+
 function mapSocial(social = {}) {
   const out = [];
   const pairs = [
@@ -249,11 +386,11 @@ function mapSponsored(rows = []) {
   });
 }
 
-async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 10) {
+async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
   const bio = String(bioguideId || "").toUpperCase();
   if (!bio) return [];
 
-  const listUrl = `${CONGRESS_API}/house-vote/${CONGRESS}?format=json&limit=40&api_key=${encodeURIComponent(
+  const listUrl = `${CONGRESS_API}/house-vote/${CONGRESS}?format=json&limit=80&api_key=${encodeURIComponent(
     apiKey
   )}`;
   let votes = [];
@@ -265,12 +402,33 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 10) {
     return [];
   }
 
+  // Prefer final passage + amendments; skip pure procedural noise.
+  const ranked = votes
+    .map((vote) => {
+      const voteQuestion = vote.voteQuestion || "";
+      const result = vote.result || "";
+      return {
+        raw: vote,
+        voteKind: classifyVoteKind(voteQuestion, result),
+      };
+    })
+    .filter((row) => row.voteKind !== "procedural")
+    .sort((a, b) => {
+      const rank = (kind) =>
+        kind === "final_passage" ? 0 : kind === "amendment" ? 1 : 2;
+      const byKind = rank(a.voteKind) - rank(b.voteKind);
+      if (byKind) return byKind;
+      return String(b.raw.startDate || b.raw.date || "").localeCompare(
+        String(a.raw.startDate || a.raw.date || "")
+      );
+    });
+
   const found = [];
   const chunkSize = 6;
-  for (let i = 0; i < votes.length && found.length < limit; i += chunkSize) {
-    const chunk = votes.slice(i, i + chunkSize);
+  for (let i = 0; i < ranked.length && found.length < limit; i += chunkSize) {
+    const chunk = ranked.slice(i, i + chunkSize);
     const results = await Promise.all(
-      chunk.map(async (vote) => {
+      chunk.map(async ({ raw: vote, voteKind }) => {
         const congress = vote.congress || CONGRESS;
         const session = vote.sessionNumber || 1;
         const roll = vote.rollCallNumber;
@@ -287,36 +445,70 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 10) {
               String(entry.bioguideID || "").toUpperCase() === bio
           );
           if (!row) return null;
-          const type = String(vote.legislationType || "").toLowerCase();
+          const type = String(vote.legislationType || "")
+            .toLowerCase()
+            .replace(/\./g, "");
           const number = String(vote.legislationNumber || "");
-          return {
-            id:
-              type && number
-                ? `federal-${congress}-${type}-${number}`.toLowerCase()
-                : `house-vote-${congress}-${session}-${roll}`,
-            billNumber:
-              type && number
-                ? `${String(vote.legislationType || "").toUpperCase()} ${number}`
-                : `Roll Call ${roll}`,
-            title:
-              vote.voteQuestion ||
-              vote.legislationTitle ||
-              `House Roll Call ${roll}`,
+          const billNumber =
+            type && number
+              ? `${String(vote.legislationType || type).toUpperCase().replace(/\./g, "")} ${number}`
+              : `Roll Call ${roll}`;
+          const billId =
+            type && number && voteKind === "final_passage"
+              ? `federal-${congress}-${type}-${number}`.toLowerCase()
+              : `house-vote-${congress}-${session}-${roll}`;
+          const title =
+            vote.legislationTitle ||
+            vote.voteQuestion ||
+            `House Roll Call ${roll}`;
+          const base = {
+            id: billId,
+            billId,
+            billNumber,
+            title,
+            level: "Federal",
+            jurisdiction: "U.S. House",
             congress,
             sessionNumber: session,
             rollCallNumber: roll,
+            voteQuestion: vote.voteQuestion || "",
+            voteKind,
             voteCast: normalizeVoteCast(row.voteCast),
             result: vote.result || "",
             date: vote.startDate || vote.date || null,
+            lastUpdated: vote.startDate
+              ? new Date(`${vote.startDate}T12:00:00`).toISOString()
+              : new Date().toISOString(),
             policyArea: null,
+            subjectCategory: "Other",
+            tags: [],
+            shortPitch: "",
+            yeaMeans: "",
+            nayMeans: "",
             officialUrl:
               type && number
                 ? `https://www.congress.gov/bill/${congress}th-congress/${type}/${number}`
                 : `https://clerk.house.gov/Votes/Details/${congress}${String(
                     roll
                   ).padStart(3, "0")}`,
+            clerkUrl: `https://clerk.house.gov/Votes/Details/${congress}${String(
+              roll
+            ).padStart(3, "0")}`,
+            hasLinkedBill: Boolean(type && number),
+            legislationType: type,
+            legislationNumber: number,
             kind: "vote",
+            primarySponsor: { name: "U.S. House", title: "Roll-call vote" },
+            statusLabel: vote.result || vote.voteQuestion || "House vote",
+            allSteps: [],
+            status: null,
+            deltaSummary: { added: [], changed: [], removed: [] },
           };
+          const meanings = yeaNayMeans(base);
+          base.yeaMeans = meanings.yeaMeans;
+          base.nayMeans = meanings.nayMeans;
+          base.shortPitch = plainEnglishForVote(base);
+          return base;
         } catch {
           return null;
         }
@@ -327,6 +519,44 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 10) {
       if (found.length >= limit) break;
     }
   }
+
+  // Enrich a capped set with CRS summary + policy area for plain English.
+  const enrichCount = Math.min(found.length, limit);
+  const chunkEnrich = 4;
+  for (let i = 0; i < enrichCount; i += chunkEnrich) {
+    const chunk = found.slice(i, i + chunkEnrich);
+    await Promise.all(
+      chunk.map(async (vote) => {
+        if (!vote.hasLinkedBill) return;
+        const [summary, policyArea] = await Promise.all([
+          fetchBillSummary(
+            vote.congress,
+            vote.legislationType,
+            vote.legislationNumber,
+            apiKey
+          ),
+          fetchBillPolicyArea(
+            vote.congress,
+            vote.legislationType,
+            vote.legislationNumber,
+            apiKey
+          ),
+        ]);
+        vote.policyArea = policyArea || null;
+        vote.subjectCategory = mapSubjectCategory(policyArea);
+        vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
+        vote.shortPitch = plainEnglishForVote(vote, summary);
+        const meanings = yeaNayMeans(vote);
+        vote.yeaMeans = meanings.yeaMeans;
+        vote.nayMeans = meanings.nayMeans;
+      })
+    );
+  }
+
+  // Chronological for the profile feed.
+  found.sort((a, b) =>
+    String(b.date || "").localeCompare(String(a.date || ""))
+  );
   return found;
 }
 
@@ -385,7 +615,7 @@ module.exports = async function handler(req, res) {
 
     let recentVotes = [];
     if (overview.chamber === "house") {
-      recentVotes = await fetchRecentVotesForMember(apiKey, bioguide, 10);
+      recentVotes = await fetchRecentVotesForMember(apiKey, bioguide, 16);
     }
 
     const recentActions = [...recentVotes, ...sponsored]

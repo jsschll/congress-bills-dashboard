@@ -237,7 +237,16 @@
     if (item.congress) {
       params.set("congress", String(item.congress));
     }
-    const bios = houseRepBioguides();
+    const fromItem = Array.isArray(item.compareBioguides)
+      ? item.compareBioguides
+      : [];
+    const bios = [
+      ...new Set(
+        [...houseRepBioguides(), ...fromItem]
+          .map((id) => String(id || "").toUpperCase())
+          .filter(Boolean)
+      ),
+    ];
     if (bios.length) params.set("bioguides", bios.join(","));
     if (typeof API_KEY === "string" && API_KEY.trim()) {
       params.set("api_key", API_KEY.trim());
@@ -646,6 +655,17 @@ Sincerely,
       await loadMatchScores(client);
     }
     await refreshMountedCard(item, roots, votePayload);
+    if (typeof roots.onStanceChange === "function") {
+      try {
+        await roots.onStanceChange({
+          item,
+          stance: activeStance,
+          votePayload,
+        });
+      } catch (error) {
+        console.warn(error);
+      }
+    }
   }
 
   async function refreshMountedCard(item, roots, votePayload = null) {
@@ -658,8 +678,10 @@ Sincerely,
     opposeBtn.classList.toggle("is-active", mine === "oppose");
     supportBtn.setAttribute("aria-pressed", String(mine === "support"));
     opposeBtn.setAttribute("aria-pressed", String(mine === "oppose"));
-    const stats = await fetchCommunity(item.id);
-    communityBody.innerHTML = renderCommunityHtml(stats);
+    if (communityBody) {
+      const stats = await fetchCommunity(item.id);
+      communityBody.innerHTML = renderCommunityHtml(stats);
+    }
     if (alignmentEl) {
       alignmentEl.outerHTML =
         alignmentChipHtml() ||
@@ -687,9 +709,13 @@ Sincerely,
     const opposeLabel = options.opposeLabel || "Oppose 👎";
     const prompt = options.prompt || "";
     const showTakeAction = options.showTakeAction !== false;
+    const showCommunity = options.showCommunity !== false;
     const whoVotedHint =
       options.whoVotedHint ||
       "Tap Support or Oppose to compare with House roll call votes.";
+    if (Array.isArray(options.compareBioguides) && options.compareBioguides.length) {
+      item.compareBioguides = options.compareBioguides;
+    }
 
     const wrap = document.createElement("section");
     wrap.className = "policy-engage";
@@ -721,12 +747,16 @@ Sincerely,
           <p class="policy-engage__vote-empty">${escapeHtml(whoVotedHint)}</p>
         </div>
       </details>
-      <details class="policy-engage__community">
+      ${
+        showCommunity
+          ? `<details class="policy-engage__community">
         <summary>Community Stances</summary>
         <div class="policy-engage__community-body">
           <p class="policy-engage__community-empty">Loading community split…</p>
         </div>
-      </details>
+      </details>`
+          : ""
+      }
     `;
 
     // Keep engagement actions at the bottom of the card.
@@ -739,6 +769,7 @@ Sincerely,
       communityBody: wrap.querySelector(".policy-engage__community-body"),
       voteBody: wrap.querySelector(".policy-engage__vote-body"),
       alignmentEl: wrap.querySelector(".policy-engage__alignment"),
+      onStanceChange: options.onStanceChange || null,
     };
 
     const mine = state.stances.get(item.id);
@@ -774,11 +805,13 @@ Sincerely,
 
     const details = wrap.querySelector(".policy-engage__community");
     let loaded = false;
-    details.addEventListener("toggle", async () => {
+    details?.addEventListener("toggle", async () => {
       if (!details.open || loaded) return;
       loaded = true;
       const stats = await fetchCommunity(item.id);
-      roots.communityBody.innerHTML = renderCommunityHtml(stats);
+      if (roots.communityBody) {
+        roots.communityBody.innerHTML = renderCommunityHtml(stats);
+      }
     });
 
     if (mine) {
@@ -788,13 +821,15 @@ Sincerely,
     }
   }
 
-  function mountVote(card, item) {
+  function mountVote(card, item, options = {}) {
     return mount(card, item, {
       supportLabel: "Yea",
       opposeLabel: "Nay",
       prompt: "How would you vote?",
       showTakeAction: false,
+      showCommunity: false,
       whoVotedHint: "Tap Yea or Nay to compare with House members.",
+      ...options,
     });
   }
 
