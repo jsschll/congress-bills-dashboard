@@ -865,12 +865,12 @@ function setActivityTab(tab) {
 }
 
 function voteKindLabel(kind, item = {}) {
-  if (kind === "final_passage") return "Pass or fail";
-  if (kind === "amendment") return "Change to bill";
+  if (kind === "final_passage") return "Final passage";
+  if (kind === "amendment") return "Amendment";
   const chamber = String(item.chamber || item.jurisdiction || "").toLowerCase();
   if (chamber.includes("senate")) return "Senate vote";
   if (chamber.includes("house")) return "House vote";
-  return "Yes/No vote";
+  return "Floor vote";
 }
 
 function formatVoteMeta(item) {
@@ -883,7 +883,7 @@ function formatVoteMeta(item) {
         : item.date
     );
   }
-  if (item.rollCallNumber != null) parts.push(`Vote #${item.rollCallNumber}`);
+  if (item.rollCallNumber != null) parts.push(`Roll Call ${item.rollCallNumber}`);
   return parts.join(" · ");
 }
 
@@ -894,15 +894,15 @@ function voteCardCopy(item = {}) {
   return {
     summary:
       String(item.shortPitch || "").trim() ||
-      "Congress took a recorded Yes/No vote on this bill or change.",
+      "This is a recent congressional vote on the linked bill.",
     yeaMeans:
       String(item.yeaMeans || "").trim() ||
-      "Voting Yes means you want this to move forward as written.",
+      "A Yea vote supports advancing this bill as written on this vote.",
     nayMeans:
       String(item.nayMeans || "").trim() ||
-      "Voting No means you want to stop this.",
-    yeaLabel: "Yes, support it",
-    nayLabel: "No, oppose it",
+      "A Nay vote supports rejecting this bill on this vote.",
+    yeaLabel: "Support Measure",
+    nayLabel: "Oppose Measure",
     meansAreGeneric: true,
   };
 }
@@ -932,20 +932,18 @@ function renderVotesList(target, votes, emptyMessage, person) {
       String(item.jurisdiction || item.chamber || "")
         .toLowerCase()
         .includes("senate")
-        ? "Senate Yes/No vote"
-        : "House Yes/No vote";
-    const castLabel =
-      cast === "Yea" ? "Yes" : cast === "Nay" ? "No" : cast;
+        ? "Senate roll-call vote"
+        : "House roll-call vote";
     card.innerHTML = `
       <header class="politician-vote-card__header">
         <span class="politician-vote-cast ${voteCastClass(cast)}" title="${escapeHtml(
           personName
-        )}’s recorded vote">${escapeHtml(castLabel)}</span>
+        )}’s recorded vote">${escapeHtml(cast)}</span>
         <div class="politician-vote-card__heading">
           <div class="politician-vote-card__badges">
             <span class="politician-vote-card__kind">${escapeHtml(kind)}</span>
             <span class="politician-vote-card__bill">${escapeHtml(
-              item.billNumber || `Vote ${item.rollCallNumber || ""}`
+              item.billNumber || `Roll Call ${item.rollCallNumber || ""}`
             )}</span>
             ${
               subject && subject !== "Other"
@@ -963,23 +961,23 @@ function renderVotesList(target, votes, emptyMessage, person) {
           )}</p>
         </div>
       </header>
-      <section class="politician-vote-card__summary" aria-label="What this vote is about">
-        <h4>What this vote is about</h4>
+      <section class="politician-vote-card__summary" aria-label="What was proposed">
+        <h4>What’s proposed</h4>
         <p>${escapeHtml(copy.summary)}</p>
       </section>
-      <div class="politician-vote-card__meanings" aria-label="What Yes and No mean">
+      <div class="politician-vote-card__meanings" aria-label="What Yea and Nay mean">
         <div class="politician-vote-card__meaning is-yea">
-          <strong>Voting Yes means</strong>
+          <strong>Yea means</strong>
           <p>${escapeHtml(copy.yeaMeans)}</p>
         </div>
         <div class="politician-vote-card__meaning is-nay">
-          <strong>Voting No means</strong>
+          <strong>Nay means</strong>
           <p>${escapeHtml(copy.nayMeans)}</p>
         </div>
       </div>
       <a class="bill-card__link" href="${escapeHtml(
         item.clerkUrl || item.officialUrl || "#"
-      )}" target="_blank" rel="noopener noreferrer">See the official vote record</a>
+      )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
     `;
 
     if (window.PolicyEngagement?.mountVote) {
@@ -1085,8 +1083,8 @@ function renderActivity(congress, person) {
   if (votesIntro) {
     votesIntro.textContent =
       roleKind === "senate"
-        ? "Recent Senate Yes/No votes — what each one is about in plain English, what Yes and No mean, and how you’d vote (feeds Action Match)."
-        : "Recent House Yes/No votes — what each one is about in plain English, what Yes and No mean, and how you’d vote (feeds Action Match).";
+        ? "Recent Senate roll calls for this member — what was proposed, what Yea / Nay mean, and how you’d vote (feeds Action Match)."
+        : "Recent House roll calls for this member — what was proposed, what Yea / Nay mean, and how you’d vote (feeds Action Match).";
   }
 
   const votes = congress?.recentVotes || [];

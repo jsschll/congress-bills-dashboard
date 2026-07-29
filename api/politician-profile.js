@@ -6,10 +6,9 @@ const {
   classifyVoteKind,
   completeSentences,
   plainVoteFallback,
+  defaultYeaNayMeans,
   DEFAULT_YEA_LABEL,
   DEFAULT_NAY_LABEL,
-  DEFAULT_YEA_MEANS,
-  DEFAULT_NAY_MEANS,
 } = require("../lib/format-bill-summary");
 const {
   fetchRecentSenateVotesForMember,
@@ -121,13 +120,8 @@ function plainEnglishForVote(vote, summaryText = "") {
   return plainVoteFallback(vote);
 }
 
-function yeaNayMeans() {
-  return {
-    yeaMeans: DEFAULT_YEA_MEANS,
-    nayMeans: DEFAULT_NAY_MEANS,
-    yeaLabel: DEFAULT_YEA_LABEL,
-    nayLabel: DEFAULT_NAY_LABEL,
-  };
+function yeaNayMeans(vote = {}) {
+  return defaultYeaNayMeans(vote);
 }
 
 async function fetchBillSummary(congress, type, number, apiKey) {
@@ -504,7 +498,7 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             status: null,
             deltaSummary: { added: [], changed: [], removed: [] },
           };
-          const meanings = yeaNayMeans();
+          const meanings = yeaNayMeans(base);
           base.yeaMeans = meanings.yeaMeans;
           base.nayMeans = meanings.nayMeans;
           base.yeaLabel = meanings.yeaLabel;

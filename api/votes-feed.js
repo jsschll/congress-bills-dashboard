@@ -7,10 +7,9 @@ const {
   classifyVoteKind,
   completeSentences,
   plainVoteFallback,
+  defaultYeaNayMeans,
   DEFAULT_YEA_LABEL,
   DEFAULT_NAY_LABEL,
-  DEFAULT_YEA_MEANS,
-  DEFAULT_NAY_MEANS,
 } = require("../lib/format-bill-summary");
 
 function json(res, status, body) {
@@ -357,11 +356,12 @@ module.exports = async function handler(req, res) {
 
     // Keep remaining unenriched votes behind the enriched ones if needed.
     const remaining = cards.slice(enrichCount).map((vote) => {
+      const means = defaultYeaNayMeans(vote);
       vote.shortPitch = plainEnglishForVote(vote);
-      vote.yeaMeans = vote.yeaMeans || DEFAULT_YEA_MEANS;
-      vote.nayMeans = vote.nayMeans || DEFAULT_NAY_MEANS;
-      vote.yeaLabel = vote.yeaLabel || DEFAULT_YEA_LABEL;
-      vote.nayLabel = vote.nayLabel || DEFAULT_NAY_LABEL;
+      vote.yeaMeans = vote.yeaMeans || means.yeaMeans;
+      vote.nayMeans = vote.nayMeans || means.nayMeans;
+      vote.yeaLabel = vote.yeaLabel || means.yeaLabel;
+      vote.nayLabel = vote.nayLabel || means.nayLabel;
       return vote;
     });
 

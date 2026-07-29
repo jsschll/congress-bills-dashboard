@@ -127,12 +127,12 @@ function formatShortDate(value) {
   });
 }
 
-const VOTE_CARD_DEFAULT_YEA_LABEL = "Yes, support it";
-const VOTE_CARD_DEFAULT_NAY_LABEL = "No, oppose it";
+const VOTE_CARD_DEFAULT_YEA_LABEL = "Support Measure";
+const VOTE_CARD_DEFAULT_NAY_LABEL = "Oppose Measure";
 const VOTE_CARD_GENERIC_YEA_MEANS =
-  "Voting Yes means you want this to move forward as written.";
+  "A Yea vote supports advancing this bill as written on this vote.";
 const VOTE_CARD_GENERIC_NAY_MEANS =
-  "Voting No means you want to stop this.";
+  "A Nay vote supports rejecting this bill on this vote.";
 
 /**
  * True for empty/placeholder means copy that should not unlock custom labels.
@@ -141,8 +141,12 @@ function isGenericVoteMeans(text = "") {
   const value = String(text || "").trim().toLowerCase();
   if (!value) return true;
   return (
-    /^a yea vote supports advancing this measure/.test(value) ||
-    /^a nay vote supports rejecting this measure/.test(value) ||
+    /^a yea vote supports advancing this (measure|bill)/.test(value) ||
+    /^a nay vote supports rejecting this (measure|bill)/.test(value) ||
+    /^a yea vote supports passing this bill/.test(value) ||
+    /^a nay vote supports rejecting this bill/.test(value) ||
+    /^a yea vote supports this amendment/.test(value) ||
+    /^a nay vote supports rejecting this amendment/.test(value) ||
     /^voting yes means you want this to move forward/.test(value) ||
     /^voting no means you want to stop this/.test(value) ||
     /^you support advancing this measure/.test(value) ||
@@ -199,7 +203,7 @@ function resolveVoteCardCopy(item = {}) {
 
   const summary =
     String(item.shortPitch || item.summary || "").trim() ||
-    "Congress took a recorded Yes/No vote on this bill or change.";
+    "This is a recent congressional vote on the linked bill.";
 
   let yeaLabel = String(item.yeaLabel || item.yea_label || "").trim();
   let nayLabel = String(item.nayLabel || item.nay_label || "").trim();
