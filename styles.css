@@ -4871,26 +4871,6 @@ body.politician-notes-modal-open {
   outline: none;
 }
 
-.politician-notes-signin {
-  display: grid;
-  gap: 0.75rem;
-  justify-items: start;
-  padding: 0.85rem 0.95rem;
-  border: 1px solid #334155;
-  border-radius: 0.85rem;
-  background: rgba(15, 23, 42, 0.72);
-}
-
-.politician-notes-signin p {
-  margin: 0;
-  color: #cbd5e1;
-  font-size: 0.95rem;
-}
-
-.politician-notes-signin .refresh-btn {
-  text-decoration: none;
-}
-
 .politician-notes-modal .status {
   margin: 0;
 }

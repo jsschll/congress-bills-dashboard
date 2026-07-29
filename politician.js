@@ -7,9 +7,7 @@ const recentActionsEl = document.getElementById("politician-recent-actions");
 const keyBillsEl = document.getElementById("politician-key-bills");
 const notesModal = document.getElementById("politician-notes-modal");
 const notesStatusEl = document.getElementById("politician-notes-status");
-const notesSigninEl = document.getElementById("politician-notes-signin");
 const notesEditorEl = document.getElementById("politician-notes-editor");
-const notesAuthLink = document.getElementById("politician-notes-auth-link");
 const noteBodyInput = document.getElementById("politician-note-body");
 const noteSaveBtn = document.getElementById("politician-note-save");
 const noteClearBtn = document.getElementById("politician-note-clear");
@@ -730,14 +728,7 @@ function refreshNoteUi() {
   if (noteClearBtn) noteClearBtn.hidden = !noteHasContent();
 }
 
-function syncNotesModalViews(user) {
-  if (notesAuthLink) notesAuthLink.href = authNextHref();
-  if (!user) {
-    if (notesSigninEl) notesSigninEl.hidden = false;
-    if (notesEditorEl) notesEditorEl.hidden = true;
-    return;
-  }
-  if (notesSigninEl) notesSigninEl.hidden = true;
+function syncNotesModalViews() {
   if (notesEditorEl) notesEditorEl.hidden = false;
   if (noteBodyInput) noteBodyInput.value = String(politicianNote?.body || "");
   if (noteClearBtn) noteClearBtn.hidden = !noteHasContent();
@@ -794,19 +785,10 @@ function openNotesModal() {
   if (!notesModal) return;
   hideNotePopover({ immediate: true });
   notesModalLastFocus = document.activeElement;
+  syncNotesModalViews();
   notesModal.hidden = false;
   document.body.classList.add("politician-notes-modal-open");
-  Promise.resolve(typeof getUser === "function" ? getUser() : null).then(
-    (user) => {
-      syncNotesModalViews(user);
-      const focusTarget =
-        notesEditorEl && !notesEditorEl.hidden
-          ? noteBodyInput
-          : notesSigninEl?.querySelector("a") ||
-            notesModal.querySelector("[data-close-notes]");
-      focusTarget?.focus?.();
-    }
-  );
+  noteBodyInput?.focus?.();
 }
 
 function closeNotesModal() {
