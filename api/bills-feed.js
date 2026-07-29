@@ -111,6 +111,9 @@ async function fetchJson(url) {
 function stripHtml(html) {
   return String(html || "")
     .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
     .replace(/\s+/g, " ")
     .trim();
 }
