@@ -100,6 +100,7 @@ let profile = {
   estimated_income: 75000,
   filing_status: "single",
   vehicle_count: 1,
+  impact_roles: [],
 };
 let pendingAvatarUrl = null;
 let followedBillOptions = [];
@@ -322,11 +323,14 @@ function syncPreferenceSummaries() {
   if (pocketbookSummary) {
     const property = Number(profile.estimated_property_value) || 0;
     const income = Number(profile.estimated_income) || 0;
+    const roles = Array.isArray(profile.impact_roles)
+      ? profile.impact_roles.length
+      : 0;
     pocketbookSummary.textContent = `Property $${Math.round(
       property / 1000
     )}k · Income $${Math.round(income / 1000)}k · ${
       profile.vehicle_count || 0
-    } vehicles`;
+    } vehicles · ${roles} role${roles === 1 ? "" : "s"}`;
   }
 }
 
@@ -530,6 +534,17 @@ function fillFormsFromProfile() {
     vehicleCountInput.value = profile.vehicle_count ?? 1;
   }
 
+  const selectedRoles = new Set(
+    (Array.isArray(profile.impact_roles) ? profile.impact_roles : []).map(
+      (role) => String(role || "").toLowerCase()
+    )
+  );
+  pocketbookForm
+    ?.querySelectorAll('input[name="impact_roles"]')
+    .forEach((input) => {
+      input.checked = selectedRoles.has(String(input.value || "").toLowerCase());
+    });
+
   const registration = profile.voter_registration_status || "";
   const registrationInput = registrationForm?.querySelector(
     `input[name="voter_registration_status"][value="${registration}"]`
@@ -575,6 +590,7 @@ async function loadProfileRow(userId) {
       estimated_income: 75000,
       filing_status: "single",
       vehicle_count: 1,
+      impact_roles: [],
     };
   }
 
@@ -595,6 +611,7 @@ async function loadProfileRow(userId) {
     estimated_income: data?.estimated_income ?? 75000,
     filing_status: data?.filing_status || "single",
     vehicle_count: data?.vehicle_count ?? 1,
+    impact_roles: Array.isArray(data?.impact_roles) ? data.impact_roles : [],
   };
 }
 
@@ -1492,12 +1509,16 @@ avatarClearBtn?.addEventListener("click", () => {
 pocketbookForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   setProfileStatus("Saving pocketbook baselines…", "loading");
+  const roles = [
+    ...pocketbookForm.querySelectorAll('input[name="impact_roles"]:checked'),
+  ].map((input) => String(input.value || "").toLowerCase());
   try {
     await saveProfilePatch({
       estimated_property_value: Number(propertyValueInput?.value) || null,
       estimated_income: Number(incomeInput?.value) || null,
       filing_status: filingStatusInput?.value || "single",
       vehicle_count: Number(vehicleCountInput?.value) || 0,
+      impact_roles: roles,
     });
     syncPreferenceSummaries();
     setProfileStatus("Pocketbook baselines saved.", "success");
@@ -1505,7 +1526,7 @@ pocketbookForm?.addEventListener("submit", async (event) => {
     console.error(error);
     setProfileStatus(
       error.message ||
-        "Could not save baselines. Run the pocketbook migration in Supabase if columns are missing.",
+        "Could not save baselines. Run the pocketbook / impact-roles migrations in Supabase if columns are missing.",
       "error"
     );
   }
@@ -1700,6 +1721,10 @@ registrationForm?.addEventListener("submit", async (event) => {
     setProfileStatus("", "success");
     if (window.location.hash === "#account" || window.location.hash === "#settings") {
       document.getElementById("account")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (window.location.hash === "#pocketbook") {
+      const panel = document.querySelector('[data-accordion-key="pocketbook"]');
+      panel?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   } catch (error) {
     console.error(error);
