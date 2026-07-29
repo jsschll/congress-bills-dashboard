@@ -908,9 +908,12 @@ function mapCiceroDistrictType(districtType = "", officeTitle = "") {
     };
   }
   if (type.startsWith("LOCAL") || type === "LOCAL") {
+    const isExec = type.includes("EXEC");
     return {
       level: "city",
-      chamber: type.includes("EXEC") ? "mayor" : "city_council",
+      chamber: isExec ? "mayor" : "city_council",
+      // Prefer a human title when Cicero only sent the district type code.
+      default_title: isExec ? "Mayor" : "City Council",
     };
   }
   return { level: "local", chamber: slugKey(type) || "local" };
@@ -989,7 +992,16 @@ function mapCiceroOfficial(official) {
       ""
   ).toUpperCase();
   const sk = official.sk || official.id;
-  const officeTitle = officeTitleHint || mapped.chamber;
+  const rawTitle = officeTitleHint || "";
+  const titleLooksLikeTypeCode =
+    !rawTitle ||
+    /^local(_exec)?$/i.test(rawTitle) ||
+    String(rawTitle).toUpperCase() === String(districtTypeName || "").toUpperCase();
+  const officeTitle =
+    (titleLooksLikeTypeCode && mapped.default_title) ||
+    rawTitle ||
+    mapped.default_title ||
+    mapped.chamber;
   const districtValue = cleanDistrictValue(
     district.district_id ||
       district.label ||

@@ -1178,6 +1178,17 @@ function mapLocalOfficialRow(row) {
   };
 }
 
+function isMayorPerson(person) {
+  if (!person?.name) return false;
+  const title = String(
+    person.office_title || person.metadata?.office_title || person.chamber || ""
+  ).toLowerCase();
+  const districtType = String(person.metadata?.district_type || "").toUpperCase();
+  if (person.chamber === "mayor" || title.includes("mayor")) return true;
+  if (districtType.includes("LOCAL_EXEC")) return true;
+  return false;
+}
+
 async function fetchLocalOfficialsForGeography({
   state_code,
   city_name,
@@ -1217,7 +1228,18 @@ async function fetchLocalOfficialsForGeography({
         return dedupePoliticiansInGroup(data.map(mapLocalOfficialRow));
       }
     }
-    return [];
+
+    const { data: fuzzy, error: fuzzyError } = await client
+      .from("local_officials")
+      .select("*")
+      .eq("state_code", stateCode)
+      .ilike("city_name", `%${cityName}%`)
+      .eq("level", "City");
+    if (fuzzyError) {
+      console.error("local_officials fuzzy query error:", fuzzyError);
+      return [];
+    }
+    return dedupePoliticiansInGroup((fuzzy || []).map(mapLocalOfficialRow));
   } catch (error) {
     console.error("fetchLocalOfficialsForGeography failed:", error);
     return [];
@@ -2600,10 +2622,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         group.filter((person) => {
           if (person.source === "local_officials") return false;
           if (coveredNames.has(normalizePersonName(person.name))) return false;
-          const title = String(
-            person.office_title || person.metadata?.office_title || person.chamber || ""
-          ).toLowerCase();
-          return person.chamber === "mayor" || title.includes("mayor");
+          return isMayorPerson(person);
         })
       );
       appendStateCategorySection(
@@ -2611,7 +2630,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
         "Mayor",
         dedupePoliticiansInGroup([...dbLocalGroup, ...civicMayors]),
         geography.city
-          ? `No mayor record is seeded yet for ${geography.city}.`
+          ? `No mayor found yet for ${geography.city}. City executives come from Cicero when available, and are saved for next time.`
           : "No mayor found for this city.",
         cardOptions,
         level
@@ -2619,10 +2638,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       const otherCity = dedupePoliticiansInGroup(
         group.filter((person) => {
           if (person.source === "local_officials") return false;
-          const title = String(
-            person.office_title || person.metadata?.office_title || person.chamber || ""
-          ).toLowerCase();
-          return !(person.chamber === "mayor" || title.includes("mayor"));
+          return !isMayorPerson(person);
         })
       );
       if (otherCity.length) {
@@ -2833,10 +2849,7 @@ function mountAddressResultsPage({
 
   (async () => {
     results.replaceChildren();
-    setStatus(
-      "Checking cached roster, then loading representatives…",
-      "loading"
-    );
+    setStatus("Looking up representatives…", "loading");
 
     try {
       await injectSupabaseScript().catch(() => {});
@@ -2845,8 +2858,8 @@ function mountAddressResultsPage({
         ? await loadFollowedPoliticianIds(user.id)
         : new Set();
 
-      // Address lookup API now: cache hit (<30d) → return instantly; else live
-      // Civic APIs + merge Federal/State directors from Supabase + write cache.
+      // Address lookup API: cache hit (<30d) → instant; else live Civic APIs +
+      // Federal/State directors from Supabase, then write cache.
       const lookupResult = await lookupRepresentatives(address)
         .then((data) => ({ ok: true, data }))
         .catch((error) => ({
@@ -2858,11 +2871,9 @@ function mountAddressResultsPage({
       const rosterFromApi = Boolean(
         lookupResult.ok && lookupResult.data?.rosterEnriched
       );
-      const cacheHit = Boolean(lookupResult.ok && lookupResult.data?.cache?.hit);
 
       // Prefer server-enriched directors when present (cached or freshly built).
-      // Fall back to client Supabase reads for older API responses / cache misses
-      // that predate roster enrichment.
+      // Fall back to client Supabase reads for older API responses.
       let nationalOfficials = rosterFromApi
         ? lookupResult.data.nationalOfficials || []
         : [];
@@ -2931,17 +2942,29 @@ function mountAddressResultsPage({
           state_senate_districts: geography.stateSenateDistricts,
           state_house_districts: geography.stateHouseDistricts,
         });
-        localOfficials = await fetchLocalOfficialsForGeography({
+      }
+
+      // Always try the mayor directory when city is known — covers seed rows and
+      // mayors saved from earlier live lookups that the API roster missed.
+      if (geography.state && geography.city) {
+        const fromDirectory = await fetchLocalOfficialsForGeography({
           state_code: geography.state,
           city_name: geography.city,
         });
+        if (fromDirectory.length) {
+          localOfficials = dedupePoliticiansInGroup([
+            ...localOfficials,
+            ...fromDirectory,
+          ]);
+        }
       }
       const stateJudges = stateOfficials;
 
       if (
         !uniquePeople.length &&
         !nationalOfficials.length &&
-        !stateJudges.length
+        !stateJudges.length &&
+        !localOfficials.length
       ) {
         setStatus(
           lookupResult.ok
@@ -2957,72 +2980,14 @@ function mountAddressResultsPage({
         : address;
       if (queryLabel) queryLabel.textContent = resolvedAddress;
 
-      const levelCounts = DISPLAY_LEVEL_ORDER.map((level) => {
-        let count = uniquePeople.filter((p) =>
-          politicianLevels(p).includes(level)
-        ).length;
-        if (level === "federal") count += nationalOfficials.length;
-        if (level === "state") count += stateJudges.length;
-        return count ? `${levelLabel(level)} ${count}` : null;
-      }).filter(Boolean);
-
-      const localCount = uniquePeople.length;
-      const nationalCount = nationalOfficials.length;
-      const judgeCount = stateJudges.length;
-      const legislatureCount = stateJudges.filter(
-        (person) => person.metadata?.court_group === "legislative"
-      ).length;
-      const executiveCount = stateJudges.filter(
-        (person) =>
-          person.metadata?.court_group === "executive" ||
-          person.metadata?.court_group === "leadership"
-      ).length;
-      const placeMode = Boolean(lookupResult.ok && lookupResult.data.placeMode);
-      const senateDistrictCount =
-        geography.stateSenateDistricts?.length || 0;
-      const houseDistrictCount =
-        geography.stateHouseDistricts?.length || 0;
-      const cacheAge = lookupResult.ok
-        ? lookupResult.data.cache?.ageDays
-        : null;
-      const summaryParts = [
-        cacheHit
-          ? `cached${cacheAge != null ? ` (${cacheAge}d old)` : ""}`
-          : rosterFromApi
-            ? "fresh lookup"
-            : null,
-        nationalCount
-          ? `${nationalCount} nationwide (White House, Cabinet, agencies, Court)`
-          : null,
-        executiveCount ? `${executiveCount} statewide executives` : null,
-        legislatureCount
-          ? `${legislatureCount} state legislators`
-          : null,
-        placeMode && (senateDistrictCount || houseDistrictCount)
-          ? `citywide districts: ${senateDistrictCount} senate / ${houseDistrictCount} house`
-          : null,
-        !executiveCount && !legislatureCount && judgeCount
-          ? `${judgeCount} state officials`
-          : null,
-        localCount
-          ? `${localCount} for this ${placeMode ? "city" : "address"}`
-          : null,
-        geography.county ? `${geography.county} County` : null,
-        levelCounts.length ? levelCounts.join(" · ") : null,
-      ].filter(Boolean);
-
-      if (!lookupResult.ok && (nationalCount || judgeCount)) {
+      // Keep the status line quiet on success — counts live in the sections.
+      if (!lookupResult.ok) {
         setStatus(
-          `${summaryParts.join(" · ")}. Address lookup failed: ${lookupResult.error}`,
+          `Address lookup failed: ${lookupResult.error}`,
           "error"
         );
-      } else if (!localCount && (nationalCount || judgeCount)) {
-        setStatus(
-          `${summaryParts.join(" · ")}. No district officials found for that address.`,
-          "success"
-        );
       } else {
-        setStatus(summaryParts.join(" · "), "success");
+        setStatus("", "loading");
       }
 
       renderPoliticianGroups(results, uniquePeople, {
@@ -3033,14 +2998,6 @@ function mountAddressResultsPage({
         localOfficials,
         geography,
       });
-
-      // SORT BY stays first; summary line sits directly under it.
-      const toolbar = results.querySelector(".politician-results-toolbar");
-      if (toolbar) {
-        toolbar.after(status);
-      } else {
-        results.prepend(status);
-      }
 
       Promise.all(
         uniquePeople.map(async (politician) => {
