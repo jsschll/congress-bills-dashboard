@@ -10,58 +10,70 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729g" />
+    <link rel="stylesheet" href="styles.css?v=20260729h" />
   </head>
-  <body>
+  <body class="page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
-    <main class="page">
-      <header class="header">
-        <div>
-          <p class="eyebrow">Representation</p>
-          <h1>Politicians</h1>
-          <p class="subtitle">
-            Look up federal, state, county, city, and school officials for an
-            address — then follow the ones you want to track.
-          </p>
-        </div>
-      </header>
-
-      <section class="lookup-panel" aria-labelledby="lookup-heading">
-        <h2 id="lookup-heading">Find who represents you</h2>
-        <form id="address-form" class="keyword-form">
+    <section class="politicians-hero" aria-label="Find your representatives">
+      <div class="politicians-hero__media" aria-hidden="true"></div>
+      <div class="politicians-hero__shade" aria-hidden="true"></div>
+      <div class="politicians-hero__content">
+        <p class="politicians-hero__brand">Congress Bills</p>
+        <h1 class="politicians-hero__title">Politicians</h1>
+        <p class="politicians-hero__lede">
+          Look up federal, state, county, city, and school officials for an
+          address — then follow the ones you want to track.
+        </p>
+        <form
+          id="address-form"
+          class="politicians-hero__form"
+          aria-label="Look up your representatives"
+        >
+          <label class="visually-hidden" for="address-input"
+            >Street address or ZIP code</label
+          >
           <input
             id="address-input"
-            class="search-bar__input"
+            class="politicians-hero__input"
             type="search"
             name="address"
             placeholder="Street address or ZIP code"
+            autocomplete="street-address"
             required
           />
-          <button class="refresh-btn" type="submit">Look up</button>
+          <button class="politicians-hero__submit" type="submit">
+            Find my representatives
+          </button>
         </form>
-      </section>
+      </div>
+    </section>
 
-      <section class="topics-panel" aria-labelledby="browse-heading">
-        <div class="topics-panel__header">
+    <main class="page page--politicians">
+      <section class="politicians-browse" aria-labelledby="browse-heading">
+        <div class="politicians-browse__intro">
           <h2 id="browse-heading">Browse politicians</h2>
+          <p>
+            Filter the national roster while you explore — or use the address
+            search above for your exact districts.
+          </p>
         </div>
 
-        <div class="filter-bar">
+        <div class="filter-bar politicians-filter-bar">
           <label>
             Level
-            <select id="filter-level" class="search-bar__input">
+            <select id="filter-level" class="politicians-filter-bar__input">
               <option value="federal" selected>Federal</option>
               <option value="all">All levels</option>
               <option value="state">State</option>
               <option value="county">County</option>
-              <option value="city">City / Municipal</option>
+              <option value="city">Municipal</option>
               <option value="school">School Board / District</option>
             </select>
           </label>
           <label>
             Party
-            <select id="filter-party" class="search-bar__input">
+            <select id="filter-party" class="politicians-filter-bar__input">
               <option value="">Any party</option>
               <option value="Democratic">Democratic</option>
               <option value="Republican">Republican</option>
@@ -70,7 +82,7 @@
           </label>
           <label>
             State
-            <select id="filter-state" class="search-bar__input">
+            <select id="filter-state" class="politicians-filter-bar__input">
               <option value="">All states</option>
             </select>
           </label>
@@ -78,14 +90,14 @@
             Search
             <input
               id="filter-search"
-              class="search-bar__input"
+              class="politicians-filter-bar__input"
               type="search"
               placeholder="Name or district"
             />
           </label>
         </div>
 
-        <p id="browse-status" class="status" hidden></p>
+        <p id="browse-status" class="status politicians-status" hidden></p>
         <div id="politicians-grid" class="politician-results"></div>
       </section>
     </main>
@@ -93,7 +105,7 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260729g"></script>
-    <script src="politicians-shared.js?v=20260729f"></script>
-    <script src="politicians.js" defer></script>
+    <script src="politicians-shared.js?v=20260729h"></script>
+    <script src="politicians.js?v=20260729h" defer></script>
   </body>
 </html>

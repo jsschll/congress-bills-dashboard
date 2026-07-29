@@ -84,10 +84,10 @@ const LEVEL_LABELS = {
   federal: "Federal",
   state: "State",
   county: "County",
-  city: "City / Municipal",
-  school: "School Board / District",
-  local: "City / Municipal",
-  municipal: "City / Municipal",
+  city: "Municipal",
+  school: "School",
+  local: "Municipal",
+  municipal: "Municipal",
 };
 
 function toDisplayLevel(level) {
@@ -1624,10 +1624,11 @@ function appendPoliticianSubgroup(
   header.className = "politician-subgroup__header";
   header.setAttribute("aria-expanded", startCollapsed ? "false" : "true");
 
-  const arrow = document.createElement("span");
-  arrow.className = "politician-subgroup__arrow";
-  arrow.setAttribute("aria-hidden", "true");
-  arrow.textContent = startCollapsed ? "▸" : "▾";
+    const arrow = document.createElement("span");
+    arrow.className = "politician-subgroup__arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.innerHTML = '<span class="politician-chevron"></span>';
+    arrow.dataset.collapsed = startCollapsed ? "true" : "false";
 
   const title = document.createElement("h4");
   title.className = "politician-subgroup__title";
@@ -1654,9 +1655,9 @@ function appendPoliticianSubgroup(
   header.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const collapsed = subgroup.classList.toggle("is-collapsed");
-    arrow.textContent = collapsed ? "▸" : "▾";
-    header.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    const collapsedNow = subgroup.classList.toggle("is-collapsed");
+    arrow.dataset.collapsed = collapsedNow ? "true" : "false";
+    header.setAttribute("aria-expanded", collapsedNow ? "false" : "true");
   });
 
   subgroup.append(header, body);
@@ -1893,16 +1894,36 @@ function renderPoliticianCard(
     district: activeOffice?.district || politician.district,
   };
 
+  const badges = document.createElement("div");
+  badges.className = "politician-card__badges";
+
+  const titleText =
+    officeTitle || chamberLabel(viewForLabel.chamber, viewForLabel);
+  if (titleText) {
+    const titleBadge = document.createElement("span");
+    titleBadge.className = "politician-badge";
+    titleBadge.textContent = titleText;
+    badges.append(titleBadge);
+  }
+
+  const levelBadge = document.createElement("span");
+  levelBadge.className = "politician-badge politician-badge--level";
+  levelBadge.textContent = levelLabel(activeLevel);
+  badges.append(levelBadge);
+
+  if (courtName && courtName !== officeTitle) {
+    const courtBadge = document.createElement("span");
+    courtBadge.className = "politician-badge politician-badge--soft";
+    courtBadge.textContent = courtName;
+    badges.append(courtBadge);
+  }
+
   const meta = document.createElement("p");
   meta.className = "politician-card__meta";
   meta.textContent = [
-    officeTitle || chamberLabel(viewForLabel.chamber, viewForLabel),
-    courtName && courtName !== officeTitle ? courtName : null,
     politician.state,
     formatDistrictMeta(viewForLabel.district, viewForLabel),
-    politician.metadata?.city
-      ? politician.metadata.city
-      : null,
+    politician.metadata?.city ? politician.metadata.city : null,
     politician.metadata?.county
       ? `${politician.metadata.county} County`
       : null,
@@ -2013,7 +2034,9 @@ function renderPoliticianCard(
   });
 
   actions.append(followBtn);
-  body.append(name, meta, extras);
+  body.append(name, badges);
+  if (meta.textContent) body.append(meta);
+  body.append(extras);
   card.append(media, body, actions);
   return card;
 }
@@ -2293,7 +2316,7 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
       section.classList.toggle("is-collapsed", collapsed.has(level));
       const arrow = section.querySelector(".politician-level-group__arrow");
       if (arrow) {
-        arrow.textContent = collapsed.has(level) ? "▸" : "▾";
+        arrow.dataset.collapsed = collapsed.has(level) ? "true" : "false";
         arrow.setAttribute(
           "aria-label",
           collapsed.has(level) ? "Expand section" : "Collapse section"
@@ -2521,7 +2544,8 @@ function renderPoliticianGroups(container, politicians, cardOptions = {}) {
     const arrow = document.createElement("span");
     arrow.className = "politician-level-group__arrow";
     arrow.setAttribute("aria-hidden", "true");
-    arrow.textContent = "▾";
+    arrow.innerHTML = '<span class="politician-chevron"></span>';
+    arrow.dataset.collapsed = "false";
 
     const title = document.createElement("h3");
     title.className = "politician-level-group__title";

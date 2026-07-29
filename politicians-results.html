@@ -10,46 +10,53 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729g" />
+    <link rel="stylesheet" href="styles.css?v=20260729h" />
   </head>
-  <body>
+  <body class="page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
-    <main class="page">
-      <header class="header">
-        <div>
-          <p class="eyebrow">
-            <a class="text-link" href="politicians.html">← Politicians</a>
-          </p>
-          <h1>Your representatives</h1>
-          <p class="subtitle">
-            Results for <strong id="results-query">your address</strong>
-          </p>
-        </div>
-      </header>
-
-      <section class="lookup-panel" aria-labelledby="results-lookup-heading">
-        <h2 id="results-lookup-heading">Search another address</h2>
-        <form id="address-form" class="keyword-form">
+    <section class="politicians-hero politicians-hero--compact" aria-label="Search representatives">
+      <div class="politicians-hero__media" aria-hidden="true"></div>
+      <div class="politicians-hero__shade" aria-hidden="true"></div>
+      <div class="politicians-hero__content">
+        <p class="politicians-hero__brand">
+          <a class="politicians-hero__back" href="politicians.html">← Politicians</a>
+        </p>
+        <h1 class="politicians-hero__title">Your representatives</h1>
+        <p class="politicians-hero__lede">
+          Results for <strong id="results-query">your address</strong>
+        </p>
+        <form
+          id="address-form"
+          class="politicians-hero__form"
+          aria-label="Search another address"
+        >
+          <label class="visually-hidden" for="address-input"
+            >Street address or ZIP code</label
+          >
           <input
             id="address-input"
-            class="search-bar__input"
+            class="politicians-hero__input"
             type="search"
             name="address"
             placeholder="Street address or ZIP code"
             autocomplete="street-address"
             required
           />
-          <button class="refresh-btn" type="submit">Look up</button>
+          <button class="politicians-hero__submit" type="submit">
+            Look up
+          </button>
         </form>
-      </section>
+      </div>
+    </section>
 
+    <main class="page page--politicians">
       <section
-        class="lookup-results-panel"
+        class="lookup-results-panel politicians-results-panel"
         aria-labelledby="results-heading"
       >
         <h2 id="results-heading" class="visually-hidden">Search results</h2>
-        <p id="address-status" class="status lookup-panel__status" hidden></p>
+        <p id="address-status" class="status politicians-status" hidden></p>
         <div id="address-results" class="politician-results"></div>
       </section>
     </main>
@@ -57,7 +64,7 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260729g"></script>
-    <script src="politicians-shared.js?v=20260729f"></script>
-    <script src="politicians-results.js?v=20260728e" defer></script>
+    <script src="politicians-shared.js?v=20260729h"></script>
+    <script src="politicians-results.js?v=20260729h" defer></script>
   </body>
 </html>
