@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Search · Congress Bills</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260729m" />
+  </head>
+  <body class="page-app page-search">
+    <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
+
+    <main class="page page--search">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Federal legislation</p>
+          <h1>Search</h1>
+          <p class="subtitle">
+            Find bills, enacted laws, and agency regulations. Search by keyword
+            or citation — for example HR 1, Pub. L. 118-90, or climate.
+          </p>
+        </div>
+      </header>
+
+      <form id="search-form" class="search-hero" role="search">
+        <label class="search-bar__label" for="search-input">Search query</label>
+        <div class="search-hero__row">
+          <input
+            id="search-input"
+            class="search-bar__input search-hero__input"
+            type="search"
+            name="q"
+            placeholder="Keyword or citation (HR 5800, Pub. L. 117-58, clean energy…)"
+            autocomplete="off"
+            enterkeyhint="search"
+          />
+          <button class="refresh-btn search-hero__submit" type="submit">
+            Search
+          </button>
+        </div>
+      </form>
+
+      <section class="search-type-filters" aria-label="Document types">
+        <button
+          type="button"
+          class="search-type-filters__button is-active"
+          data-type="bill"
+          aria-pressed="true"
+        >
+          Bills
+        </button>
+        <button
+          type="button"
+          class="search-type-filters__button is-active"
+          data-type="law"
+          aria-pressed="true"
+        >
+          Enacted Laws
+        </button>
+        <button
+          type="button"
+          class="search-type-filters__button is-active"
+          data-type="regulation"
+          aria-pressed="true"
+        >
+          Agency Regulations
+        </button>
+      </section>
+
+      <p id="search-coverage" class="search-coverage" hidden></p>
+      <p id="search-status" class="status" aria-live="polite" hidden></p>
+      <p id="search-summary" class="search-summary" hidden></p>
+
+      <section
+        id="search-results"
+        class="search-results"
+        aria-label="Search results"
+      ></section>
+
+      <p id="search-empty" class="no-results" hidden>
+        No matching federal documents. Try another keyword, a bill number, or a
+        public law citation.
+      </p>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js?v=20260729m"></script>
+    <script src="search.js?v=20260729m" defer></script>
+    <script>
+      bootNav("search");
+    </script>
+  </body>
+</html>

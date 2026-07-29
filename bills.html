@@ -3,63 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Recent Federal Bills · Congress Bills</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="styles.css?v=20260729k" />
-  </head>
-  <body class="page-app page-bills">
-    <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
-
-    <main class="page">
-      <header class="header">
-        <div>
-          <p class="eyebrow">Congress.gov</p>
-          <h1>Recent Federal Bills</h1>
-          <p class="subtitle">
-            Latest legislation from the 119th Congress with official CRS
-            summaries. Sign in to follow topics and get a personalized feed.
-          </p>
-        </div>
-        <div class="header__actions">
-          <button id="refresh-btn" class="refresh-btn" type="button">
-            Refresh
-          </button>
-        </div>
-      </header>
-
-      <div class="search-bar">
-        <label class="search-bar__label" for="search-input">Search bills</label>
-        <input
-          id="search-input"
-          class="search-bar__input"
-          type="search"
-          placeholder="Search Congress.gov by title or bill number (e.g. HR 5800)…"
-          autocomplete="off"
-        />
-      </div>
-
-      <p id="status" class="status" aria-live="polite">
-        Loading recent bills from Congress.gov…
-      </p>
-
-      <section id="bills-grid" class="grid" aria-label="Recent federal bills"></section>
-
-      <p id="no-results" class="no-results" hidden>
-        No bills match your search.
-      </p>
-    </main>
-
-    <script src="config.js"></script>
-    <script src="shared.js"></script>
-    <script src="nav.js?v=20260729g"></script>
-    <script src="app.js?v=20260729i" defer></script>
+    <title>Redirecting… · Congress Bills</title>
     <script>
-      bootNav("bills");
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var next = new URLSearchParams();
+        var q = params.get("q") || params.get("search") || "";
+        if (q) next.set("q", q);
+        next.set("types", "bill,law,regulation");
+        var qs = next.toString();
+        window.location.replace("search.html" + (qs ? "?" + qs : ""));
+      })();
     </script>
+    <meta http-equiv="refresh" content="0;url=search.html" />
+  </head>
+  <body>
+    <p>
+      Moved to
+      <a href="search.html">Search</a>.
+    </p>
   </body>
 </html>

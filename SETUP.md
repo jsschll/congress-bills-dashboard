@@ -27,7 +27,7 @@ Copy `config.example.js` to `config.js` and set:
 
 ## 3. Vercel env vars
 Set these for Production/Preview (Project Settings → Environment Variables, then Redeploy):
-- `CONGRESS_API_KEY` — **required for Bills, Laws & Policies and watch-bills cron** (same value as `API_KEY` in `config.js`)
+- `CONGRESS_API_KEY` — **required for Search (Congress.gov + GovInfo), Bills/Laws feed, and watch-bills cron** (same value as `API_KEY` in `config.js`). Federal Register regulation search needs no key.
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY` (also bake into deployed `config.js`, or replace config at build time)
 - `SUPABASE_SERVICE_ROLE_KEY` (server only — never expose to the browser)
