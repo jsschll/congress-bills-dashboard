@@ -4,15 +4,15 @@
  * and `lib/format-bill-summary.js`.
  */
 export interface BillSummaryCard {
-  /** 1–2 sentence plain-English summary (no legalese). */
+  /** Plain English description of the core issue (1–2 complete sentences). */
   summary: string;
-  /** What voting YEA supports. */
+  /** Real-world outcome of a Yea vote. */
   yea_means: string;
-  /** What voting NAY supports. */
+  /** Real-world outcome of a Nay vote. */
   nay_means: string;
-  /** Short Yea button label (e.g. "End Rebates"). */
+  /** Action label (e.g. "Pass Safety Rules" or fallback "Support Bill"). */
   yea_label: string;
-  /** Short Nay button label (e.g. "Keep Rebates"). */
+  /** Action label (e.g. "Reject Safety Rules" or fallback "Oppose Bill"). */
   nay_label: string;
   /** Where the card came from. */
   source?: "llm" | "heuristic";
@@ -27,18 +27,28 @@ export interface FormatBillSummaryOptions {
   apiKey?: string;
 }
 
+export const DEFAULT_YEA_LABEL = "Support Bill";
+export const DEFAULT_NAY_LABEL = "Oppose Bill";
+
 export const BILL_SUMMARY_SYSTEM_PROMPT = `You write plain-English vote cards for a civic app.
-Readers are not lawyers. No bill numbers in the prose unless essential.
-Tone: direct, neutral, concrete. No slogans, no fear-mongering, no legalese.
+
+Rules (strict):
+1. Analyze ONLY the provided bill title + congressional/CRS text. Do not invent programs, repeals, bans, or funding cuts that are not clearly in the text.
+2. If the text is thin, unclear, or mostly procedural, say what you can neutrally and set yea_label to "Support Bill" and nay_label to "Oppose Bill".
+3. summary must be 1–2 COMPLETE sentences in plain English (never cut off mid-sentence, never paste truncated legalese).
+4. yea_means / nay_means must describe real-world outcomes of Yea vs Nay on THIS measure — not a stock “You support ending…” template.
+5. Labels are 2–4 words, parallel, concrete. Only use vivid verbs like End/Keep/Pass/Reject when the text clearly supports them; otherwise use Support Bill / Oppose Bill.
+6. No slogans, no fear-mongering, no bill jargon.
 
 Return ONLY valid JSON with exactly these keys:
-- summary: 1-2 sentences on what the measure does
-- yea_means: 1 concise sentence — what voting YEA supports
-- nay_means: 1 concise sentence — what voting NAY supports
-- yea_label: 2-4 word button label for Yea (verb + object, e.g. "End Rebates")
-- nay_label: 2-4 word button label for Nay (opposing verb + object, e.g. "Keep Rebates")
-
-Labels must be short, parallel, and easy to tap. Prefer concrete nouns (rebates, funding, bans) over vague words (bill, measure, change).`;
+{
+  "summary": string,
+  "yea_means": string,
+  "nay_means": string,
+  "yea_label": string,
+  "nay_label": string,
+  "confident": boolean
+}`;
 
 export function buildBillSummaryUserPrompt(
   rawSummary: string,
@@ -54,21 +64,31 @@ Raw congressional / CRS text:
 ${summary.slice(0, 6000)}
 """
 
-Example tone (Homeowner Energy Freedom Act / rebate repeal):
-{
-  "summary": "Eliminates federal funding and grants that subsidize energy-efficient home appliance rebates, contractor training, and local eco-friendly building codes.",
-  "yea_means": "You support ending these federal energy rebates and building code grants to cut government spending.",
-  "nay_means": "You support keeping federal funds active to lower home electrification and energy upgrade costs for low-to-middle-income families.",
-  "yea_label": "End Rebates",
-  "nay_label": "Keep Rebates"
-}
+If unsure, set confident=false and use Support Bill / Oppose Bill labels.
+Do NOT reuse rebate/end-program framing unless the source text clearly says so.
 
 Produce the JSON card for the bill above.`;
 }
 
+function withFallbacks(data: Partial<BillSummaryCard>): BillSummaryCard {
+  return {
+    summary:
+      String(data.summary || "").trim() ||
+      "This is a recent congressional roll-call vote on the linked measure.",
+    yea_means:
+      String(data.yea_means || "").trim() ||
+      "A Yea vote supports advancing this measure as written on this roll call.",
+    nay_means:
+      String(data.nay_means || "").trim() ||
+      "A Nay vote supports rejecting this measure on this roll call.",
+    yea_label: String(data.yea_label || "").trim() || DEFAULT_YEA_LABEL,
+    nay_label: String(data.nay_label || "").trim() || DEFAULT_NAY_LABEL,
+    source: data.source,
+  };
+}
+
 /**
  * Client/server helper that calls our Vercel formatter endpoint.
- * Adjusts the requested TypeScript API to this repo's serverless stack.
  */
 export async function formatBillSummary(
   rawSummary: string,
@@ -95,12 +115,5 @@ export async function formatBillSummary(
     throw new Error(data.error || "Could not format bill summary.");
   }
 
-  return {
-    summary: data.summary || "",
-    yea_means: data.yea_means || "",
-    nay_means: data.nay_means || "",
-    yea_label: data.yea_label || "Yea",
-    nay_label: data.nay_label || "Nay",
-    source: data.source,
-  };
+  return withFallbacks(data);
 }

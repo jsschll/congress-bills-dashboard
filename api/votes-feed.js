@@ -1,6 +1,14 @@
 const CONGRESS_API = "https://api.congress.gov/v3";
 const CONGRESS = 119;
 const DEFAULT_LIMIT = 16;
+const {
+  formatBillSummary,
+  isProceduralLegislation,
+  classifyVoteKind,
+  completeSentences,
+  DEFAULT_YEA_LABEL,
+  DEFAULT_NAY_LABEL,
+} = require("../lib/format-bill-summary");
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -56,15 +64,7 @@ function stripHtml(html) {
 }
 
 function toSentences(text, max = 2) {
-  const protectedText = String(text || "").replace(
-    /\b(No|Nos|Mr|Mrs|Ms|Dr|Sen|Rep|vs|etc|U\.S)\./gi,
-    "$1\u2024"
-  );
-  const parts = protectedText
-    .split(/(?<=[.!?])\s+/)
-    .map((part) => part.replace(/\u2024/g, ".").trim())
-    .filter(Boolean);
-  return parts.slice(0, max).join(" ");
+  return completeSentences(text, { maxSentences: max, maxChars: 480 });
 }
 
 function normalizeVoteCast(voteCast = "") {
@@ -74,26 +74,6 @@ function normalizeVoteCast(voteCast = "") {
   if (value.includes("present")) return "Present";
   if (value.includes("not voting") || value === "nv") return "Not Voting";
   return voteCast || "—";
-}
-
-function classifyVoteKind(voteQuestion = "", result = "") {
-  const q = `${voteQuestion} ${result}`.toLowerCase();
-  if (
-    /\bon passage\b|\bfinal passage\b|agreeing to the (conference )?report|concurring in the senate amendment|concurring in senate amendment/.test(
-      q
-    )
-  ) {
-    return "final_passage";
-  }
-  if (/\bamendment\b|\bamdt\b/.test(q)) return "amendment";
-  if (
-    /motion to (adjourn|table|reconsider|recommit)|previous question|suspend the rules|election of speaker|approve the journal|quorum call|ordering a second|committee of the whole/.test(
-      q
-    )
-  ) {
-    return "procedural";
-  }
-  return "other";
 }
 
 function mapSubjectCategory(policyArea = "") {
@@ -146,20 +126,23 @@ function subjectMatches(vote, subjectQuery) {
 }
 
 function plainEnglishForVote(vote, summaryText = "") {
-  const crs = toSentences(summaryText, 2);
+  const crs = completeSentences(summaryText, { maxSentences: 2, maxChars: 480 });
   if (crs) return crs;
   const kind = vote.voteKind;
   const bill = vote.billNumber || "this measure";
   const title = vote.title ? ` (${vote.title})` : "";
   if (kind === "final_passage") {
-    return `This was a final House vote on whether to pass ${bill}${title}. Yea means pass it; Nay means reject it.`;
+    return `This was a final House vote on whether to pass ${bill}${title}.`;
   }
   if (kind === "amendment") {
-    return `This House vote was on an amendment to ${bill}${title}. Yea supports the amendment; Nay opposes it.`;
+    return `This House vote was on an amendment to ${bill}${title}.`;
   }
   const question = String(vote.voteQuestion || "").trim();
   if (question) {
-    return `House roll call on: ${question.replace(/\.$/, "")}.`;
+    return completeSentences(`House roll call on: ${question}`, {
+      maxSentences: 1,
+      maxChars: 320,
+    });
   }
   return `Recent House roll-call vote on ${bill}.`;
 }
@@ -214,7 +197,12 @@ function mapVoteCard(raw) {
       : `Roll Call ${rollCallNumber}`;
   const voteQuestion = raw.voteQuestion || "";
   const result = raw.result || "";
-  const voteKind = classifyVoteKind(voteQuestion, result);
+  const voteKind = classifyVoteKind(voteQuestion, result, {
+    legislationType: type,
+    billNumber,
+    billId: type && number ? `federal-${congress}-${type}-${number}` : "",
+    title: raw.legislationTitle || "",
+  });
   const billId =
     type && number && voteKind === "final_passage"
       ? `federal-${congress}-${type}-${number}`.toLowerCase()
@@ -250,6 +238,10 @@ function mapVoteCard(raw) {
       rollCallNumber
     ).padStart(3, "0")}`,
     shortPitch: "",
+    yeaMeans: "",
+    nayMeans: "",
+    yeaLabel: DEFAULT_YEA_LABEL,
+    nayLabel: DEFAULT_NAY_LABEL,
     policyArea: "",
     subjectCategory: "Other",
     tags: [],
@@ -295,7 +287,10 @@ module.exports = async function handler(req, res) {
       .filter((vote) => vote.rollCallNumber);
 
     if (!includeProcedural) {
-      cards = cards.filter((vote) => vote.voteKind !== "procedural");
+      cards = cards.filter(
+        (vote) =>
+          vote.voteKind !== "procedural" && !isProceduralLegislation(vote)
+      );
     }
     if (kindFilter === "final_passage" || kindFilter === "amendment") {
       cards = cards.filter((vote) => vote.voteKind === kindFilter);
@@ -316,36 +311,54 @@ module.exports = async function handler(req, res) {
     );
     cards = cards.slice(0, Math.max(limit * 2, limit));
 
-    // Enrich a capped set with CRS summary + policy area for plain English.
+    // Enrich a capped set with CRS summary + plain-English vote cards.
     const enrichCount = Math.min(cards.length, Math.max(limit, 10));
+    const llmBudget = env("OPENAI_API_KEY", "OPENAI_KEY", "AI_API_KEY") ? 3 : 0;
     const enriched = [];
     const chunkSize = 4;
     for (let i = 0; i < enrichCount; i += chunkSize) {
       const chunk = cards.slice(i, i + chunkSize);
       const rows = await Promise.all(
-        chunk.map(async (vote) => {
-          if (!vote.hasLinkedBill) {
-            vote.shortPitch = plainEnglishForVote(vote);
-            return vote;
+        chunk.map(async (vote, chunkIndex) => {
+          const absoluteIndex = i + chunkIndex;
+          let summary = "";
+          if (vote.hasLinkedBill) {
+            const [crsSummary, policyArea] = await Promise.all([
+              fetchBillSummary(
+                vote.congress,
+                vote.legislationType,
+                vote.legislationNumber,
+                apiKey
+              ),
+              fetchBillPolicyArea(
+                vote.congress,
+                vote.legislationType,
+                vote.legislationNumber,
+                apiKey
+              ),
+            ]);
+            summary = crsSummary || "";
+            vote.policyArea = policyArea || "";
+            vote.subjectCategory = mapSubjectCategory(policyArea);
+            vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
           }
-          const [summary, policyArea] = await Promise.all([
-            fetchBillSummary(
-              vote.congress,
-              vote.legislationType,
-              vote.legislationNumber,
-              apiKey
-            ),
-            fetchBillPolicyArea(
-              vote.congress,
-              vote.legislationType,
-              vote.legislationNumber,
-              apiKey
-            ),
-          ]);
-          vote.policyArea = policyArea || "";
-          vote.subjectCategory = mapSubjectCategory(policyArea);
-          vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
-          vote.shortPitch = plainEnglishForVote(vote, summary);
+          try {
+            const card = await formatBillSummary(
+              summary || vote.voteQuestion || "",
+              vote.title || vote.billNumber || "",
+              { forceHeuristic: absoluteIndex >= llmBudget }
+            );
+            vote.shortPitch = card.summary;
+            vote.yeaMeans = card.yea_means;
+            vote.nayMeans = card.nay_means;
+            vote.yeaLabel = card.yea_label;
+            vote.nayLabel = card.nay_label;
+            vote.summarySource = card.source;
+          } catch {
+            vote.shortPitch = plainEnglishForVote(vote, summary);
+            vote.yeaLabel = DEFAULT_YEA_LABEL;
+            vote.nayLabel = DEFAULT_NAY_LABEL;
+          }
           return vote;
         })
       );
@@ -355,6 +368,8 @@ module.exports = async function handler(req, res) {
     // Keep remaining unenriched votes behind the enriched ones if needed.
     const remaining = cards.slice(enrichCount).map((vote) => {
       vote.shortPitch = plainEnglishForVote(vote);
+      vote.yeaLabel = vote.yeaLabel || DEFAULT_YEA_LABEL;
+      vote.nayLabel = vote.nayLabel || DEFAULT_NAY_LABEL;
       return vote;
     });
 
