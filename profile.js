@@ -28,6 +28,12 @@ const followsSummary = document.getElementById("profile-follows-summary");
 const electionsSummary = document.getElementById("profile-elections-summary");
 const impactForm = document.getElementById("profile-impact-form");
 const pocketbookForm = document.getElementById("profile-pocketbook-form");
+const pocketbookSaved = document.getElementById("profile-pocketbook-saved");
+const pocketbookSavedList = document.getElementById(
+  "profile-pocketbook-saved-list"
+);
+const pocketbookChangeBtn = document.getElementById("profile-pocketbook-change");
+const pocketbookCancelBtn = document.getElementById("profile-pocketbook-cancel");
 const propertyValueInput = document.getElementById("profile-property-value");
 const incomeInput = document.getElementById("profile-income");
 const filingStatusInput = document.getElementById("profile-filing-status");
@@ -96,10 +102,10 @@ let profile = {
   notify_digest: "weekly",
   notify_neighborhood: false,
   voter_registration_status: "",
-  estimated_property_value: 350000,
-  estimated_income: 75000,
-  filing_status: "single",
-  vehicle_count: 1,
+  estimated_property_value: null,
+  estimated_income: null,
+  filing_status: "",
+  vehicle_count: null,
   impact_roles: [],
 };
 let pendingAvatarUrl = null;
@@ -109,6 +115,7 @@ let civicActions = [];
 let civicActionFilter = "all";
 let editingAddress = false;
 let editingRegistration = false;
+let editingPocketbook = false;
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -320,17 +327,123 @@ function syncPreferenceSummaries() {
     if (profile.notify_neighborhood) parts.push("Neighborhood on");
     notifySummary.textContent = parts.join(" · ");
   }
+  syncPocketbookView();
+}
+
+const IMPACT_ROLE_LABELS = {
+  teacher: "Teacher / educator",
+  student: "Student",
+  parent: "Parent / guardian",
+  homeowner: "Homeowner",
+  renter: "Renter",
+  veteran: "Veteran / military",
+  farmer: "Farmer / rancher",
+  small_business: "Small-business owner",
+  healthcare: "Healthcare worker",
+  retiree: "Retiree",
+};
+
+function filingStatusLabel(value) {
+  switch (value) {
+    case "married_joint":
+      return "Married filing jointly";
+    case "married_separate":
+      return "Married filing separately";
+    case "head":
+      return "Head of household";
+    case "single":
+      return "Single";
+    default:
+      return value || "—";
+  }
+}
+
+function formatMoneyShort(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  return amount.toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
+}
+
+function hasSavedPocketbook() {
+  return (
+    profile.estimated_property_value != null ||
+    profile.estimated_income != null ||
+    Boolean(profile.filing_status) ||
+    profile.vehicle_count != null ||
+    (Array.isArray(profile.impact_roles) && profile.impact_roles.length > 0)
+  );
+}
+
+function pocketbookRoleLabels() {
+  return (Array.isArray(profile.impact_roles) ? profile.impact_roles : [])
+    .map((role) => IMPACT_ROLE_LABELS[String(role || "").toLowerCase()] || role)
+    .filter(Boolean);
+}
+
+function syncPocketbookView() {
+  const hasSaved = hasSavedPocketbook();
+  const showForm = !hasSaved || editingPocketbook;
+
+  if (pocketbookForm) {
+    pocketbookForm.hidden = !showForm;
+    pocketbookForm.classList.toggle("is-hidden", !showForm);
+  }
+  if (pocketbookSaved) {
+    const showSaved = !showForm && hasSaved;
+    pocketbookSaved.hidden = !showSaved;
+    pocketbookSaved.classList.toggle("is-hidden", !showSaved);
+  }
+  if (pocketbookCancelBtn) {
+    pocketbookCancelBtn.hidden = !editingPocketbook || !hasSaved;
+  }
+
+  if (pocketbookSavedList) {
+    const roles = pocketbookRoleLabels();
+    const rows = [
+      ["Property value", formatMoneyShort(profile.estimated_property_value)],
+      ["Household income", formatMoneyShort(profile.estimated_income)],
+      ["Filing status", filingStatusLabel(profile.filing_status)],
+      [
+        "Vehicles",
+        profile.vehicle_count == null ? "—" : String(profile.vehicle_count),
+      ],
+      ["Roles", roles.length ? roles.join(", ") : "None selected"],
+    ];
+    pocketbookSavedList.innerHTML = rows
+      .map(
+        ([label, value]) =>
+          `<div class="profile-saved-facts__row"><dt>${escapeProfileHtml(
+            label
+          )}</dt><dd>${escapeProfileHtml(value)}</dd></div>`
+      )
+      .join("");
+  }
+
   if (pocketbookSummary) {
-    const property = Number(profile.estimated_property_value) || 0;
-    const income = Number(profile.estimated_income) || 0;
-    const roles = Array.isArray(profile.impact_roles)
-      ? profile.impact_roles.length
-      : 0;
-    pocketbookSummary.textContent = `Property $${Math.round(
-      property / 1000
-    )}k · Income $${Math.round(income / 1000)}k · ${
-      profile.vehicle_count || 0
-    } vehicles · ${roles} role${roles === 1 ? "" : "s"}`;
+    if (!hasSaved) {
+      pocketbookSummary.textContent = "Add household details";
+      return;
+    }
+    const property = Number(profile.estimated_property_value);
+    const income = Number(profile.estimated_income);
+    const parts = [];
+    if (Number.isFinite(property)) parts.push(`Property ${formatMoneyShort(property)}`);
+    if (Number.isFinite(income)) parts.push(`Income ${formatMoneyShort(income)}`);
+    if (profile.vehicle_count != null) {
+      parts.push(
+        `${profile.vehicle_count} vehicle${
+          Number(profile.vehicle_count) === 1 ? "" : "s"
+        }`
+      );
+    }
+    const roles = pocketbookRoleLabels();
+    if (roles.length === 1) parts.push(roles[0]);
+    else if (roles.length > 1) parts.push(`${roles.length} roles`);
+    pocketbookSummary.textContent = parts.join(" · ") || "Saved";
   }
 }
 
@@ -524,14 +637,21 @@ function fillFormsFromProfile() {
   }
 
   if (propertyValueInput) {
-    propertyValueInput.value = profile.estimated_property_value ?? 350000;
+    propertyValueInput.value =
+      profile.estimated_property_value == null
+        ? ""
+        : profile.estimated_property_value;
   }
-  if (incomeInput) incomeInput.value = profile.estimated_income ?? 75000;
+  if (incomeInput) {
+    incomeInput.value =
+      profile.estimated_income == null ? "" : profile.estimated_income;
+  }
   if (filingStatusInput) {
     filingStatusInput.value = profile.filing_status || "single";
   }
   if (vehicleCountInput) {
-    vehicleCountInput.value = profile.vehicle_count ?? 1;
+    vehicleCountInput.value =
+      profile.vehicle_count == null ? "" : profile.vehicle_count;
   }
 
   const selectedRoles = new Set(
@@ -553,6 +673,7 @@ function fillFormsFromProfile() {
 
   editingAddress = false;
   editingRegistration = false;
+  editingPocketbook = false;
   syncAddressView();
   syncRegistrationView();
   syncPreferenceSummaries();
@@ -586,10 +707,10 @@ async function loadProfileRow(userId) {
       notify_digest: "weekly",
       notify_neighborhood: false,
       voter_registration_status: "",
-      estimated_property_value: 350000,
-      estimated_income: 75000,
-      filing_status: "single",
-      vehicle_count: 1,
+      estimated_property_value: null,
+      estimated_income: null,
+      filing_status: "",
+      vehicle_count: null,
       impact_roles: [],
     };
   }
@@ -607,10 +728,14 @@ async function loadProfileRow(userId) {
     notify_neighborhood: Boolean(data?.notify_neighborhood),
     voter_registration_status: data?.voter_registration_status || "",
     estimated_property_value:
-      data?.estimated_property_value ?? 350000,
-    estimated_income: data?.estimated_income ?? 75000,
-    filing_status: data?.filing_status || "single",
-    vehicle_count: data?.vehicle_count ?? 1,
+      data?.estimated_property_value == null
+        ? null
+        : Number(data.estimated_property_value),
+    estimated_income:
+      data?.estimated_income == null ? null : Number(data.estimated_income),
+    filing_status: data?.filing_status || "",
+    vehicle_count:
+      data?.vehicle_count == null ? null : Number(data.vehicle_count),
     impact_roles: Array.isArray(data?.impact_roles) ? data.impact_roles : [],
   };
 }
@@ -1506,6 +1631,16 @@ avatarClearBtn?.addEventListener("click", () => {
   refreshAvatarUI();
 });
 
+pocketbookChangeBtn?.addEventListener("click", () => {
+  editingPocketbook = true;
+  syncPocketbookView();
+});
+
+pocketbookCancelBtn?.addEventListener("click", () => {
+  editingPocketbook = false;
+  fillFormsFromProfile();
+});
+
 pocketbookForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   setProfileStatus("Saving pocketbook baselines…", "loading");
@@ -1517,9 +1652,13 @@ pocketbookForm?.addEventListener("submit", async (event) => {
       estimated_property_value: Number(propertyValueInput?.value) || null,
       estimated_income: Number(incomeInput?.value) || null,
       filing_status: filingStatusInput?.value || "single",
-      vehicle_count: Number(vehicleCountInput?.value) || 0,
+      vehicle_count:
+        vehicleCountInput?.value === "" || vehicleCountInput?.value == null
+          ? null
+          : Number(vehicleCountInput.value),
       impact_roles: roles,
     });
+    editingPocketbook = false;
     syncPreferenceSummaries();
     setProfileStatus("Pocketbook baselines saved.", "success");
   } catch (error) {

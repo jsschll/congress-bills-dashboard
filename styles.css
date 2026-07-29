@@ -1905,6 +1905,40 @@ body {
   line-height: 1.3;
 }
 
+.profile-saved-facts {
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.profile-saved-facts__row {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.profile-saved-facts__row dt {
+  margin: 0;
+  color: var(--app-muted, #94a3b8);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.profile-saved-facts__row dd {
+  margin: 0;
+  color: var(--app-text, #e8eef7);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .profile-saved-facts__row {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+}
+
 .profile-form__actions {
   display: flex;
   flex-wrap: wrap;

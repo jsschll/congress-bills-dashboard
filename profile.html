@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729z" />
+    <link rel="stylesheet" href="styles.css?v=20260730a" />
   </head>
   <body class="page-app page-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -302,10 +302,20 @@
           </button>
           <div class="profile-accordion__body">
             <p class="profile-panel__lede">
-              Saved values and roles power Impact calculators on Feed and Search
-              cards. Add roles so bills for teachers, veterans, and other groups
-              don’t show misleading dollar estimates.
+              Used to estimate how bills may affect your household.
             </p>
+
+            <div id="profile-pocketbook-saved" class="profile-saved" hidden>
+              <dl id="profile-pocketbook-saved-list" class="profile-saved-facts"></dl>
+              <button
+                id="profile-pocketbook-change"
+                class="refresh-btn"
+                type="button"
+              >
+                Change
+              </button>
+            </div>
+
             <form id="profile-pocketbook-form" class="profile-form">
               <label class="profile-form__field">
                 Estimated property value
@@ -354,11 +364,8 @@
               </label>
 
               <fieldset class="profile-impact-roles">
-                <legend>Roles that affect impact estimates</legend>
-                <p class="profile-form__note">
-                  Select any that apply. Bills aimed at a group you haven’t
-                  selected won’t invent a personal dollar impact.
-                </p>
+                <legend>Your roles</legend>
+                <p class="profile-form__note">Select any that apply.</p>
                 <div id="profile-impact-roles" class="profile-impact-roles__grid">
                   <label
                     ><input type="checkbox" name="impact_roles" value="teacher" />
@@ -415,7 +422,17 @@
                 </div>
               </fieldset>
 
-              <button class="refresh-btn" type="submit">Save baselines</button>
+              <div class="profile-form__actions">
+                <button class="refresh-btn" type="submit">Save baselines</button>
+                <button
+                  id="profile-pocketbook-cancel"
+                  class="profile-btn profile-btn--ghost"
+                  type="button"
+                  hidden
+                >
+                  Cancel
+                </button>
+              </div>
             </form>
           </div>
         </section>
@@ -876,6 +893,6 @@
     <script src="nav.js?v=20260729x"></script>
     <script src="politicians-shared.js?v=20260729u"></script>
     <script src="engagement.js?v=20260729t"></script>
-    <script src="profile.js?v=20260729z" defer></script>
+    <script src="profile.js?v=20260730a" defer></script>
   </body>
 </html>
