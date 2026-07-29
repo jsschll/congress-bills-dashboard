@@ -209,26 +209,55 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
     })
   );
 
-  const close = () => {
-    panel.hidden = true;
-    trigger.setAttribute("aria-expanded", "false");
-  };
-
-  trigger.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const open = panel.hidden;
-    // Close notification panels if open
+  const openMenu = () => {
     document.querySelectorAll(".notif-bell__panel").forEach((el) => {
       el.hidden = true;
     });
     document.querySelectorAll(".notif-bell__button").forEach((el) => {
       el.setAttribute("aria-expanded", "false");
     });
-    panel.hidden = !open;
-    trigger.setAttribute("aria-expanded", String(open));
+    panel.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+  };
+
+  const closeMenu = () => {
+    panel.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+  };
+
+  let closeTimer = null;
+  const clearCloseTimer = () => {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    clearCloseTimer();
+    closeTimer = setTimeout(closeMenu, 120);
+  };
+
+  // Desktop: open on hover, close when the pointer leaves the menu.
+  wrap.addEventListener("pointerenter", (event) => {
+    if (event.pointerType === "touch") return;
+    clearCloseTimer();
+    openMenu();
+  });
+  wrap.addEventListener("pointerleave", (event) => {
+    if (event.pointerType === "touch") return;
+    scheduleClose();
   });
 
-  document.addEventListener("click", close);
+  // Touch / keyboard: click toggles; outside click closes.
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    clearCloseTimer();
+    if (panel.hidden) openMenu();
+    else closeMenu();
+  });
+
+  document.addEventListener("click", closeMenu);
   panel.addEventListener("click", (event) => event.stopPropagation());
 
   wrap.append(trigger, panel);
