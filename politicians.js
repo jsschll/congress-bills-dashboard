@@ -2,12 +2,15 @@ const filterLevel = document.getElementById("filter-level");
 const filterParty = document.getElementById("filter-party");
 const filterState = document.getElementById("filter-state");
 const filterSearch = document.getElementById("filter-search");
+const filterTracked = document.getElementById("filter-tracked");
 const browseStatus = document.getElementById("browse-status");
 const politiciansGrid = document.getElementById("politicians-grid");
 
 let allPoliticians = [];
 let followedIds = new Set();
 let currentUser = null;
+let trackedOnly =
+  new URLSearchParams(window.location.search).get("tracked") === "1";
 
 function setBrowseStatus(message, type = "loading") {
   browseStatus.hidden = !message;
@@ -117,6 +120,9 @@ function applyFilters() {
   const search = filterSearch.value.trim().toLowerCase();
 
   const filtered = allPoliticians.filter((politician) => {
+    if (trackedOnly || filterTracked?.checked) {
+      if (!politician.id || !followedIds.has(politician.id)) return false;
+    }
     if (level !== "all") {
       const displayLevel = toDisplayLevel(politician.level);
       if (displayLevel !== level && politician.level !== level) return false;
@@ -164,7 +170,12 @@ function applyFilters() {
 
   politiciansGrid.replaceChildren();
   if (!filtered.length) {
-    setBrowseStatus("No politicians match these filters.", "error");
+    setBrowseStatus(
+      trackedOnly || filterTracked?.checked
+        ? "No tracked officials match these filters."
+        : "No politicians match these filters.",
+      "error"
+    );
     return;
   }
 
@@ -182,7 +193,14 @@ function applyFilters() {
     stateJudges,
     geography,
   });
-  setBrowseStatus(`Showing ${filtered.length} politicians.`, "success");
+  setBrowseStatus(
+    trackedOnly || filterTracked?.checked
+      ? `Showing ${filtered.length} tracked official${
+          filtered.length === 1 ? "" : "s"
+        }.`
+      : `Showing ${filtered.length} politicians.`,
+    "success"
+  );
 }
 
 async function loadBrowseList() {
@@ -242,6 +260,14 @@ filterLevel.addEventListener("change", () => {
 filterParty.addEventListener("change", applyFilters);
 filterState.addEventListener("change", applyFilters);
 filterSearch.addEventListener("input", applyFilters);
+filterTracked?.addEventListener("change", () => {
+  trackedOnly = Boolean(filterTracked.checked);
+  const url = new URL(window.location.href);
+  if (trackedOnly) url.searchParams.set("tracked", "1");
+  else url.searchParams.delete("tracked");
+  window.history.replaceState({}, "", url);
+  applyFilters();
+});
 
 (async function initPoliticiansPage() {
   fillStateFilter();
@@ -278,6 +304,16 @@ filterSearch.addEventListener("input", applyFilters);
   currentUser = (await getUser().catch(() => null)) || null;
   if (currentUser) {
     followedIds = await loadFollowedPoliticianIds(currentUser.id);
+  }
+  if (filterTracked) {
+    filterTracked.checked = trackedOnly;
+    if (!currentUser) {
+      filterTracked.disabled = true;
+      filterTracked.title = "Sign in to filter tracked officials";
+    } else if (trackedOnly && filterLevel) {
+      // Show tracked officials across levels by default.
+      filterLevel.value = "all";
+    }
   }
 
   await loadBrowseList();

@@ -26,6 +26,10 @@ let notePopoverHideTimer = 0;
 let activeActivityTab = "votes";
 /** @type {Record<string, unknown> | null} */
 let activeCongress = null;
+/** @type {Set<string>} */
+let followedPoliticianIds = new Set();
+/** @type {{ id?: string } | null} */
+let followUser = null;
 
 const CATEGORY_RULES = [
   { key: "Immigration", re: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i },
@@ -381,6 +385,18 @@ function renderOverview(person, congress) {
       )}</a>`
     );
   }
+
+  contactBits.unshift(`
+    <button
+      type="button"
+      id="politician-follow-btn"
+      class="politician-profile-follow-btn"
+      aria-pressed="false"
+    >
+      Track Official
+    </button>
+  `);
+
   contactBits.push(`
     <div class="politician-profile-note-wrap" id="politician-note-wrap">
       <button
@@ -459,7 +475,7 @@ function renderOverview(person, congress) {
         formatRole(person)
       )}</p>
       <p class="politician-profile-card__tenure">${escapeHtml(tenureLabel)}</p>
-      <div class="politician-profile-contact" aria-label="Contact and notes">
+      <div class="politician-profile-contact" aria-label="Contact, tracking, and notes">
         ${
           contactBits.length
             ? contactBits.join("")
@@ -476,9 +492,86 @@ function renderOverview(person, congress) {
     });
   }
 
+  bindFollowButton(person);
   bindNotePopover();
   refreshNoteUi();
   document.title = `${person.name || "Politician"} · Congress Bills`;
+}
+
+function syncFollowButton() {
+  const button = document.getElementById("politician-follow-btn");
+  if (!button) return;
+  const tracking = Boolean(
+    activePerson?.id && followedPoliticianIds.has(String(activePerson.id))
+  );
+  button.textContent = tracking ? "Tracking" : "Track Official";
+  button.classList.toggle("is-tracking", tracking);
+  button.setAttribute("aria-pressed", tracking ? "true" : "false");
+  button.title = tracking
+    ? "Stop tracking this official"
+    : "Track this official to find them quickly from the nav";
+}
+
+function bindFollowButton(person) {
+  const button = document.getElementById("politician-follow-btn");
+  if (!button || button.dataset.bound === "1") return;
+  button.dataset.bound = "1";
+  activePerson = person;
+  syncFollowButton();
+
+  button.addEventListener("click", async () => {
+    if (!followUser) {
+      window.location.href = `auth.html?next=${encodeURIComponent(
+        `${window.location.pathname}${window.location.search}`
+      )}`;
+      return;
+    }
+    button.disabled = true;
+    try {
+      let record = activePerson || person;
+      if (!record.id && typeof upsertPoliticianRecord === "function") {
+        const saved = await upsertPoliticianRecord(record);
+        if (!saved?.id) throw new Error("Could not save official for tracking.");
+        record = { ...record, id: saved.id };
+        activePerson = record;
+        if (person) person.id = saved.id;
+      }
+      if (!record?.id) throw new Error("Could not track this official.");
+
+      const id = String(record.id);
+      if (followedPoliticianIds.has(id)) {
+        await unfollowPolitician(followUser.id, id);
+        followedPoliticianIds.delete(id);
+      } else {
+        await followPolitician(followUser.id, id);
+        followedPoliticianIds.add(id);
+      }
+      syncFollowButton();
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || "Could not update tracking.", "error");
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+async function setupFollowState(person) {
+  activePerson = person;
+  followUser = typeof getUser === "function" ? await getUser() : null;
+  followedPoliticianIds = new Set();
+  if (followUser && typeof loadFollowedPoliticianIds === "function") {
+    followedPoliticianIds = await loadFollowedPoliticianIds(followUser.id);
+  }
+  // Resolve id for national officials already upserted earlier.
+  if (
+    person &&
+    !person.id &&
+    typeof resolveExistingPoliticianId === "function"
+  ) {
+    await resolveExistingPoliticianId(person);
+  }
+  syncFollowButton();
 }
 
 function officialRoleKind(person = {}) {
@@ -1314,6 +1407,7 @@ async function boot() {
       return;
     }
 
+    await setupFollowState(person);
     renderOverview(person, congress);
     await setupNotes(person);
     renderMatchScorecard(matchPayload, person);
