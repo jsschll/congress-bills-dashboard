@@ -53,6 +53,23 @@ function normalizeVoteCast(voteCast = "") {
   return voteCast || null;
 }
 
+function toIsoDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const date = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function displayDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const iso = toIsoDate(raw);
+  return iso ? iso.slice(0, 10) : raw;
+}
+
 function stripHtml(html) {
   return String(html || "")
     .replace(/<[^>]+>/g, " ")
@@ -112,6 +129,27 @@ function mapSubjectCategory(policyArea = "") {
   return "Other";
 }
 
+function plainEnglishForVote(vote, summaryText = "") {
+  const crs = toSentences(summaryText, 2);
+  if (crs) return crs;
+  const kind = vote.voteKind;
+  const bill = vote.billNumber || "this measure";
+  const title =
+    vote.title && vote.title !== vote.voteQuestion ? ` (${vote.title})` : "";
+  if (kind === "final_passage") {
+    return `This was a final House vote on whether to pass ${bill}${title}.`;
+  }
+  if (kind === "amendment") {
+    return `This House vote was on an amendment to ${bill}${title}.`;
+  }
+  const question = String(vote.voteQuestion || "").trim();
+  if (question) return `House roll call on: ${question.replace(/\.$/, "")}.`;
+  if (vote.hasLinkedBill || (vote.legislationType && vote.legislationNumber)) {
+    return `House roll-call vote on ${bill}${title}. Yea supports the measure on this question; Nay opposes it.`;
+  }
+  return `Recent House roll-call vote${vote.result ? ` — result: ${vote.result}` : ""}.`;
+}
+
 function yeaNayMeans(vote) {
   const bill = vote.billNumber || "this measure";
   const kind = vote.voteKind;
@@ -127,27 +165,16 @@ function yeaNayMeans(vote) {
       nayMeans: `Reject the amendment to ${bill}.`,
     };
   }
+  if (vote.hasLinkedBill || (vote.legislationType && vote.legislationNumber)) {
+    return {
+      yeaMeans: `Support ${bill} on this roll call.`,
+      nayMeans: `Oppose ${bill} on this roll call.`,
+    };
+  }
   return {
     yeaMeans: "Record a Yea on this House roll call.",
     nayMeans: "Record a Nay on this House roll call.",
   };
-}
-
-function plainEnglishForVote(vote, summaryText = "") {
-  const crs = toSentences(summaryText, 2);
-  if (crs) return crs;
-  const kind = vote.voteKind;
-  const bill = vote.billNumber || "this measure";
-  const title = vote.title && vote.title !== vote.voteQuestion ? ` (${vote.title})` : "";
-  if (kind === "final_passage") {
-    return `This was a final House vote on whether to pass ${bill}${title}.`;
-  }
-  if (kind === "amendment") {
-    return `This House vote was on an amendment to ${bill}${title}.`;
-  }
-  const question = String(vote.voteQuestion || "").trim();
-  if (question) return `House roll call on: ${question.replace(/\.$/, "")}.`;
-  return `Recent House roll-call vote on ${bill}.`;
 }
 
 async function fetchBillSummary(congress, type, number, apiKey) {
@@ -475,10 +502,9 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             voteKind,
             voteCast: normalizeVoteCast(row.voteCast),
             result: vote.result || "",
-            date: vote.startDate || vote.date || null,
-            lastUpdated: vote.startDate
-              ? new Date(`${vote.startDate}T12:00:00`).toISOString()
-              : new Date().toISOString(),
+            date: displayDate(vote.startDate || vote.date || null),
+            lastUpdated:
+              toIsoDate(vote.startDate || vote.date) || new Date().toISOString(),
             policyArea: null,
             subjectCategory: "Other",
             tags: [],
@@ -521,34 +547,39 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
   }
 
   // Enrich a capped set with CRS summary + policy area for plain English.
-  const enrichCount = Math.min(found.length, limit);
+  // Keep this small so the profile API stays fast on Vercel.
+  const enrichCount = Math.min(found.length, 8);
   const chunkEnrich = 4;
   for (let i = 0; i < enrichCount; i += chunkEnrich) {
     const chunk = found.slice(i, i + chunkEnrich);
     await Promise.all(
       chunk.map(async (vote) => {
         if (!vote.hasLinkedBill) return;
-        const [summary, policyArea] = await Promise.all([
-          fetchBillSummary(
-            vote.congress,
-            vote.legislationType,
-            vote.legislationNumber,
-            apiKey
-          ),
-          fetchBillPolicyArea(
-            vote.congress,
-            vote.legislationType,
-            vote.legislationNumber,
-            apiKey
-          ),
-        ]);
-        vote.policyArea = policyArea || null;
-        vote.subjectCategory = mapSubjectCategory(policyArea);
-        vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
-        vote.shortPitch = plainEnglishForVote(vote, summary);
-        const meanings = yeaNayMeans(vote);
-        vote.yeaMeans = meanings.yeaMeans;
-        vote.nayMeans = meanings.nayMeans;
+        try {
+          const [summary, policyArea] = await Promise.all([
+            fetchBillSummary(
+              vote.congress,
+              vote.legislationType,
+              vote.legislationNumber,
+              apiKey
+            ),
+            fetchBillPolicyArea(
+              vote.congress,
+              vote.legislationType,
+              vote.legislationNumber,
+              apiKey
+            ),
+          ]);
+          vote.policyArea = policyArea || null;
+          vote.subjectCategory = mapSubjectCategory(policyArea);
+          vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
+          vote.shortPitch = plainEnglishForVote(vote, summary);
+          const meanings = yeaNayMeans(vote);
+          vote.yeaMeans = meanings.yeaMeans;
+          vote.nayMeans = meanings.nayMeans;
+        } catch (error) {
+          console.warn(error);
+        }
       })
     );
   }
