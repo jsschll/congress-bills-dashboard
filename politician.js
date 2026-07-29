@@ -535,14 +535,27 @@ function bindFollowButton(person) {
     button.disabled = true;
     try {
       let record = activePerson || person;
-      if (!record.id && typeof upsertPoliticianRecord === "function") {
-        const saved = await upsertPoliticianRecord(record);
-        if (!saved?.id) throw new Error("Could not save official to follow.");
-        record = { ...record, id: saved.id };
+      if (!record.id) {
+        const savedId =
+          typeof ensurePoliticianId === "function"
+            ? await ensurePoliticianId(record)
+            : null;
+        if (!savedId && typeof upsertPoliticianRecord === "function") {
+          const saved = await upsertPoliticianRecord(record);
+          if (saved?.id) {
+            record = { ...record, id: saved.id };
+          }
+        } else if (savedId) {
+          record = { ...record, id: savedId };
+        }
         activePerson = record;
-        if (person) person.id = saved.id;
+        if (person) person.id = record.id;
       }
-      if (!record?.id) throw new Error("Could not follow this official.");
+      if (!record?.id) {
+        throw new Error(
+          "Could not save this official to follow. Try again in a moment."
+        );
+      }
 
       const id = String(record.id);
       if (followedPoliticianIds.has(id)) {
@@ -553,6 +566,7 @@ function bindFollowButton(person) {
         followedPoliticianIds.add(id);
       }
       syncFollowButton();
+      setStatus("", "loading");
     } catch (error) {
       console.error(error);
       setStatus(error.message || "Could not update follow.", "error");
@@ -1270,11 +1284,25 @@ async function ensurePoliticianId(person) {
   const existing = await resolveExistingPoliticianId(person);
   if (existing) return existing;
   if (typeof upsertPoliticianRecord !== "function") return null;
-  if (!person?.external_key || !person?.name) return null;
-  const record = await upsertPoliticianRecord(person);
-  if (record?.id) {
-    person.id = record.id;
-    return String(record.id);
+
+  const bioguide = String(person?.bioguide_id || person?.bioguideId || "")
+    .trim()
+    .toUpperCase();
+  if (!person.external_key && bioguide) {
+    person.external_key = `federal:${bioguide}`;
+  }
+  if (!person.level) person.level = bioguide ? "federal" : person.level || "federal";
+  if (!person?.name) return null;
+
+  try {
+    const record = await upsertPoliticianRecord(person);
+    if (record?.id) {
+      person.id = record.id;
+      return String(record.id);
+    }
+  } catch (error) {
+    console.error(error);
+    throw error;
   }
   return null;
 }

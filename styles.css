@@ -2875,6 +2875,20 @@ body {
   max-width: 42rem;
 }
 
+.politicians-hero__or {
+  margin: 0.85rem 0 0;
+  max-width: 42rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232, 238, 247, 0.7);
+}
+
+.politicians-hero__or + .politicians-hero__form {
+  margin-top: 0.85rem;
+}
+
 .politicians-hero__input {
   flex: 1 1 16rem;
   min-width: 0;

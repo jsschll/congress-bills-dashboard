@@ -331,6 +331,7 @@ function normalizeMember(member) {
 
   return {
     bioguide_id: bioguide,
+    external_key: bioguide ? `federal:${bioguide}` : null,
     name:
       member.directOrderName ||
       member.name ||

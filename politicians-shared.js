@@ -411,20 +411,48 @@ async function lookupRepresentatives(query) {
 
 async function upsertPoliticianRecord(politician) {
   const client = getSupabase();
-  if (!client) return null;
+  if (!client || !politician) return null;
+
+  const bioguide = String(
+    politician.bioguide_id || politician.bioguideId || ""
+  )
+    .trim()
+    .toUpperCase();
+  const level = String(politician.level || "federal").toLowerCase();
+  const name = String(politician.name || "").trim();
+  if (!name) {
+    console.error("upsertPoliticianRecord: missing name");
+    return null;
+  }
+
+  let externalKey = String(politician.external_key || "").trim();
+  if (!externalKey && bioguide) {
+    externalKey = `federal:${bioguide}`;
+  }
+  if (!externalKey) {
+    const state = String(politician.state || "xx").toLowerCase();
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    externalKey = `${level}:${state}:${slug}`;
+  }
+
+  // Keep the in-memory person in sync so follow / notes can reuse the key.
+  politician.external_key = externalKey;
+  if (bioguide) politician.bioguide_id = bioguide;
+  if (!politician.level) politician.level = level;
 
   const officeTitle =
     politician.office_title ||
     politician.metadata?.office_title ||
+    politician.role_label ||
     politician.chamber ||
     null;
 
   const payload = {
-    p_external_key: politician.external_key,
-    p_bioguide_id: politician.bioguide_id || null,
-    p_level: politician.level,
+    p_external_key: externalKey,
+    p_bioguide_id: bioguide || null,
+    p_level: level === "local" ? "local" : level,
     p_chamber: politician.chamber || null,
-    p_name: politician.name,
+    p_name: name,
     p_party: politician.party || null,
     p_state: politician.state || null,
     p_district: politician.district || null,
@@ -447,9 +475,14 @@ async function upsertPoliticianRecord(politician) {
 
   if (error) {
     console.error(error);
-    return null;
+    const err = new Error(error.message || "Could not save official.");
+    err.cause = error;
+    throw err;
   }
-  return data;
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (row?.id) politician.id = row.id;
+  return row || null;
 }
 
 async function loadFollowedPoliticianIds(userId) {
@@ -3304,7 +3337,10 @@ function mountAddressResultsPage({
           if (politician.metadata?.district_only || politician.id) {
             return politician;
           }
-          const row = await upsertPoliticianRecord(politician);
+          const row = await upsertPoliticianRecord(politician).catch((error) => {
+            console.error(error);
+            return null;
+          });
           if (row?.id) politician.id = row.id;
           return politician;
         })

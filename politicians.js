@@ -147,10 +147,14 @@ function applyFilters() {
         politician.metadata?.category,
         politician.state,
         politician.level,
+        politician.external_key,
+        politician.bioguide_id,
       ]
         .join(" ")
         .toLowerCase();
-      if (!haystack.includes(search)) return false;
+      // Every token must match so "josh hawley" finds the senator.
+      const tokens = search.split(/\s+/).filter(Boolean);
+      if (!tokens.every((token) => haystack.includes(token))) return false;
     }
     return true;
   });
@@ -256,12 +260,41 @@ async function loadBrowseList() {
   }
 }
 
+const nameSearchForm = document.getElementById("name-search-form");
+const nameSearchInput = document.getElementById("name-search-input");
+const browseSection = document.querySelector(".politicians-browse");
+
+function syncNameSearchUrl(query) {
+  const url = new URL(window.location.href);
+  const q = String(query || "").trim();
+  if (q) url.searchParams.set("q", q);
+  else url.searchParams.delete("q");
+  window.history.replaceState({}, "", url);
+}
+
+function scrollToBrowse() {
+  browseSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function applyNameSearch(query, { scroll = true, syncUrl = true } = {}) {
+  const q = String(query || "").trim();
+  if (nameSearchInput) nameSearchInput.value = q;
+  if (filterSearch) filterSearch.value = q;
+  if (syncUrl) syncNameSearchUrl(q);
+  applyFilters();
+  if (scroll && q) scrollToBrowse();
+}
+
 filterLevel.addEventListener("change", () => {
   loadBrowseList();
 });
 filterParty.addEventListener("change", applyFilters);
 filterState.addEventListener("change", applyFilters);
-filterSearch.addEventListener("input", applyFilters);
+filterSearch.addEventListener("input", () => {
+  if (nameSearchInput) nameSearchInput.value = filterSearch.value;
+  syncNameSearchUrl(filterSearch.value);
+  applyFilters();
+});
 filterFollowing?.addEventListener("change", () => {
   followingOnly = Boolean(filterFollowing.checked);
   const url = new URL(window.location.href);
@@ -269,6 +302,11 @@ filterFollowing?.addEventListener("change", () => {
   else url.searchParams.delete("following");
   window.history.replaceState({}, "", url);
   applyFilters();
+});
+
+nameSearchForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  applyNameSearch(nameSearchInput?.value || "");
 });
 
 (async function initPoliticiansPage() {
@@ -282,13 +320,21 @@ filterFollowing?.addEventListener("change", () => {
     }
   }
 
+  const params = new URLSearchParams(window.location.search);
   const addressInput = document.getElementById("address-input");
   const addressForm = document.getElementById("address-form");
-  const prefillAddress = new URLSearchParams(window.location.search)
-    .get("address")
-    ?.trim();
+  const prefillAddress = params.get("address")?.trim();
+  const prefillName =
+    params.get("q")?.trim() ||
+    params.get("name")?.trim() ||
+    params.get("search")?.trim() ||
+    "";
   if (prefillAddress && addressInput) {
     addressInput.value = prefillAddress;
+  }
+  if (prefillName) {
+    if (nameSearchInput) nameSearchInput.value = prefillName;
+    if (filterSearch) filterSearch.value = prefillName;
   }
 
   mountAddressLookup({
@@ -319,4 +365,7 @@ filterFollowing?.addEventListener("change", () => {
   }
 
   await loadBrowseList();
+  if (prefillName) {
+    applyNameSearch(prefillName, { scroll: true, syncUrl: true });
+  }
 })();

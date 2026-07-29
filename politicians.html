@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729ag" />
+    <link rel="stylesheet" href="styles.css?v=20260729an" />
   </head>
   <body class="page-app page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -22,9 +22,31 @@
         <p class="politicians-hero__brand">Congress Bills</p>
         <h1 class="politicians-hero__title">Politicians</h1>
         <p class="politicians-hero__lede">
-          Look up federal, state, county, city, and school officials for an
-          address — then follow the ones you care about.
+          Search officials by name, or look up who represents an address —
+          then follow the ones you care about.
         </p>
+        <form
+          id="name-search-form"
+          class="politicians-hero__form politicians-hero__form--name"
+          aria-label="Search politicians by name"
+        >
+          <label class="visually-hidden" for="name-search-input"
+            >Search by name</label
+          >
+          <input
+            id="name-search-input"
+            class="politicians-hero__input"
+            type="search"
+            name="q"
+            placeholder="Search by name — e.g. Josh Hawley"
+            autocomplete="off"
+            enterkeyhint="search"
+          />
+          <button class="politicians-hero__submit" type="submit">
+            Search names
+          </button>
+        </form>
+        <p class="politicians-hero__or" aria-hidden="true">or</p>
         <form
           id="address-form"
           class="politicians-hero__form"
@@ -40,7 +62,6 @@
             name="address"
             placeholder="Street address or ZIP code"
             autocomplete="street-address"
-            required
           />
           <button class="politicians-hero__submit" type="submit">
             Find my representatives
@@ -54,8 +75,8 @@
         <div class="politicians-browse__intro">
           <h2 id="browse-heading">Browse politicians</h2>
           <p>
-            Filter the national roster while you explore — or use the address
-            search above for your exact districts.
+            Results update as you type. Use the name search above, or filter
+            by level, party, and state.
           </p>
         </div>
 
@@ -87,12 +108,12 @@
             </select>
           </label>
           <label class="filter-bar__search">
-            Search
+            Name filter
             <input
               id="filter-search"
               class="politicians-filter-bar__input"
               type="search"
-              placeholder="Name or district"
+              placeholder="Filter by name or district"
             />
           </label>
           <label class="politicians-filter-bar__following">
@@ -110,7 +131,7 @@
     <script src="shared.js"></script>
     <script src="nav.js?v=20260729ag"></script>
     <script src="engagement.js?v=20260729t"></script>
-    <script src="politicians-shared.js?v=20260729u"></script>
-    <script src="politicians.js?v=20260729ag" defer></script>
+    <script src="politicians-shared.js?v=20260729an"></script>
+    <script src="politicians.js?v=20260729an" defer></script>
   </body>
 </html>
