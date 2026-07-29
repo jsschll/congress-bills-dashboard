@@ -429,7 +429,7 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
     return [];
   }
 
-  // Prefer final passage + amendments; skip pure procedural noise.
+  // Skip pure procedural noise; keep chronological so "Recent Votes" is recent.
   const ranked = votes
     .map((vote) => {
       const voteQuestion = vote.voteQuestion || "";
@@ -440,15 +440,11 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
       };
     })
     .filter((row) => row.voteKind !== "procedural")
-    .sort((a, b) => {
-      const rank = (kind) =>
-        kind === "final_passage" ? 0 : kind === "amendment" ? 1 : 2;
-      const byKind = rank(a.voteKind) - rank(b.voteKind);
-      if (byKind) return byKind;
-      return String(b.raw.startDate || b.raw.date || "").localeCompare(
+    .sort((a, b) =>
+      String(b.raw.startDate || b.raw.date || "").localeCompare(
         String(a.raw.startDate || a.raw.date || "")
-      );
-    });
+      )
+    );
 
   const found = [];
   const chunkSize = 6;
