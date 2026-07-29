@@ -10,9 +10,9 @@ export interface BillSummaryCard {
   yea_means: string;
   /** Real-world outcome of a Nay vote. */
   nay_means: string;
-  /** Action label (e.g. "Pass Safety Rules" or fallback "Support Bill"). */
+  /** Action label (e.g. "Pass Safety Rules" or fallback "Support Measure"). */
   yea_label: string;
-  /** Action label (e.g. "Reject Safety Rules" or fallback "Oppose Bill"). */
+  /** Action label (e.g. "Reject Safety Rules" or fallback "Oppose Measure"). */
   nay_label: string;
   /** Where the card came from. */
   source?: "llm" | "heuristic";
@@ -27,17 +27,17 @@ export interface FormatBillSummaryOptions {
   apiKey?: string;
 }
 
-export const DEFAULT_YEA_LABEL = "Support Bill";
-export const DEFAULT_NAY_LABEL = "Oppose Bill";
+export const DEFAULT_YEA_LABEL = "Support Measure";
+export const DEFAULT_NAY_LABEL = "Oppose Measure";
 
 export const BILL_SUMMARY_SYSTEM_PROMPT = `You write plain-English vote cards for a civic app.
 
 Rules (strict):
 1. Analyze ONLY the provided bill title + congressional/CRS text. Do not invent programs, repeals, bans, or funding cuts that are not clearly in the text.
-2. If the text is thin, unclear, or mostly procedural, say what you can neutrally and set yea_label to "Support Bill" and nay_label to "Oppose Bill".
+2. If the text is thin, unclear, or mostly procedural, say what you can neutrally and set yea_label to "Support Measure" and nay_label to "Oppose Measure".
 3. summary must be 1–2 COMPLETE sentences in plain English (never cut off mid-sentence, never paste truncated legalese).
 4. yea_means / nay_means must describe real-world outcomes of Yea vs Nay on THIS measure — not a stock “You support ending…” template.
-5. Labels are 2–4 words, parallel, concrete. Only use vivid verbs like End/Keep/Pass/Reject when the text clearly supports them; otherwise use Support Bill / Oppose Bill.
+5. Labels are 2–4 words, parallel, concrete. Only use vivid verbs like End/Keep/Pass/Reject when the text clearly supports them; otherwise use Support Measure / Oppose Measure.
 6. No slogans, no fear-mongering, no bill jargon.
 
 Return ONLY valid JSON with exactly these keys:
@@ -64,25 +64,70 @@ Raw congressional / CRS text:
 ${summary.slice(0, 6000)}
 """
 
-If unsure, set confident=false and use Support Bill / Oppose Bill labels.
+If unsure, set confident=false and use Support Measure / Oppose Measure labels.
 Do NOT reuse rebate/end-program framing unless the source text clearly says so.
 
 Produce the JSON card for the bill above.`;
 }
 
-function withFallbacks(data: Partial<BillSummaryCard>): BillSummaryCard {
+function isGenericMeans(text = ""): boolean {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return true;
+  return (
+    /^a yea vote supports advancing this measure/.test(value) ||
+    /^a nay vote supports rejecting this measure/.test(value) ||
+    /^you support advancing this measure/.test(value) ||
+    /^you support rejecting this measure/.test(value) ||
+    /^support this (roll-call|roll call|measure|bill)/.test(value) ||
+    /^oppose this (roll-call|roll call|measure|bill)/.test(value)
+  );
+}
+
+function isBannedMeansTemplate(text = ""): boolean {
+  const value = String(text || "").trim().toLowerCase();
+  if (!value) return false;
+  return (
+    /you support ending this program described in this measure/.test(value) ||
+    /you support keeping this program in place/.test(value) ||
+    /you support ending .+ described in this measure/.test(value)
+  );
+}
+
+function withFallbacks(
+  data: Partial<BillSummaryCard>,
+  options: { structuredYea?: boolean; structuredNay?: boolean } = {}
+): BillSummaryCard {
+  let yea_means = String(data.yea_means || "").trim();
+  let nay_means = String(data.nay_means || "").trim();
+
+  if (isBannedMeansTemplate(yea_means) && !options.structuredYea) {
+    yea_means = "";
+  }
+  if (isBannedMeansTemplate(nay_means) && !options.structuredNay) {
+    nay_means = "";
+  }
+
+  const meansAreGeneric = isGenericMeans(yea_means) || isGenericMeans(nay_means) ||
+    isBannedMeansTemplate(yea_means) || isBannedMeansTemplate(nay_means);
+  let yea_label = String(data.yea_label || "").trim();
+  let nay_label = String(data.nay_label || "").trim();
+  if (meansAreGeneric) {
+    yea_label = DEFAULT_YEA_LABEL;
+    nay_label = DEFAULT_NAY_LABEL;
+  }
+
   return {
     summary:
       String(data.summary || "").trim() ||
       "This is a recent congressional roll-call vote on the linked measure.",
     yea_means:
-      String(data.yea_means || "").trim() ||
+      yea_means ||
       "A Yea vote supports advancing this measure as written on this roll call.",
     nay_means:
-      String(data.nay_means || "").trim() ||
+      nay_means ||
       "A Nay vote supports rejecting this measure on this roll call.",
-    yea_label: String(data.yea_label || "").trim() || DEFAULT_YEA_LABEL,
-    nay_label: String(data.nay_label || "").trim() || DEFAULT_NAY_LABEL,
+    yea_label: yea_label || DEFAULT_YEA_LABEL,
+    nay_label: nay_label || DEFAULT_NAY_LABEL,
     source: data.source,
   };
 }
@@ -115,5 +160,8 @@ export async function formatBillSummary(
     throw new Error(data.error || "Could not format bill summary.");
   }
 
-  return withFallbacks(data);
+  return withFallbacks(data, {
+    structuredYea: Object.prototype.hasOwnProperty.call(data, "yea_means"),
+    structuredNay: Object.prototype.hasOwnProperty.call(data, "nay_means"),
+  });
 }

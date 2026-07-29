@@ -1157,17 +1157,22 @@ function renderVoteCard(item) {
   card.className = "vote-feed-card policy-bill-card";
   const subject = item.subjectCategory || item.policyArea || "";
   const kind = voteKindLabel(item.voteKind);
-  const summary =
-    String(item.shortPitch || "").trim() ||
-    "This is a recent congressional roll-call vote on the linked measure.";
-  const yeaLabel = String(item.yeaLabel || "").trim() || "Support Bill";
-  const nayLabel = String(item.nayLabel || "").trim() || "Oppose Bill";
-  const yeaMeans =
-    String(item.yeaMeans || "").trim() ||
-    "A Yea vote supports advancing this measure as written on this roll call.";
-  const nayMeans =
-    String(item.nayMeans || "").trim() ||
-    "A Nay vote supports rejecting this measure on this roll call.";
+  const copy =
+    typeof resolveVoteCardCopy === "function"
+      ? resolveVoteCardCopy(item)
+      : {
+          summary:
+            String(item.shortPitch || "").trim() ||
+            "This is a recent congressional roll-call vote on the linked measure.",
+          yeaMeans:
+            String(item.yeaMeans || "").trim() ||
+            "A Yea vote supports advancing this measure as written on this roll call.",
+          nayMeans:
+            String(item.nayMeans || "").trim() ||
+            "A Nay vote supports rejecting this measure on this roll call.",
+          yeaLabel: "Support Measure",
+          nayLabel: "Oppose Measure",
+        };
   card.innerHTML = `
     <div class="policy-bill-card__header">
       <div>
@@ -1194,16 +1199,16 @@ function renderVoteCard(item) {
     </div>
     <section class="policy-bill-card__summary" aria-label="Plain English summary">
       <h3 class="policy-bill-card__summary-label">What’s proposed</h3>
-      <p class="policy-bill-card__pitch">${escapePolicyHtml(summary)}</p>
+      <p class="policy-bill-card__pitch">${escapePolicyHtml(copy.summary)}</p>
     </section>
     <div class="vote-feed-card__meanings" aria-label="What Yea and Nay mean">
       <div class="vote-feed-card__meaning is-yea">
         <strong>Yea means</strong>
-        <p>${escapePolicyHtml(yeaMeans)}</p>
+        <p>${escapePolicyHtml(copy.yeaMeans)}</p>
       </div>
       <div class="vote-feed-card__meaning is-nay">
         <strong>Nay means</strong>
-        <p>${escapePolicyHtml(nayMeans)}</p>
+        <p>${escapePolicyHtml(copy.nayMeans)}</p>
       </div>
     </div>
     <a class="bill-card__link" href="${escapePolicyHtml(
@@ -1213,14 +1218,14 @@ function renderVoteCard(item) {
 
   if (window.PolicyEngagement?.mountVote) {
     window.PolicyEngagement.mountVote(card, item, {
-      supportLabel: yeaLabel,
-      opposeLabel: nayLabel,
-      whoVotedHint: `Tap ${yeaLabel} or ${nayLabel} to compare with House members.`,
+      supportLabel: copy.yeaLabel,
+      opposeLabel: copy.nayLabel,
+      whoVotedHint: `Tap ${copy.yeaLabel} or ${copy.nayLabel} to compare with House members.`,
     });
   } else if (window.PolicyEngagement?.mount) {
     window.PolicyEngagement.mount(card, item, {
-      supportLabel: yeaLabel,
-      opposeLabel: nayLabel,
+      supportLabel: copy.yeaLabel,
+      opposeLabel: copy.nayLabel,
       prompt: "How would you vote?",
       showTakeAction: false,
     });
