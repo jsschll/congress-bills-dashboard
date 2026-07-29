@@ -142,6 +142,26 @@ function renderCard(item) {
     }
   `;
 
+  if (
+    window.PolicyEngagement?.mount &&
+    (item.docType === "bill" || item.docType === "law")
+  ) {
+    window.PolicyEngagement.mount(article, {
+      id: item.id,
+      billNumber: item.billNumber,
+      title: item.title,
+      level: item.level || "Federal",
+      jurisdiction: item.jurisdiction || "U.S. Congress",
+      shortPitch: item.shortPitch,
+      officialUrl: item.officialUrl,
+      lastUpdated: item.lastUpdated,
+      tags: item.tags || [],
+      primarySponsor: { name: item.meta?.chamber || "Congress", title: "" },
+      allSteps: [],
+      deltaSummary: { added: [], changed: [], removed: [] },
+    });
+  }
+
   return article;
 }
 
@@ -297,4 +317,15 @@ function bootFromUrl() {
   runSearch();
 }
 
-bootFromUrl();
+(async function bootSearchPage() {
+  if (window.PolicyEngagement?.init) {
+    try {
+      await window.PolicyEngagement.init();
+      const header = document.querySelector(".page--search .header > div");
+      window.PolicyEngagement.renderHeaderScore(header);
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+  bootFromUrl();
+})();

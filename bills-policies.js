@@ -936,6 +936,10 @@ function renderBillCard(item) {
       }
     });
 
+  if (window.PolicyEngagement?.mount) {
+    window.PolicyEngagement.mount(card, item);
+  }
+
   return card;
 }
 
@@ -1448,6 +1452,16 @@ locationForm?.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     console.warn(error);
+  }
+
+  if (window.PolicyEngagement?.init) {
+    try {
+      await window.PolicyEngagement.init();
+      const header = document.querySelector(".page--policy-feed .header > div");
+      window.PolicyEngagement.renderHeaderScore(header);
+    } catch (error) {
+      console.warn(error);
+    }
   }
 
   syncFilterControls();

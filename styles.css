@@ -3815,4 +3815,237 @@ body {
   }
 }
 
+/* —— Policy card engagement —— */
+.policy-alignment-score {
+  margin: 0.85rem 0 0;
+  color: #94a3b8;
+  font-size: 0.92rem;
+}
+
+.policy-alignment-score strong {
+  color: #6ee7b7;
+  font-weight: 700;
+}
+
+.policy-engage {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.15rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #1e293b;
+}
+
+.policy-engage__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.policy-engage__stances {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.policy-engage__stance {
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.policy-engage__stance:hover {
+  border-color: rgba(31, 138, 122, 0.55);
+}
+
+.policy-engage__stance--support.is-active,
+.policy-engage__stance--support:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+}
+
+.policy-engage__stance--oppose.is-active,
+.policy-engage__stance--oppose:hover {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+}
+
+.policy-engage__alignment {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+}
+
+.policy-engage__alignment.is-empty {
+  display: none;
+}
+
+.policy-engage__community {
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.55);
+  padding: 0.55rem 0.75rem;
+}
+
+.policy-engage__community summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #e2e8f0;
+  list-style: none;
+}
+
+.policy-engage__community summary::-webkit-details-marker {
+  display: none;
+}
+
+.policy-engage__community summary::after {
+  content: "▾";
+  float: right;
+  color: #94a3b8;
+}
+
+.policy-engage__community[open] summary::after {
+  content: "▴";
+}
+
+.policy-engage__community-body {
+  margin-top: 0.65rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.policy-engage__community-summary,
+.policy-engage__community-empty {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.policy-engage__community-summary strong {
+  color: #e2e8f0;
+}
+
+.policy-engage__bar {
+  display: flex;
+  height: 0.55rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #1e293b;
+}
+
+.policy-engage__bar-support {
+  background: #34d399;
+}
+
+.policy-engage__bar-oppose {
+  background: #f87171;
+}
+
+.policy-action-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.policy-action-modal[hidden] {
+  display: none !important;
+}
+
+.policy-action-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.policy-action-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(640px, 100%);
+  max-height: min(90vh, 900px);
+  overflow: auto;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid #1e293b;
+  border-radius: 1rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 0.55rem;
+  color: #e8eef7;
+}
+
+.policy-action-modal__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.policy-action-modal__header h2 {
+  margin: 0;
+  font-family: var(--home-font-display, "Fraunces", serif);
+  font-size: 1.35rem;
+  color: #f8fafc;
+}
+
+.policy-action-modal__rep {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.92rem;
+}
+
+.policy-action-modal__body {
+  width: 100%;
+  min-height: 14rem;
+  resize: vertical;
+  font: inherit;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  box-sizing: border-box;
+}
+
+.policy-action-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.policy-action-modal__send {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.policy-action-modal__hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .policy-engage__alignment {
+    margin-left: 0;
+  }
+}
+
+
 
