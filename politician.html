@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729z" />
+    <link rel="stylesheet" href="styles.css?v=20260729aa" />
   </head>
   <body class="page-app page-politicians page-politician-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -29,22 +29,74 @@
       ></section>
 
       <section
-        id="politician-notes"
-        class="politician-profile-panel politician-notes-panel"
-        aria-labelledby="politician-notes-title"
+        id="politician-match"
+        class="politician-profile-panel"
+        aria-labelledby="politician-match-title"
         hidden
       >
         <div class="politician-profile-panel__header">
-          <h2 id="politician-notes-title">Your Notes</h2>
+          <h2 id="politician-match-title">Action Match Scorecard</h2>
           <p class="politician-profile-panel__lede">
-            Private notes about this official. Only you can see them.
+            Your Support / Oppose stances compared to this official’s House roll
+            call votes.
           </p>
         </div>
+        <div id="politician-match-body"></div>
+      </section>
+
+      <section
+        id="politician-activity"
+        class="politician-profile-panel"
+        aria-labelledby="politician-activity-title"
+        hidden
+      >
+        <div class="politician-profile-panel__header">
+          <h2 id="politician-activity-title">Activity Feed</h2>
+        </div>
+        <div class="politician-profile-activity">
+          <div>
+            <h3>Recent Actions</h3>
+            <ul id="politician-recent-actions" class="politician-profile-list"></ul>
+          </div>
+          <div>
+            <h3>Key / Impactful Legislation</h3>
+            <ul id="politician-key-bills" class="politician-profile-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div
+      id="politician-notes-modal"
+      class="politician-notes-modal"
+      hidden
+    >
+      <div class="politician-notes-modal__backdrop" data-close-notes="1"></div>
+      <div
+        class="politician-notes-modal__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="politician-notes-title"
+      >
+        <header class="politician-notes-modal__header">
+          <div>
+            <h2 id="politician-notes-title">Private notes</h2>
+            <p class="politician-notes-modal__lede">
+              Only you can see notes about this official.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="politician-notes-modal__close"
+            data-close-notes="1"
+            aria-label="Close notes"
+          >
+            ✕
+          </button>
+        </header>
         <p id="politician-notes-status" class="status" hidden></p>
         <div id="politician-notes-signin" class="politician-notes-signin" hidden>
-          <p>
-            Sign in to write and save private notes on this official.
-          </p>
+          <p>Sign in to write and save private notes on this official.</p>
           <a id="politician-notes-auth-link" class="refresh-btn" href="auth.html"
             >Sign in</a
           >
@@ -88,51 +140,14 @@
             ></ul>
           </div>
         </div>
-      </section>
-
-      <section
-        id="politician-match"
-        class="politician-profile-panel"
-        aria-labelledby="politician-match-title"
-        hidden
-      >
-        <div class="politician-profile-panel__header">
-          <h2 id="politician-match-title">Action Match Scorecard</h2>
-          <p class="politician-profile-panel__lede">
-            Your Support / Oppose stances compared to this official’s House roll
-            call votes.
-          </p>
-        </div>
-        <div id="politician-match-body"></div>
-      </section>
-
-      <section
-        id="politician-activity"
-        class="politician-profile-panel"
-        aria-labelledby="politician-activity-title"
-        hidden
-      >
-        <div class="politician-profile-panel__header">
-          <h2 id="politician-activity-title">Activity Feed</h2>
-        </div>
-        <div class="politician-profile-activity">
-          <div>
-            <h3>Recent Actions</h3>
-            <ul id="politician-recent-actions" class="politician-profile-list"></ul>
-          </div>
-          <div>
-            <h3>Key / Impactful Legislation</h3>
-            <ul id="politician-key-bills" class="politician-profile-list"></ul>
-          </div>
-        </div>
-      </section>
-    </main>
+      </div>
+    </div>
 
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260729x"></script>
     <script src="engagement.js?v=20260729t"></script>
     <script src="politicians-shared.js?v=20260729u"></script>
-    <script src="politician.js?v=20260729z" defer></script>
+    <script src="politician.js?v=20260729aa" defer></script>
   </body>
 </html>
