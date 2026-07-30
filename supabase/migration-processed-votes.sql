@@ -1,34 +1,80 @@
 -- Processed congressional roll-call votes (plain-English cards).
 -- Used by /api/sync-votes (and app/api/sync-votes when on Next.js).
+-- Safe to re-run: creates the table if missing, then adds any missing columns.
 
 create table if not exists public.processed_votes (
-  id text primary key,
-  congress integer not null,
-  session_number integer not null default 1,
-  roll_call_number integer not null,
-  chamber text not null default 'house'
-    check (chamber in ('house', 'senate')),
-  bill_type text,
-  bill_number text,
-  legislation_number text,
-  title text,
-  vote_question text,
-  result text,
-  vote_date date,
-  vote_kind text,
-  official_url text,
-  clerk_url text,
-  summary text,
-  yea_means text,
-  nay_means text,
-  yea_label text,
-  nay_label text,
-  summary_source text default 'llm',
-  raw_payload jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (chamber, congress, session_number, roll_call_number)
+  id text primary key
 );
+
+alter table public.processed_votes
+  add column if not exists congress integer,
+  add column if not exists session_number integer not null default 1,
+  add column if not exists roll_call_number integer,
+  add column if not exists chamber text not null default 'house',
+  add column if not exists bill_type text,
+  add column if not exists bill_number text,
+  add column if not exists legislation_number text,
+  add column if not exists title text,
+  add column if not exists vote_question text,
+  add column if not exists result text,
+  add column if not exists vote_date date,
+  add column if not exists vote_kind text,
+  add column if not exists official_url text,
+  add column if not exists clerk_url text,
+  add column if not exists summary text,
+  add column if not exists yea_means text,
+  add column if not exists nay_means text,
+  add column if not exists yea_label text,
+  add column if not exists nay_label text,
+  add column if not exists summary_source text default 'llm',
+  add column if not exists raw_payload jsonb not null default '{}'::jsonb,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+-- Backfill NOT NULL fields that may have been added as nullable on older stubs.
+update public.processed_votes
+set congress = coalesce(congress, 119)
+where congress is null;
+
+update public.processed_votes
+set roll_call_number = coalesce(roll_call_number, 0)
+where roll_call_number is null;
+
+alter table public.processed_votes
+  alter column congress set not null,
+  alter column roll_call_number set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'processed_votes_chamber_check'
+      and conrelid = 'public.processed_votes'::regclass
+  ) then
+    alter table public.processed_votes
+      add constraint processed_votes_chamber_check
+      check (chamber in ('house', 'senate'));
+  end if;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'processed_votes_chamber_congress_session_number_roll_call_number_key'
+      and conrelid = 'public.processed_votes'::regclass
+  ) then
+    alter table public.processed_votes
+      add constraint processed_votes_chamber_congress_session_number_roll_call_number_key
+      unique (chamber, congress, session_number, roll_call_number);
+  end if;
+exception
+  when duplicate_object then null;
+end $$;
 
 create index if not exists processed_votes_date_idx
   on public.processed_votes (vote_date desc nulls last);
@@ -38,7 +84,6 @@ create index if not exists processed_votes_bill_idx
 
 alter table public.processed_votes enable row level security;
 
--- Public read for vote cards; writes go through the service role (bypasses RLS).
 drop policy if exists "Anyone can read processed votes" on public.processed_votes;
 create policy "Anyone can read processed votes"
   on public.processed_votes for select
