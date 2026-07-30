@@ -243,6 +243,15 @@
   font-size: 1.02rem;
 }
 
+.line-clamp-3,
+.vote-card__summary-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
 .policy-bill-card__status {
   margin: 0;
   color: #94a3b8;
@@ -4822,6 +4831,14 @@ a.politician-badge--match {
   color: #e2e8f0;
   font-size: 0.95rem;
   line-height: 1.45;
+}
+
+.politician-vote-card__summary .vote-card__summary-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 
 .politician-vote-card__meanings {

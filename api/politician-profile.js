@@ -1,12 +1,9 @@
 const CONGRESS_API = "https://api.congress.gov/v3";
 const CONGRESS = 119;
 const {
-  formatBillSummary,
   isProceduralLegislation,
   classifyVoteKind,
   completeSentences,
-  plainVoteFallback,
-  defaultYeaNayMeans,
   DEFAULT_YEA_LABEL,
   DEFAULT_NAY_LABEL,
 } = require("../lib/format-bill-summary");
@@ -112,16 +109,6 @@ function mapSubjectCategory(policyArea = "") {
   if (/civil rights|civil liberties|discrimination/.test(value)) return "Civil rights";
   if (/immigration|border/.test(value)) return "Immigration";
   return "Other";
-}
-
-function plainEnglishForVote(vote, summaryText = "") {
-  const crs = toSentences(summaryText, 2);
-  if (crs) return crs;
-  return plainVoteFallback(vote);
-}
-
-function yeaNayMeans(vote = {}) {
-  return defaultYeaNayMeans(vote);
 }
 
 async function fetchBillSummary(congress, type, number, apiKey) {
@@ -474,7 +461,8 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             policyArea: null,
             subjectCategory: "Other",
             tags: [],
-            shortPitch: "",
+            shortPitch: title || vote.voteQuestion || "",
+            officialSummary: "",
             yeaMeans: "",
             nayMeans: "",
             yeaLabel: DEFAULT_YEA_LABEL,
@@ -498,12 +486,6 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             status: null,
             deltaSummary: { added: [], changed: [], removed: [] },
           };
-          const meanings = yeaNayMeans(base);
-          base.yeaMeans = meanings.yeaMeans;
-          base.nayMeans = meanings.nayMeans;
-          base.yeaLabel = meanings.yeaLabel;
-          base.nayLabel = meanings.nayLabel;
-          base.shortPitch = plainEnglishForVote(base);
           return base;
         } catch {
           return null;
@@ -523,51 +505,47 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
 }
 
 async function enrichVoteCards(found, apiKey) {
+  // Attach official CRS text only — no LLM rewrite at runtime.
   const enrichCount = Math.min(found.length, 8);
-  const llmBudget = env("OPENAI_API_KEY", "OPENAI_KEY", "AI_API_KEY") ? 3 : 0;
   const chunkEnrich = 4;
   for (let i = 0; i < enrichCount; i += chunkEnrich) {
     const chunk = found.slice(i, i + chunkEnrich);
     await Promise.all(
-      chunk.map(async (vote, chunkIndex) => {
-        const absoluteIndex = i + chunkIndex;
+      chunk.map(async (vote) => {
         try {
-          let summary = "";
-          if (vote.hasLinkedBill) {
-            const [crsSummary, policyArea] = await Promise.all([
-              fetchBillSummary(
-                vote.congress,
-                vote.legislationType,
-                vote.legislationNumber,
-                apiKey
-              ),
-              fetchBillPolicyArea(
-                vote.congress,
-                vote.legislationType,
-                vote.legislationNumber,
-                apiKey
-              ),
-            ]);
-            summary = crsSummary || "";
-            vote.policyArea = policyArea || null;
-            vote.subjectCategory = mapSubjectCategory(policyArea);
-            vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
+          if (!vote.hasLinkedBill) {
+            vote.shortPitch =
+              vote.shortPitch || vote.title || vote.voteQuestion || "";
+            vote.summarySource = "official";
+            return;
           }
-
-          const card = await formatBillSummary(
-            summary || vote.shortPitch || vote.voteQuestion || "",
-            vote.title || vote.billNumber || "",
-            {
-              forceHeuristic: absoluteIndex >= llmBudget,
-              voteMeta: vote,
-            }
-          );
-          vote.shortPitch = card.summary;
-          vote.yeaMeans = card.yea_means;
-          vote.nayMeans = card.nay_means;
-          vote.yeaLabel = card.yea_label;
-          vote.nayLabel = card.nay_label;
-          vote.summarySource = card.source;
+          const [crsSummary, policyArea] = await Promise.all([
+            fetchBillSummary(
+              vote.congress,
+              vote.legislationType,
+              vote.legislationNumber,
+              apiKey
+            ),
+            fetchBillPolicyArea(
+              vote.congress,
+              vote.legislationType,
+              vote.legislationNumber,
+              apiKey
+            ),
+          ]);
+          const official = toSentences(crsSummary, 3) || crsSummary || "";
+          vote.officialSummary = official;
+          vote.shortPitch =
+            official || vote.title || vote.voteQuestion || vote.shortPitch || "";
+          vote.policyArea = policyArea || null;
+          vote.subjectCategory = mapSubjectCategory(policyArea);
+          vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
+          // Leave yea/nay means empty unless a future data source supplies them.
+          vote.yeaMeans = vote.yeaMeans || "";
+          vote.nayMeans = vote.nayMeans || "";
+          vote.yeaLabel = vote.yeaLabel || DEFAULT_YEA_LABEL;
+          vote.nayLabel = vote.nayLabel || DEFAULT_NAY_LABEL;
+          vote.summarySource = official ? "crs" : "official";
         } catch (error) {
           console.warn(error);
         }

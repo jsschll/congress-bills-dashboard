@@ -2,12 +2,9 @@ const CONGRESS_API = "https://api.congress.gov/v3";
 const CONGRESS = 119;
 const DEFAULT_LIMIT = 16;
 const {
-  formatBillSummary,
   isProceduralLegislation,
   classifyVoteKind,
   completeSentences,
-  plainVoteFallback,
-  defaultYeaNayMeans,
   DEFAULT_YEA_LABEL,
   DEFAULT_NAY_LABEL,
 } = require("../lib/format-bill-summary");
@@ -127,12 +124,6 @@ function subjectMatches(vote, subjectQuery) {
   return needles.some((needle) => haystack.includes(needle));
 }
 
-function plainEnglishForVote(vote, summaryText = "") {
-  const crs = completeSentences(summaryText, { maxSentences: 2, maxChars: 480 });
-  if (crs) return crs;
-  return plainVoteFallback({ ...vote, chamber: "house" });
-}
-
 async function fetchBillSummary(congress, type, number, apiKey) {
   try {
     const url = `${CONGRESS_API}/bill/${congress}/${type}/${number}/summaries?format=json&api_key=${encodeURIComponent(
@@ -226,7 +217,8 @@ function mapVoteCard(raw) {
     clerkUrl: `https://clerk.house.gov/Votes/Details/${congress}${String(
       rollCallNumber
     ).padStart(3, "0")}`,
-    shortPitch: "",
+    shortPitch: title || voteQuestion || "",
+    officialSummary: "",
     yeaMeans: "",
     nayMeans: "",
     yeaLabel: DEFAULT_YEA_LABEL,
@@ -300,17 +292,14 @@ module.exports = async function handler(req, res) {
     );
     cards = cards.slice(0, Math.max(limit * 2, limit));
 
-    // Enrich a capped set with CRS summary + plain-English vote cards.
+    // Attach official CRS summaries only — no LLM rewrite at runtime.
     const enrichCount = Math.min(cards.length, Math.max(limit, 10));
-    const llmBudget = env("OPENAI_API_KEY", "OPENAI_KEY", "AI_API_KEY") ? 3 : 0;
     const enriched = [];
     const chunkSize = 4;
     for (let i = 0; i < enrichCount; i += chunkSize) {
       const chunk = cards.slice(i, i + chunkSize);
       const rows = await Promise.all(
-        chunk.map(async (vote, chunkIndex) => {
-          const absoluteIndex = i + chunkIndex;
-          let summary = "";
+        chunk.map(async (vote) => {
           if (vote.hasLinkedBill) {
             const [crsSummary, policyArea] = await Promise.all([
               fetchBillSummary(
@@ -326,45 +315,39 @@ module.exports = async function handler(req, res) {
                 apiKey
               ),
             ]);
-            summary = crsSummary || "";
+            const official =
+              completeSentences(crsSummary, { maxSentences: 3, maxChars: 480 }) ||
+              crsSummary ||
+              "";
+            vote.officialSummary = official;
+            vote.shortPitch =
+              official || vote.title || vote.voteQuestion || vote.shortPitch || "";
             vote.policyArea = policyArea || "";
             vote.subjectCategory = mapSubjectCategory(policyArea);
             vote.tags = policyArea ? [policyArea, vote.subjectCategory] : [];
+            vote.summarySource = official ? "crs" : "official";
+          } else {
+            vote.shortPitch =
+              vote.shortPitch || vote.title || vote.voteQuestion || "";
+            vote.summarySource = "official";
           }
-          try {
-            const card = await formatBillSummary(
-              summary || vote.voteQuestion || "",
-              vote.title || vote.billNumber || "",
-              {
-                forceHeuristic: absoluteIndex >= llmBudget,
-                voteMeta: vote,
-              }
-            );
-            vote.shortPitch = card.summary;
-            vote.yeaMeans = card.yea_means;
-            vote.nayMeans = card.nay_means;
-            vote.yeaLabel = card.yea_label;
-            vote.nayLabel = card.nay_label;
-            vote.summarySource = card.source;
-          } catch {
-            vote.shortPitch = plainEnglishForVote(vote, summary);
-            vote.yeaLabel = DEFAULT_YEA_LABEL;
-            vote.nayLabel = DEFAULT_NAY_LABEL;
-          }
+          vote.yeaMeans = vote.yeaMeans || "";
+          vote.nayMeans = vote.nayMeans || "";
+          vote.yeaLabel = vote.yeaLabel || DEFAULT_YEA_LABEL;
+          vote.nayLabel = vote.nayLabel || DEFAULT_NAY_LABEL;
           return vote;
         })
       );
       enriched.push(...rows);
     }
 
-    // Keep remaining unenriched votes behind the enriched ones if needed.
     const remaining = cards.slice(enrichCount).map((vote) => {
-      const means = defaultYeaNayMeans(vote);
-      vote.shortPitch = plainEnglishForVote(vote);
-      vote.yeaMeans = vote.yeaMeans || means.yeaMeans;
-      vote.nayMeans = vote.nayMeans || means.nayMeans;
-      vote.yeaLabel = vote.yeaLabel || means.yeaLabel;
-      vote.nayLabel = vote.nayLabel || means.nayLabel;
+      vote.shortPitch = vote.shortPitch || vote.title || vote.voteQuestion || "";
+      vote.yeaMeans = vote.yeaMeans || "";
+      vote.nayMeans = vote.nayMeans || "";
+      vote.yeaLabel = vote.yeaLabel || DEFAULT_YEA_LABEL;
+      vote.nayLabel = vote.nayLabel || DEFAULT_NAY_LABEL;
+      vote.summarySource = "official";
       return vote;
     });
 

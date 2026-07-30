@@ -129,18 +129,15 @@ function formatShortDate(value) {
 
 const VOTE_CARD_DEFAULT_YEA_LABEL = "Support Measure";
 const VOTE_CARD_DEFAULT_NAY_LABEL = "Oppose Measure";
-const VOTE_CARD_GENERIC_YEA_MEANS =
-  "A Yea vote supports advancing this bill as written on this vote.";
-const VOTE_CARD_GENERIC_NAY_MEANS =
-  "A Nay vote supports rejecting this bill on this vote.";
 
 /**
- * True for empty/placeholder means copy that should not unlock custom labels.
+ * True for empty/placeholder means copy — do not render the Yea/Nay section.
  */
 function isGenericVoteMeans(text = "") {
   const value = String(text || "").trim().toLowerCase();
   if (!value) return true;
   return (
+    /described in this measure/.test(value) ||
     /^a yea vote supports advancing this (measure|bill)/.test(value) ||
     /^a nay vote supports rejecting this (measure|bill)/.test(value) ||
     /^a yea vote supports passing this bill/.test(value) ||
@@ -151,6 +148,9 @@ function isGenericVoteMeans(text = "") {
     /^voting no means you want to stop this/.test(value) ||
     /^you support advancing this measure/.test(value) ||
     /^you support rejecting this measure/.test(value) ||
+    /^you support ending this program described in this measure/.test(value) ||
+    /^you support keeping this program in place/.test(value) ||
+    /^you support ending .+ described in this measure/.test(value) ||
     /^support this (roll-call|roll call|measure|bill)/.test(value) ||
     /^oppose this (roll-call|roll call|measure|bill)/.test(value) ||
     /^record a yea/.test(value) ||
@@ -158,71 +158,51 @@ function isGenericVoteMeans(text = "") {
   );
 }
 
-/**
- * Known hallucinated templates. Never invent these on the client.
- * Only render if a structured backend field explicitly provided them.
- */
-function isBannedVoteMeansTemplate(text = "") {
-  const value = String(text || "").trim().toLowerCase();
+function isShortVoteLabel(text = "") {
+  const value = String(text || "").trim();
   if (!value) return false;
-  return (
-    /you support ending this program described in this measure/.test(value) ||
-    /you support keeping this program in place/.test(value) ||
-    /you support ending .+ described in this measure/.test(value)
-  );
-}
-
-function hasStructuredVoteField(item, camelKey, snakeKey) {
-  return (
-    Object.prototype.hasOwnProperty.call(item, camelKey) ||
-    Object.prototype.hasOwnProperty.call(item, snakeKey)
-  );
+  const words = value.split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.length <= 4 && value.length <= 28;
 }
 
 /**
  * Normalize vote-card props for Feed / politician Recent Votes.
+ * No AI rewrite — prefer official summary/title text.
  */
 function resolveVoteCardCopy(item = {}) {
-  const rawYea = String(item.yeaMeans ?? item.yea_means ?? "").trim();
-  const rawNay = String(item.nayMeans ?? item.nay_means ?? "").trim();
-  const structuredYea = hasStructuredVoteField(item, "yeaMeans", "yea_means");
-  const structuredNay = hasStructuredVoteField(item, "nayMeans", "nay_means");
-
-  let yeaMeans = rawYea;
-  let nayMeans = rawNay;
-
-  // Suppress banned templates unless they came from structured backend fields.
-  if (isBannedVoteMeansTemplate(yeaMeans) && !structuredYea) yeaMeans = "";
-  if (isBannedVoteMeansTemplate(nayMeans) && !structuredNay) nayMeans = "";
-
-  const meansAreGeneric =
-    isGenericVoteMeans(yeaMeans) ||
-    isGenericVoteMeans(nayMeans) ||
-    isBannedVoteMeansTemplate(yeaMeans) ||
-    isBannedVoteMeansTemplate(nayMeans);
+  const yeaMeansRaw = String(item.yeaMeans ?? item.yea_means ?? "").trim();
+  const nayMeansRaw = String(item.nayMeans ?? item.nay_means ?? "").trim();
+  const yeaMeans = isGenericVoteMeans(yeaMeansRaw) ? "" : yeaMeansRaw;
+  const nayMeans = isGenericVoteMeans(nayMeansRaw) ? "" : nayMeansRaw;
+  const showMeans = Boolean(yeaMeans && nayMeans);
 
   const summary =
-    String(item.shortPitch || item.summary || "").trim() ||
-    "This is a recent congressional vote on the linked bill.";
+    String(
+      item.officialSummary ||
+        item.shortPitch ||
+        item.summary ||
+        item.title ||
+        item.voteQuestion ||
+        ""
+    ).trim() || "No official summary available for this vote.";
 
-  let yeaLabel = String(item.yeaLabel || item.yea_label || "").trim();
-  let nayLabel = String(item.nayLabel || item.nay_label || "").trim();
-
-  if (meansAreGeneric) {
-    yeaLabel = VOTE_CARD_DEFAULT_YEA_LABEL;
-    nayLabel = VOTE_CARD_DEFAULT_NAY_LABEL;
-  } else {
-    yeaLabel = yeaLabel || VOTE_CARD_DEFAULT_YEA_LABEL;
-    nayLabel = nayLabel || VOTE_CARD_DEFAULT_NAY_LABEL;
-  }
+  const yeaLabelRaw = String(item.yeaLabel || item.yea_label || "").trim();
+  const nayLabelRaw = String(item.nayLabel || item.nay_label || "").trim();
+  const yeaLabel = isShortVoteLabel(yeaLabelRaw)
+    ? yeaLabelRaw
+    : VOTE_CARD_DEFAULT_YEA_LABEL;
+  const nayLabel = isShortVoteLabel(nayLabelRaw)
+    ? nayLabelRaw
+    : VOTE_CARD_DEFAULT_NAY_LABEL;
 
   return {
     summary,
-    yeaMeans: yeaMeans || VOTE_CARD_GENERIC_YEA_MEANS,
-    nayMeans: nayMeans || VOTE_CARD_GENERIC_NAY_MEANS,
+    yeaMeans,
+    nayMeans,
+    showMeans,
     yeaLabel,
     nayLabel,
-    meansAreGeneric,
+    meansAreGeneric: !showMeans,
   };
 }
 

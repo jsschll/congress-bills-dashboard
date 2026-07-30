@@ -1162,14 +1162,17 @@ function renderVoteCard(item) {
       ? resolveVoteCardCopy(item)
       : {
           summary:
-            String(item.shortPitch || "").trim() ||
-            "This is a recent congressional vote on the linked bill.",
-          yeaMeans:
-            String(item.yeaMeans || "").trim() ||
-            "A Yea vote supports advancing this bill as written on this vote.",
-          nayMeans:
-            String(item.nayMeans || "").trim() ||
-            "A Nay vote supports rejecting this bill on this vote.",
+            String(
+              item.officialSummary ||
+                item.shortPitch ||
+                item.summary ||
+                item.title ||
+                item.voteQuestion ||
+                ""
+            ).trim() || "No official summary available for this vote.",
+          yeaMeans: "",
+          nayMeans: "",
+          showMeans: false,
           yeaLabel: "Support Measure",
           nayLabel: "Oppose Measure",
         };
@@ -1197,11 +1200,15 @@ function renderVoteCard(item) {
         )}</p>
       </div>
     </div>
-    <section class="policy-bill-card__summary" aria-label="Plain English summary">
+    <section class="policy-bill-card__summary" aria-label="Official summary">
       <h3 class="policy-bill-card__summary-label">What’s proposed</h3>
-      <p class="policy-bill-card__pitch">${escapePolicyHtml(copy.summary)}</p>
+      <p class="policy-bill-card__pitch vote-card__summary-text line-clamp-3">${escapePolicyHtml(
+        copy.summary
+      )}</p>
     </section>
-    <div class="vote-feed-card__meanings" aria-label="What Yea and Nay mean">
+    ${
+      copy.showMeans
+        ? `<div class="vote-feed-card__meanings" aria-label="What Yea and Nay mean">
       <div class="vote-feed-card__meaning is-yea">
         <strong>Yea means</strong>
         <p>${escapePolicyHtml(copy.yeaMeans)}</p>
@@ -1210,7 +1217,9 @@ function renderVoteCard(item) {
         <strong>Nay means</strong>
         <p>${escapePolicyHtml(copy.nayMeans)}</p>
       </div>
-    </div>
+    </div>`
+        : ""
+    }
     <a class="bill-card__link" href="${escapePolicyHtml(
       item.clerkUrl || item.officialUrl || "#"
     )}" target="_blank" rel="noopener noreferrer">Open roll call</a>

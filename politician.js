@@ -891,16 +891,20 @@ function voteCardCopy(item = {}) {
   if (typeof resolveVoteCardCopy === "function") {
     return resolveVoteCardCopy(item);
   }
+  const summary =
+    String(
+      item.officialSummary ||
+        item.shortPitch ||
+        item.summary ||
+        item.title ||
+        item.voteQuestion ||
+        ""
+    ).trim() || "No official summary available for this vote.";
   return {
-    summary:
-      String(item.shortPitch || "").trim() ||
-      "This is a recent congressional vote on the linked bill.",
-    yeaMeans:
-      String(item.yeaMeans || "").trim() ||
-      "A Yea vote supports advancing this bill as written on this vote.",
-    nayMeans:
-      String(item.nayMeans || "").trim() ||
-      "A Nay vote supports rejecting this bill on this vote.",
+    summary,
+    yeaMeans: "",
+    nayMeans: "",
+    showMeans: false,
     yeaLabel: "Support Measure",
     nayLabel: "Oppose Measure",
     meansAreGeneric: true,
@@ -963,9 +967,13 @@ function renderVotesList(target, votes, emptyMessage, person) {
       </header>
       <section class="politician-vote-card__summary" aria-label="What was proposed">
         <h4>What’s proposed</h4>
-        <p>${escapeHtml(copy.summary)}</p>
+        <p class="vote-card__summary-text line-clamp-3">${escapeHtml(
+          copy.summary
+        )}</p>
       </section>
-      <div class="politician-vote-card__meanings" aria-label="What Yea and Nay mean">
+      ${
+        copy.showMeans
+          ? `<div class="politician-vote-card__meanings" aria-label="What Yea and Nay mean">
         <div class="politician-vote-card__meaning is-yea">
           <strong>Yea means</strong>
           <p>${escapeHtml(copy.yeaMeans)}</p>
@@ -974,7 +982,9 @@ function renderVotesList(target, votes, emptyMessage, person) {
           <strong>Nay means</strong>
           <p>${escapeHtml(copy.nayMeans)}</p>
         </div>
-      </div>
+      </div>`
+          : ""
+      }
       <a class="bill-card__link" href="${escapeHtml(
         item.clerkUrl || item.officialUrl || "#"
       )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
