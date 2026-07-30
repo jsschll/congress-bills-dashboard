@@ -384,11 +384,11 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
       const result = vote.result || "";
       const legislationType = String(vote.legislationType || "")
         .toLowerCase()
-        .replace(/\./g, "");
-      const billNumber =
-        legislationType && vote.legislationNumber
-          ? `${legislationType}${vote.legislationNumber}`
-          : "";
+        .replace(/\./g, "")
+        .replace(/\s+/g, "");
+      const billNumber = vote.legislationType
+        ? `${vote.legislationType} ${vote.legislationNumber || ""}`.trim()
+        : "";
       return {
         raw: vote,
         voteKind: classifyVoteKind(voteQuestion, result, {

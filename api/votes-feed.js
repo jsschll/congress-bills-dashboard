@@ -175,7 +175,10 @@ function mapVoteCard(raw) {
   const congress = Number(raw.congress || CONGRESS);
   const sessionNumber = Number(raw.sessionNumber || 1);
   const rollCallNumber = Number(raw.rollCallNumber);
-  const type = String(raw.legislationType || "").toLowerCase().replace(/\./g, "");
+  const type = String(raw.legislationType || "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, "");
   const number = String(raw.legislationNumber || "");
   const billNumber =
     type && number
