@@ -33,7 +33,8 @@ type HouseVoteRaw = {
 };
 
 type MappedVote = {
-  id: string;
+  roll_call_id: string;
+  bill_id: string | null;
   congress: number;
   session_number: number;
   roll_call_number: number;
@@ -189,7 +190,8 @@ function mapHouseVote(raw: HouseVoteRaw): MappedVote {
   ).padStart(3, "0")}`;
 
   return {
-    id: `house-vote-${congress}-${sessionNumber}-${rollCallNumber}`,
+    roll_call_id: `house-vote-${congress}-${sessionNumber}-${rollCallNumber}`,
+    bill_id: billNumber || null,
     congress,
     session_number: sessionNumber,
     roll_call_number: rollCallNumber,
@@ -444,7 +446,7 @@ async function upsertProcessedVote(
 ): Promise<void> {
   const { error } = await supabase
     .from("processed_votes")
-    .upsert(row, { onConflict: "id" });
+    .upsert(row, { onConflict: "roll_call_id" });
   if (error) {
     throw new Error(error.message || "Supabase upsert failed.");
   }
@@ -533,15 +535,15 @@ async function runSync(request: Request): Promise<Response> {
         if (skipExisting) {
           const { data: existing, error: existingError } = await supabase
             .from("processed_votes")
-            .select("id")
-            .eq("id", vote.id)
+            .select("roll_call_id")
+            .eq("roll_call_id", vote.roll_call_id)
             .maybeSingle();
           if (existingError) {
             throw new Error(
               existingError.message || "Could not check existing vote."
             );
           }
-          if (existing?.id) {
+          if (existing?.roll_call_id) {
             result.skipped += 1;
             continue;
           }
@@ -566,13 +568,13 @@ async function runSync(request: Request): Promise<Response> {
 
         await upsertProcessedVote(supabase, row);
         result.upserted += 1;
-        result.ids.push(vote.id);
+        result.ids.push(vote.roll_call_id);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Unknown sync item error";
         result.failed += 1;
-        result.errors.push({ id: vote.id, message });
-        console.warn("sync-votes item failed:", vote.id, error);
+        result.errors.push({ id: vote.roll_call_id, message });
+        console.warn("sync-votes item failed:", vote.roll_call_id, error);
       }
     }
 

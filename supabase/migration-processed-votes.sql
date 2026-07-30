@@ -2,11 +2,14 @@
 -- Used by /api/sync-votes (and app/api/sync-votes when on Next.js).
 -- Safe to re-run: creates the table if missing, then adds any missing columns.
 
+-- Primary key matches the live Supabase schema (roll_call_id).
 create table if not exists public.processed_votes (
-  id text primary key
+  roll_call_id text primary key
 );
 
 alter table public.processed_votes
+  add column if not exists roll_call_id text,
+  add column if not exists bill_id text,
   add column if not exists congress integer,
   add column if not exists session_number integer not null default 1,
   add column if not exists roll_call_number integer,
