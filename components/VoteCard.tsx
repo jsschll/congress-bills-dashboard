@@ -173,9 +173,9 @@ export function VoteCard({
         </div>
       </header>
 
-      <section className="bill-summary-card__summary" aria-label="Official summary">
-        <h4>What’s proposed</h4>
-        <p className="vote-card__summary-text line-clamp-3">{officialSummary}</p>
+      <section className="bill-summary-card__summary" aria-label="Summary">
+        <h4>Summary</h4>
+        <p className="vote-card__summary-text">{officialSummary}</p>
       </section>
 
       {showMeans ? (
