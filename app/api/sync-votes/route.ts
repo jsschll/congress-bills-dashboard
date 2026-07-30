@@ -8,6 +8,7 @@ const CONGRESS_API = "https://api.congress.gov/v3";
 const DEFAULT_CONGRESS = 119;
 const DEFAULT_LIMIT = 40;
 const OPENAI_MODEL = "gpt-4o-mini";
+const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 
 type VoteCard = {
   summary: string;
@@ -317,6 +318,67 @@ function normalizeCard(
   };
 }
 
+function buildUserPrompt(title: string, rawText: string): string {
+  return `Bill title: ${title || "Untitled measure"}
+
+Raw congressional / CRS text:
+"""
+${String(rawText || "").slice(0, 6000) || "(No CRS summary available.)"}
+"""
+
+Produce the JSON card for the bill above.`;
+}
+
+async function formatVoteWithAnthropic(
+  title: string,
+  rawText: string
+): Promise<VoteCard> {
+  const apiKey = env("ANTHROPIC_API_KEY", "CLAUDE_API_KEY");
+  if (!apiKey) {
+    throw Object.assign(
+      new Error("Missing ANTHROPIC_API_KEY for vote formatting."),
+      { statusCode: 500 }
+    );
+  }
+
+  const model = env("ANTHROPIC_MODEL", "CLAUDE_MODEL") || ANTHROPIC_MODEL;
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 500,
+      temperature: 0.1,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: buildUserPrompt(title, rawText) }],
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Anthropic ${response.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = (await response.json()) as {
+    content?: Array<{ type?: string; text?: string }>;
+  };
+  const content = Array.isArray(data?.content)
+    ? data.content
+        .filter((part) => part?.type === "text")
+        .map((part) => part.text || "")
+        .join("\n")
+    : "";
+  const parsed = extractJsonObject(content);
+  if (!parsed) {
+    throw new Error("Anthropic returned non-JSON content.");
+  }
+  return normalizeCard(parsed, title);
+}
+
 async function formatVoteWithOpenAI(
   title: string,
   rawText: string
@@ -333,15 +395,6 @@ async function formatVoteWithOpenAI(
   ).replace(/\/$/, "");
   const model = env("OPENAI_MODEL", "LLM_MODEL") || OPENAI_MODEL;
 
-  const userPrompt = `Bill title: ${title || "Untitled measure"}
-
-Raw congressional / CRS text:
-"""
-${String(rawText || "").slice(0, 6000) || "(No CRS summary available.)"}
-"""
-
-Produce the JSON card for the bill above.`;
-
   const response = await fetch(`${base}/chat/completions`, {
     method: "POST",
     headers: {
@@ -354,7 +407,7 @@ Produce the JSON card for the bill above.`;
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
+        { role: "user", content: buildUserPrompt(title, rawText) },
       ],
     }),
   });
@@ -373,6 +426,16 @@ Produce the JSON card for the bill above.`;
     throw new Error("OpenAI returned non-JSON content.");
   }
   return normalizeCard(parsed, title);
+}
+
+async function formatVoteWithAI(
+  title: string,
+  rawText: string
+): Promise<VoteCard> {
+  if (env("ANTHROPIC_API_KEY", "CLAUDE_API_KEY")) {
+    return formatVoteWithAnthropic(title, rawText);
+  }
+  return formatVoteWithOpenAI(title, rawText);
 }
 
 async function upsertProcessedVote(
@@ -488,7 +551,7 @@ async function runSync(request: Request): Promise<Response> {
         const rawText = [crsText, vote.vote_question, vote.title]
           .filter(Boolean)
           .join("\n\n");
-        const card = await formatVoteWithOpenAI(vote.title, rawText);
+        const card = await formatVoteWithAI(vote.title, rawText);
 
         const row: ProcessedVoteRow = {
           ...vote,

@@ -45,7 +45,13 @@ async function main() {
   if (!process.env.CONGRESS_API_KEY && !process.env.API_KEY) {
     missing.push("CONGRESS_API_KEY (or API_KEY)");
   }
-  if (!process.env.OPENAI_API_KEY) missing.push("OPENAI_API_KEY");
+  if (
+    !process.env.ANTHROPIC_API_KEY &&
+    !process.env.CLAUDE_API_KEY &&
+    !process.env.OPENAI_API_KEY
+  ) {
+    missing.push("ANTHROPIC_API_KEY (or OPENAI_API_KEY)");
+  }
   if (!process.env.SUPABASE_URL) missing.push("SUPABASE_URL");
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     missing.push("SUPABASE_SERVICE_ROLE_KEY");
