@@ -8,7 +8,7 @@ const CONGRESS_API = "https://api.congress.gov/v3";
 const DEFAULT_CONGRESS = 119;
 const DEFAULT_LIMIT = 40;
 const OPENAI_MODEL = "gpt-4o-mini";
-const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
 
 type VoteCard = {
   summary: string;
