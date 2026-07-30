@@ -19,6 +19,7 @@
    - For Bills, Laws & Policies tables, run [`supabase/migration-bills-policies.sql`](supabase/migration-bills-policies.sql)
    - For Support/Oppose stances + community stats on Feed/Search cards, run [`supabase/migration-bill-stances.sql`](supabase/migration-bill-stances.sql)
    - For pocketbook baselines + Who Voted With Me / match scores, run [`supabase/migration-pocketbook-and-votes.sql`](supabase/migration-pocketbook-and-votes.sql)
+   - For offline-processed vote cards (`processed_votes`), run [`supabase/migration-processed-votes.sql`](supabase/migration-processed-votes.sql)
    - For impact estimator roles (teacher, veteran, etc.), run [`supabase/migration-impact-roles.sql`](supabase/migration-impact-roles.sql)
    - For profile avatars + display name (nav account menu), run [`supabase/migration-profile-avatar.sql`](supabase/migration-profile-avatar.sql)
 6. Project Settings → API: copy Project URL and the **anon / publishable** key
@@ -42,11 +43,13 @@ Set these for Production/Preview (Project Settings → Environment Variables, th
 - `RESEND_API_KEY` — required for notification **email** delivery and for **auth email codes** / password-reset codes (Forgot password + Sign in with email code). Get a key at [resend.com](https://resend.com)
 - `NOTIFY_FROM_EMAIL` — optional verified sender, e.g. `Congress Bills <alerts@yourdomain.com>` (defaults to Resend onboarding sender). Must be allowed by your Resend domain.
 - `SITE_URL` — optional canonical site URL used in email links
-- `OPENAI_API_KEY` — optional. When set, `/api/format-bill-summary` and politician Recent Votes use an LLM to write plain-English summary / Yea–Nay cards (`lib/format-bill-summary.js`). Without it, a local heuristic formatter is used. Optional overrides: `OPENAI_MODEL` (default `gpt-4o-mini`), `OPENAI_BASE_URL` for OpenAI-compatible providers.
+- `OPENAI_API_KEY` — required for `/api/sync-votes` (formats vote cards with `gpt-4o-mini` into `processed_votes`). Also used by `/api/format-bill-summary`. Optional overrides: `OPENAI_MODEL` (default `gpt-4o-mini`), `OPENAI_BASE_URL` for OpenAI-compatible providers.
+- `CRON_SECRET` or `SYNC_VOTES_SECRET` — optional. When set, `/api/sync-votes` requires `Authorization: Bearer <secret>`.
 
 Cron jobs (`vercel.json`):
 - `/api/watch-bills` daily at 00:00 UTC — topic matches, critical floor-vote alerts, neighborhood municipal samples
 - `/api/deliver-notifications` daily at 01:30 UTC — emails unsent critical alerts and sends daily/weekly digests per profile prefs
+- Manual/optional: `GET|POST /api/sync-votes` — fetch House roll calls, LLM-format, upsert `processed_votes`
 
 ## 4. Politicians feature
 1. Run [`supabase/migration-politicians.sql`](supabase/migration-politicians.sql)
