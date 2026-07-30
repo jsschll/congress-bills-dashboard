@@ -128,11 +128,8 @@ export function VoteCard({
   const officialSummary = String(summary || "").trim() || String(title || "").trim();
   const yeaMeansClean = String(yeaMeans || "").trim();
   const nayMeansClean = String(nayMeans || "").trim();
-  const showMeans =
-    Boolean(yeaMeansClean) &&
-    Boolean(nayMeansClean) &&
-    !isGenericMeans(yeaMeansClean) &&
-    !isGenericMeans(nayMeansClean);
+  // Always show action-impact text when processed_votes supplies it.
+  const showMeans = Boolean(yeaMeansClean || nayMeansClean);
 
   const yeaLabel = isShortLabel(yeaLabelProp || "")
     ? String(yeaLabelProp).trim()
@@ -184,15 +181,15 @@ export function VoteCard({
       {showMeans ? (
         <div
           className="bill-summary-card__meanings"
-          aria-label="What Yea and Nay mean"
+          aria-label="Action impact"
         >
           <div className="bill-summary-card__meaning is-yea">
             <strong>Yea means</strong>
-            <p>{yeaMeansClean}</p>
+            <p>{yeaMeansClean || "—"}</p>
           </div>
           <div className="bill-summary-card__meaning is-nay">
             <strong>Nay means</strong>
-            <p>{nayMeansClean}</p>
+            <p>{nayMeansClean || "—"}</p>
           </div>
         </div>
       ) : null}
