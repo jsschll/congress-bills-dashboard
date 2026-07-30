@@ -21,6 +21,50 @@ export type VoteCardProps = {
   className?: string;
 };
 
+/** Supabase `processed_votes` row (snake_case). */
+export type ProcessedVoteRow = {
+  roll_call_id?: string;
+  title?: string | null;
+  summary?: string | null;
+  yea_means?: string | null;
+  nay_means?: string | null;
+  yea_label?: string | null;
+  nay_label?: string | null;
+  bill_number?: string | null;
+  result?: string | null;
+  vote_date?: string | null;
+};
+
+/** Map a `processed_votes` row into VoteCard props. */
+export function voteCardPropsFromProcessed(
+  row: ProcessedVoteRow
+): Pick<
+  VoteCardProps,
+  | "title"
+  | "summary"
+  | "yeaMeans"
+  | "nayMeans"
+  | "yeaLabel"
+  | "nayLabel"
+  | "billNumber"
+  | "result"
+  | "dateLabel"
+> {
+  return {
+    title: String(row.title || "").trim() || "Congressional vote",
+    summary: String(row.summary || "").trim(),
+    yeaMeans: String(row.yea_means || "").trim(),
+    nayMeans: String(row.nay_means || "").trim(),
+    yeaLabel: String(row.yea_label || "").trim() || DEFAULT_YEA_LABEL,
+    nayLabel: String(row.nay_label || "").trim() || DEFAULT_NAY_LABEL,
+    billNumber: String(row.bill_number || "").trim() || undefined,
+    result: String(row.result || "").trim() || null,
+    dateLabel: row.vote_date
+      ? String(row.vote_date).slice(0, 10)
+      : null,
+  };
+}
+
 function isGenericMeans(text = ""): boolean {
   const value = String(text || "").trim().toLowerCase();
   if (!value) return true;

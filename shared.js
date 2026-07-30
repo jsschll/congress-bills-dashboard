@@ -206,6 +206,83 @@ function resolveVoteCardCopy(item = {}) {
   };
 }
 
+/**
+ * Map a Supabase `processed_votes` row into the Votes feed card shape.
+ */
+function mapProcessedVoteToFeedItem(row = {}) {
+  const rollCallId = String(row.roll_call_id || row.id || "").trim();
+  const congress = Number(row.congress || 119);
+  const sessionNumber = Number(row.session_number || 1);
+  const rollCallNumber = Number(row.roll_call_number || 0);
+  const billNumber = String(row.bill_number || "").trim() || null;
+  const title =
+    String(row.title || "").trim() ||
+    String(row.vote_question || "").trim() ||
+    (rollCallNumber ? `House Roll Call ${rollCallNumber}` : "Congressional vote");
+  const summary = String(row.summary || "").trim();
+  const voteQuestion = String(row.vote_question || "").trim();
+  const result = String(row.result || "").trim();
+  const dateRaw = row.vote_date;
+  let date = null;
+  if (dateRaw) {
+    const raw = String(dateRaw).trim();
+    date = /^\d{4}-\d{2}-\d{2}/.test(raw) ? raw.slice(0, 10) : raw;
+  }
+  const chamber = String(row.chamber || "house").toLowerCase();
+  const voteKind = String(row.vote_kind || "").trim() || null;
+  const yeaMeans = String(row.yea_means || row.yeaMeans || "").trim();
+  const nayMeans = String(row.nay_means || row.nayMeans || "").trim();
+  const yeaLabel =
+    String(row.yea_label || row.yeaLabel || "").trim() ||
+    VOTE_CARD_DEFAULT_YEA_LABEL;
+  const nayLabel =
+    String(row.nay_label || row.nayLabel || "").trim() ||
+    VOTE_CARD_DEFAULT_NAY_LABEL;
+  const officialUrl =
+    String(row.official_url || "").trim() ||
+    String(row.clerk_url || "").trim() ||
+    "#";
+  const clerkUrl = String(row.clerk_url || "").trim() || officialUrl;
+  const billId = String(row.bill_id || "").trim() || rollCallId;
+
+  return {
+    id: rollCallId || billId,
+    billId: billId || rollCallId,
+    rollCallId,
+    billNumber: billNumber || (rollCallNumber ? `Roll Call ${rollCallNumber}` : ""),
+    title,
+    summary,
+    officialSummary: summary,
+    shortPitch: summary || title,
+    yeaMeans,
+    nayMeans,
+    yeaLabel,
+    nayLabel,
+    level: "Federal",
+    jurisdiction: chamber === "senate" ? "U.S. Senate" : "U.S. House",
+    chamber,
+    congress,
+    sessionNumber,
+    rollCallNumber,
+    voteQuestion,
+    voteKind,
+    result,
+    date,
+    officialUrl,
+    clerkUrl,
+    policyArea: "",
+    subjectCategory: "",
+    tags: [],
+    statusLabel: result || voteQuestion || "Roll-call vote",
+    hasLinkedBill: Boolean(billNumber),
+    summarySource: String(row.summary_source || "llm"),
+    source: "processed_votes",
+  };
+}
+
+const PROCESSED_VOTES_FEED_SELECT =
+  "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
+
 const AVATAR_PRESETS = [
   { id: "slate", label: "Slate", from: "#334155", to: "#0f172a" },
   { id: "emerald", label: "Emerald", from: "#059669", to: "#064e3b" },

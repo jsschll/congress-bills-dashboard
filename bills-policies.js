@@ -1243,24 +1243,103 @@ function renderVoteCard(item) {
   return card;
 }
 
+async function fetchVotesFromProcessedTable({ limit = 16, subject = "", kind = "" } = {}) {
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client) {
+    throw new Error("Supabase is not configured.");
+  }
+  if (typeof mapProcessedVoteToFeedItem !== "function") {
+    throw new Error("Vote feed mapper is missing (shared.js).");
+  }
+
+  const fetchLimit = Math.min(100, Math.max(limit * 4, limit));
+  const { data, error } = await client
+    .from("processed_votes")
+    .select(
+      typeof PROCESSED_VOTES_FEED_SELECT === "string"
+        ? PROCESSED_VOTES_FEED_SELECT
+        : "roll_call_id, title, summary, yea_means, nay_means, yea_label, nay_label, bill_number, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, bill_id, summary_source"
+    )
+    .order("vote_date", { ascending: false })
+    .limit(fetchLimit);
+
+  if (error) {
+    throw new Error(error.message || "Could not load processed_votes.");
+  }
+
+  let items = (data || []).map(mapProcessedVoteToFeedItem);
+
+  if (kind === "final_passage" || kind === "amendment") {
+    const filtered = items.filter((vote) => vote.voteKind === kind);
+    if (filtered.length) items = filtered;
+  }
+
+  if (subject) {
+    const needle = String(subject).trim().toLowerCase();
+    const aliases = {
+      healthcare: ["healthcare", "health", "medicare", "medicaid"],
+      defense: ["defense", "armed", "national security", "foreign", "military"],
+      economy: ["economy", "tax", "budget", "appropriations", "finance", "commerce"],
+      tech: ["tech", "technology", "science", "communications", "space"],
+      energy: ["energy"],
+      "civil rights": ["civil rights", "civil liberties"],
+      immigration: ["immigration", "border"],
+      justice: ["justice", "crime"],
+      family: ["family", "education", "housing"],
+      environment: ["environment", "agriculture", "public lands"],
+    };
+    const needles = aliases[needle] || [needle.replace(/_/g, " ")];
+    items = items.filter((vote) => {
+      const haystack = [
+        vote.title,
+        vote.summary,
+        vote.officialSummary,
+        vote.voteQuestion,
+        vote.billNumber,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return needles.some((n) => haystack.includes(n));
+    });
+  }
+
+  return items.slice(0, limit);
+}
+
 async function fetchVotesFeed({ force = false } = {}) {
   if (votesLoaded && !force) return votesItems;
-  const params = new URLSearchParams();
-  params.set("limit", votesQuizMode ? "8" : "16");
-  if (votesQuizMode) params.set("kind", "final_passage");
-  if (votesSubject) params.set("subject", votesSubject);
-  if (typeof API_KEY === "string" && API_KEY.trim()) {
-    params.set("api_key", API_KEY.trim());
+  const limit = votesQuizMode ? 8 : 16;
+  const kind = votesQuizMode ? "final_passage" : "";
+  setVotesFeedStatus("Loading recent votes…", "loading");
+
+  try {
+    votesItems = await fetchVotesFromProcessedTable({
+      limit,
+      subject: votesSubject || "",
+      kind,
+    });
+    votesLoaded = true;
+    return votesItems;
+  } catch (directError) {
+    // Fallback: server API also reads processed_votes.
+    console.warn("Direct processed_votes read failed, trying API:", directError);
+    const params = new URLSearchParams();
+    params.set("limit", String(limit));
+    if (kind) params.set("kind", kind);
+    if (votesSubject) params.set("subject", votesSubject);
+    const response = await fetch(`/api/votes-feed?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        payload.error ||
+          directError.message ||
+          "Could not load votes feed."
+      );
+    }
+    votesItems = payload.items || [];
+    votesLoaded = true;
+    return votesItems;
   }
-  setVotesFeedStatus("Loading recent House votes…", "loading");
-  const response = await fetch(`/api/votes-feed?${params.toString()}`);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "Could not load votes feed.");
-  }
-  votesItems = payload.items || [];
-  votesLoaded = true;
-  return votesItems;
 }
 
 function renderVotesFeed() {
@@ -1274,7 +1353,7 @@ function renderVotesFeed() {
       votesFeedEmpty.hidden = false;
       votesFeedEmpty.innerHTML = votesSubject
         ? `<h2>No votes in this subject</h2><p>Try another subject chip or clear the filter.</p>`
-        : `<h2>No recent roll calls</h2><p>Check back after the House records new final-passage or amendment votes.</p>`;
+        : `<h2>No processed votes yet</h2><p>Run vote sync to populate <code>processed_votes</code>, then refresh.</p>`;
     }
     setVotesFeedStatus("", "success");
     return;
@@ -1282,7 +1361,7 @@ function renderVotesFeed() {
   if (votesFeedEmpty) votesFeedEmpty.hidden = true;
   votesFeedList.append(...votesItems.map(renderVoteCard));
   setVotesFeedStatus(
-    `${votesItems.length} recent House vote${votesItems.length === 1 ? "" : "s"}${
+    `${votesItems.length} processed vote${votesItems.length === 1 ? "" : "s"}${
       votesQuizMode ? " · Quick Match" : ""
     }`,
     "success"
