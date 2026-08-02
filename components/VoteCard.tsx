@@ -21,6 +21,50 @@ export type VoteCardProps = {
   className?: string;
 };
 
+/** Supabase `processed_votes` row (snake_case). */
+export type ProcessedVoteRow = {
+  roll_call_id?: string;
+  title?: string | null;
+  summary?: string | null;
+  yea_means?: string | null;
+  nay_means?: string | null;
+  yea_label?: string | null;
+  nay_label?: string | null;
+  bill_number?: string | null;
+  result?: string | null;
+  vote_date?: string | null;
+};
+
+/** Map a `processed_votes` row into VoteCard props. */
+export function voteCardPropsFromProcessed(
+  row: ProcessedVoteRow
+): Pick<
+  VoteCardProps,
+  | "title"
+  | "summary"
+  | "yeaMeans"
+  | "nayMeans"
+  | "yeaLabel"
+  | "nayLabel"
+  | "billNumber"
+  | "result"
+  | "dateLabel"
+> {
+  return {
+    title: String(row.title || "").trim() || "Congressional vote",
+    summary: String(row.summary || "").trim(),
+    yeaMeans: String(row.yea_means || "").trim(),
+    nayMeans: String(row.nay_means || "").trim(),
+    yeaLabel: String(row.yea_label || "").trim() || DEFAULT_YEA_LABEL,
+    nayLabel: String(row.nay_label || "").trim() || DEFAULT_NAY_LABEL,
+    billNumber: String(row.bill_number || "").trim() || undefined,
+    result: String(row.result || "").trim() || null,
+    dateLabel: row.vote_date
+      ? String(row.vote_date).slice(0, 10)
+      : null,
+  };
+}
+
 function isGenericMeans(text = ""): boolean {
   const value = String(text || "").trim().toLowerCase();
   if (!value) return true;
@@ -84,11 +128,8 @@ export function VoteCard({
   const officialSummary = String(summary || "").trim() || String(title || "").trim();
   const yeaMeansClean = String(yeaMeans || "").trim();
   const nayMeansClean = String(nayMeans || "").trim();
-  const showMeans =
-    Boolean(yeaMeansClean) &&
-    Boolean(nayMeansClean) &&
-    !isGenericMeans(yeaMeansClean) &&
-    !isGenericMeans(nayMeansClean);
+  // Always show action-impact text when processed_votes supplies it.
+  const showMeans = Boolean(yeaMeansClean || nayMeansClean);
 
   const yeaLabel = isShortLabel(yeaLabelProp || "")
     ? String(yeaLabelProp).trim()
@@ -132,23 +173,23 @@ export function VoteCard({
         </div>
       </header>
 
-      <section className="bill-summary-card__summary" aria-label="Official summary">
-        <h4>What’s proposed</h4>
-        <p className="vote-card__summary-text line-clamp-3">{officialSummary}</p>
+      <section className="bill-summary-card__summary" aria-label="Summary">
+        <h4>Summary</h4>
+        <p className="vote-card__summary-text">{officialSummary}</p>
       </section>
 
       {showMeans ? (
         <div
           className="bill-summary-card__meanings"
-          aria-label="What Yea and Nay mean"
+          aria-label="Action impact"
         >
           <div className="bill-summary-card__meaning is-yea">
             <strong>Yea means</strong>
-            <p>{yeaMeansClean}</p>
+            <p>{yeaMeansClean || "—"}</p>
           </div>
           <div className="bill-summary-card__meaning is-nay">
             <strong>Nay means</strong>
-            <p>{nayMeansClean}</p>
+            <p>{nayMeansClean || "—"}</p>
           </div>
         </div>
       ) : null}

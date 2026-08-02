@@ -5607,6 +5607,16 @@ body.politician-notes-modal-open {
   gap: 1rem;
 }
 
+.vote-feed-card__date {
+  margin: 0.35rem 0 0;
+  color: #94a3b8;
+  font-size: 0.88rem;
+}
+
+.vote-feed-card__date time {
+  font-variant-numeric: tabular-nums;
+}
+
 .vote-feed-card__subject {
   display: inline-flex;
   align-items: center;

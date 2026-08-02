@@ -1152,70 +1152,82 @@ function formatVoteResultMeta(item) {
   return parts.join(" · ");
 }
 
+function voteCardDateLabel(item) {
+  const raw = item.date || item.vote_date || item.voteDate || "";
+  if (!raw) return "";
+  return formatShortDate(raw) || String(raw).slice(0, 10);
+}
+
 function renderVoteCard(item) {
   const card = document.createElement("article");
   card.className = "vote-feed-card policy-bill-card";
-  const subject = item.subjectCategory || item.policyArea || "";
-  const kind = voteKindLabel(item.voteKind);
+
+  const title =
+    String(item.title || "").trim() ||
+    String(item.voteQuestion || "").trim() ||
+    "Congressional vote";
+  const dateLabel = voteCardDateLabel(item);
+  const summary =
+    String(
+      item.summary || item.officialSummary || item.shortPitch || ""
+    ).trim() || "No summary available for this vote.";
+  const yeaMeans = String(item.yeaMeans || item.yea_means || "").trim();
+  const nayMeans = String(item.nayMeans || item.nay_means || "").trim();
   const copy =
     typeof resolveVoteCardCopy === "function"
       ? resolveVoteCardCopy(item)
       : {
-          summary:
-            String(
-              item.officialSummary ||
-                item.shortPitch ||
-                item.summary ||
-                item.title ||
-                item.voteQuestion ||
-                ""
-            ).trim() || "No official summary available for this vote.",
-          yeaMeans: "",
-          nayMeans: "",
-          showMeans: false,
-          yeaLabel: "Support Measure",
-          nayLabel: "Oppose Measure",
+          yeaLabel:
+            String(item.yeaLabel || item.yea_label || "").trim() ||
+            "Support Measure",
+          nayLabel:
+            String(item.nayLabel || item.nay_label || "").trim() ||
+            "Oppose Measure",
         };
+  const yeaLabel = copy.yeaLabel || "Support Measure";
+  const nayLabel = copy.nayLabel || "Oppose Measure";
+  const billNumber =
+    item.billNumber ||
+    (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "");
+
   card.innerHTML = `
     <div class="policy-bill-card__header">
       <div>
-        <div class="policy-bill-card__badges">
-          <span class="policy-bill-card__level">${escapePolicyHtml(kind)}</span>
+        ${
+          billNumber
+            ? `<div class="policy-bill-card__badges">
           <span class="policy-bill-card__bill-number">${escapePolicyHtml(
-            item.billNumber || `Roll Call ${item.rollCallNumber || ""}`
+            billNumber
           )}</span>
-          ${
-            subject
-              ? `<span class="vote-feed-card__subject">${escapePolicyHtml(
-                  subject
-                )}</span>`
-              : ""
-          }
-        </div>
-        <h2 class="policy-bill-card__title">${escapePolicyHtml(
-          item.title || item.voteQuestion || "House roll-call vote"
-        )}</h2>
-        <p class="policy-bill-card__meta">${escapePolicyHtml(
-          formatVoteResultMeta(item)
-        )}</p>
+        </div>`
+            : ""
+        }
+        <h2 class="policy-bill-card__title">${escapePolicyHtml(title)}</h2>
+        ${
+          dateLabel
+            ? `<p class="policy-bill-card__meta vote-feed-card__date"><time datetime="${escapePolicyHtml(
+                String(item.date || item.vote_date || "").slice(0, 10)
+              )}">${escapePolicyHtml(dateLabel)}</time></p>`
+            : ""
+        }
       </div>
     </div>
-    <section class="policy-bill-card__summary" aria-label="Official summary">
-      <h3 class="policy-bill-card__summary-label">What’s proposed</h3>
-      <p class="policy-bill-card__pitch vote-card__summary-text line-clamp-3">${escapePolicyHtml(
-        copy.summary
+    <section class="policy-bill-card__summary" aria-label="Summary">
+      <h3 class="policy-bill-card__summary-label">Summary</h3>
+      <p class="policy-bill-card__pitch vote-card__summary-text">${escapePolicyHtml(
+        summary
       )}</p>
     </section>
     ${
-      copy.showMeans
-        ? `<div class="vote-feed-card__meanings" aria-label="What Yea and Nay mean">
+      yeaMeans || nayMeans
+        ? `<div class="vote-feed-card__meanings" aria-label="Action impact">
       <div class="vote-feed-card__meaning is-yea">
         <strong>Yea means</strong>
-        <p>${escapePolicyHtml(copy.yeaMeans)}</p>
+        <p>${escapePolicyHtml(yeaMeans || "—")}</p>
       </div>
       <div class="vote-feed-card__meaning is-nay">
         <strong>Nay means</strong>
-        <p>${escapePolicyHtml(copy.nayMeans)}</p>
+        <p>${escapePolicyHtml(nayMeans || "—")}</p>
       </div>
     </div>`
         : ""
@@ -1227,14 +1239,14 @@ function renderVoteCard(item) {
 
   if (window.PolicyEngagement?.mountVote) {
     window.PolicyEngagement.mountVote(card, item, {
-      supportLabel: copy.yeaLabel,
-      opposeLabel: copy.nayLabel,
-      whoVotedHint: `Tap ${copy.yeaLabel} or ${copy.nayLabel} to compare with House members.`,
+      supportLabel: yeaLabel,
+      opposeLabel: nayLabel,
+      whoVotedHint: `Tap ${yeaLabel} or ${nayLabel} to compare with representatives.`,
     });
   } else if (window.PolicyEngagement?.mount) {
     window.PolicyEngagement.mount(card, item, {
-      supportLabel: copy.yeaLabel,
-      opposeLabel: copy.nayLabel,
+      supportLabel: yeaLabel,
+      opposeLabel: nayLabel,
       prompt: "How would you vote?",
       showTakeAction: false,
     });
@@ -1243,24 +1255,103 @@ function renderVoteCard(item) {
   return card;
 }
 
+async function fetchVotesFromProcessedTable({ limit = 16, subject = "", kind = "" } = {}) {
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client) {
+    throw new Error("Supabase is not configured.");
+  }
+  if (typeof mapProcessedVoteToFeedItem !== "function") {
+    throw new Error("Vote feed mapper is missing (shared.js).");
+  }
+
+  const fetchLimit = Math.min(100, Math.max(limit * 4, limit));
+  const { data, error } = await client
+    .from("processed_votes")
+    .select(
+      typeof PROCESSED_VOTES_FEED_SELECT === "string"
+        ? PROCESSED_VOTES_FEED_SELECT
+        : "roll_call_id, title, summary, yea_means, nay_means, yea_label, nay_label, bill_number, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, bill_id, summary_source"
+    )
+    .order("vote_date", { ascending: false })
+    .limit(fetchLimit);
+
+  if (error) {
+    throw new Error(error.message || "Could not load processed_votes.");
+  }
+
+  let items = (data || []).map(mapProcessedVoteToFeedItem);
+
+  if (kind === "final_passage" || kind === "amendment") {
+    const filtered = items.filter((vote) => vote.voteKind === kind);
+    if (filtered.length) items = filtered;
+  }
+
+  if (subject) {
+    const needle = String(subject).trim().toLowerCase();
+    const aliases = {
+      healthcare: ["healthcare", "health", "medicare", "medicaid"],
+      defense: ["defense", "armed", "national security", "foreign", "military"],
+      economy: ["economy", "tax", "budget", "appropriations", "finance", "commerce"],
+      tech: ["tech", "technology", "science", "communications", "space"],
+      energy: ["energy"],
+      "civil rights": ["civil rights", "civil liberties"],
+      immigration: ["immigration", "border"],
+      justice: ["justice", "crime"],
+      family: ["family", "education", "housing"],
+      environment: ["environment", "agriculture", "public lands"],
+    };
+    const needles = aliases[needle] || [needle.replace(/_/g, " ")];
+    items = items.filter((vote) => {
+      const haystack = [
+        vote.title,
+        vote.summary,
+        vote.officialSummary,
+        vote.voteQuestion,
+        vote.billNumber,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return needles.some((n) => haystack.includes(n));
+    });
+  }
+
+  return items.slice(0, limit);
+}
+
 async function fetchVotesFeed({ force = false } = {}) {
   if (votesLoaded && !force) return votesItems;
-  const params = new URLSearchParams();
-  params.set("limit", votesQuizMode ? "8" : "16");
-  if (votesQuizMode) params.set("kind", "final_passage");
-  if (votesSubject) params.set("subject", votesSubject);
-  if (typeof API_KEY === "string" && API_KEY.trim()) {
-    params.set("api_key", API_KEY.trim());
+  const limit = votesQuizMode ? 8 : 16;
+  const kind = votesQuizMode ? "final_passage" : "";
+  setVotesFeedStatus("Loading recent votes…", "loading");
+
+  try {
+    votesItems = await fetchVotesFromProcessedTable({
+      limit,
+      subject: votesSubject || "",
+      kind,
+    });
+    votesLoaded = true;
+    return votesItems;
+  } catch (directError) {
+    // Fallback: server API also reads processed_votes.
+    console.warn("Direct processed_votes read failed, trying API:", directError);
+    const params = new URLSearchParams();
+    params.set("limit", String(limit));
+    if (kind) params.set("kind", kind);
+    if (votesSubject) params.set("subject", votesSubject);
+    const response = await fetch(`/api/votes-feed?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        payload.error ||
+          directError.message ||
+          "Could not load votes feed."
+      );
+    }
+    votesItems = payload.items || [];
+    votesLoaded = true;
+    return votesItems;
   }
-  setVotesFeedStatus("Loading recent House votes…", "loading");
-  const response = await fetch(`/api/votes-feed?${params.toString()}`);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "Could not load votes feed.");
-  }
-  votesItems = payload.items || [];
-  votesLoaded = true;
-  return votesItems;
 }
 
 function renderVotesFeed() {
@@ -1274,7 +1365,7 @@ function renderVotesFeed() {
       votesFeedEmpty.hidden = false;
       votesFeedEmpty.innerHTML = votesSubject
         ? `<h2>No votes in this subject</h2><p>Try another subject chip or clear the filter.</p>`
-        : `<h2>No recent roll calls</h2><p>Check back after the House records new final-passage or amendment votes.</p>`;
+        : `<h2>No processed votes yet</h2><p>Run vote sync to populate <code>processed_votes</code>, then refresh.</p>`;
     }
     setVotesFeedStatus("", "success");
     return;
@@ -1282,7 +1373,7 @@ function renderVotesFeed() {
   if (votesFeedEmpty) votesFeedEmpty.hidden = true;
   votesFeedList.append(...votesItems.map(renderVoteCard));
   setVotesFeedStatus(
-    `${votesItems.length} recent House vote${votesItems.length === 1 ? "" : "s"}${
+    `${votesItems.length} processed vote${votesItems.length === 1 ? "" : "s"}${
       votesQuizMode ? " · Quick Match" : ""
     }`,
     "success"
