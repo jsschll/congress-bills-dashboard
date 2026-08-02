@@ -71,22 +71,55 @@ type SyncResult = {
 
 const SYSTEM_PROMPT = `You write plain-English vote cards for a civic app.
 
-Rules (strict):
-1. Analyze ONLY the provided bill title + congressional text. Do not invent programs, repeals, bans, or funding cuts that are not clearly in the text.
-2. Be SPECIFIC. Name the actual programs, funding, rules, or agencies when the text says so.
-3. summary must be 1–2 COMPLETE sentences in plain English (no legalese).
+OUTPUT FORMAT (non-negotiable):
+- Respond with VALID JSON only. No markdown, no code fences, no prose before or after the JSON, no apologies, no explanations.
+- The entire reply must be one JSON object that parses with JSON.parse.
+- Use exactly these keys and no others:
+{"summary":"string","yea_means":"string","nay_means":"string","yea_label":"string","nay_label":"string"}
+
+Content rules (strict):
+1. Analyze ONLY the provided bill title + congressional/CRS text. Do not invent programs, repeals, bans, or funding cuts that are not clearly in the text.
+2. Be SPECIFIC. Name the actual programs, funding, rules, agencies, or people affected when the text says so.
+3. summary must be exactly 2 COMPLETE sentences in plain English (no legalese).
+   - Sentence 1: what the bill/measure actually changes (policy, funding, rules, rights, or process) — do NOT restate or paraphrase the bill title.
+   - Sentence 2: the practical impact on citizens, taxpayers, workers, businesses, or communities if it becomes law / if this vote prevails.
 4. yea_means / nay_means must be exactly 1 sentence each describing the real-world outcome of Yea vs Nay.
 5. yea_label / nay_label must be 2–3 words, parallel, concrete (e.g. "End Rebates" / "Keep Rebates"). If unsure, use "Support Measure" / "Oppose Measure".
-6. No slogans and no fear-mongering.
+6. No slogans and no fear-mongering.`;
 
-Return ONLY valid JSON with exactly these keys:
-{
-  "summary": string,
-  "yea_means": string,
-  "nay_means": string,
-  "yea_label": string,
-  "nay_label": string
-}`;
+const VOTE_CARD_TOOL = {
+  name: "submit_vote_card",
+  description:
+    "Submit the plain-English vote card. Always call this tool with valid fields; never reply with free-form text.",
+  input_schema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      summary: {
+        type: "string",
+        description:
+          "Exactly 2 plain-English sentences: (1) what the measure changes, (2) practical impact on people. Do not repeat the bill title.",
+      },
+      yea_means: {
+        type: "string",
+        description: "One sentence: real-world outcome of a Yea vote.",
+      },
+      nay_means: {
+        type: "string",
+        description: "One sentence: real-world outcome of a Nay vote.",
+      },
+      yea_label: {
+        type: "string",
+        description: "2–3 word Yea button label.",
+      },
+      nay_label: {
+        type: "string",
+        description: "2–3 word Nay button label.",
+      },
+    },
+    required: ["summary", "yea_means", "nay_means", "yea_label", "nay_label"],
+  },
+} as const;
 
 function env(...keys: string[]): string {
   for (const key of keys) {
@@ -268,22 +301,32 @@ async function fetchBillSummaryText(
 }
 
 function extractJsonObject(text: string): Partial<VoteCard> | null {
-  const raw = String(text || "").trim();
+  let raw = String(text || "").trim();
   if (!raw) return null;
+
+  raw = raw
+    .replace(/^```(?:json|JSON)?\s*/m, "")
+    .replace(/\s*```$/m, "")
+    .trim();
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    raw = raw.slice(start, end + 1);
+  }
+
   try {
     return JSON.parse(raw) as Partial<VoteCard>;
   } catch {
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      try {
-        return JSON.parse(raw.slice(start, end + 1)) as Partial<VoteCard>;
-      } catch {
-        return null;
-      }
+    try {
+      const cleaned = raw
+        .replace(/[“”]/g, '"')
+        .replace(/[‘’]/g, "'")
+        .replace(/,\s*([}\]])/g, "$1");
+      return JSON.parse(cleaned) as Partial<VoteCard>;
+    } catch {
+      return null;
     }
   }
-  return null;
 }
 
 function normalizeCard(
@@ -321,14 +364,46 @@ function normalizeCard(
 }
 
 function buildUserPrompt(title: string, rawText: string): string {
-  return `Bill title: ${title || "Untitled measure"}
+  return `Bill title (for context only — do not copy it into summary): ${
+    title || "Untitled measure"
+  }
 
 Raw congressional / CRS text:
 """
 ${String(rawText || "").slice(0, 6000) || "(No CRS summary available.)"}
 """
 
-Produce the JSON card for the bill above.`;
+Call submit_vote_card with:
+- summary: exactly 2 sentences — what changes + practical impact on people (not the title)
+- yea_means / nay_means: 1 sentence each
+- yea_label / nay_label: 2–3 words each
+
+Return structured tool input only. Never reply with markdown or conversational text.`;
+}
+
+function parseAnthropicVoteCard(data: {
+  content?: Array<{
+    type?: string;
+    text?: string;
+    name?: string;
+    input?: Partial<VoteCard>;
+  }>;
+}): Partial<VoteCard> | null {
+  const blocks = Array.isArray(data?.content) ? data.content : [];
+  const toolBlock = blocks.find(
+    (part) =>
+      part?.type === "tool_use" &&
+      (part.name === VOTE_CARD_TOOL.name || Boolean(part?.input))
+  );
+  if (toolBlock?.input && typeof toolBlock.input === "object") {
+    return toolBlock.input;
+  }
+
+  const text = blocks
+    .filter((part) => part?.type === "text")
+    .map((part) => part.text || "")
+    .join("\n");
+  return extractJsonObject(text);
 }
 
 async function formatVoteWithAnthropic(
@@ -353,9 +428,11 @@ async function formatVoteWithAnthropic(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 500,
-      temperature: 0.1,
+      max_tokens: 800,
+      temperature: 0,
       system: SYSTEM_PROMPT,
+      tools: [VOTE_CARD_TOOL],
+      tool_choice: { type: "tool", name: VOTE_CARD_TOOL.name },
       messages: [{ role: "user", content: buildUserPrompt(title, rawText) }],
     }),
   });
@@ -366,15 +443,14 @@ async function formatVoteWithAnthropic(
   }
 
   const data = (await response.json()) as {
-    content?: Array<{ type?: string; text?: string }>;
+    content?: Array<{
+      type?: string;
+      text?: string;
+      name?: string;
+      input?: Partial<VoteCard>;
+    }>;
   };
-  const content = Array.isArray(data?.content)
-    ? data.content
-        .filter((part) => part?.type === "text")
-        .map((part) => part.text || "")
-        .join("\n")
-    : "";
-  const parsed = extractJsonObject(content);
+  const parsed = parseAnthropicVoteCard(data);
   if (!parsed) {
     throw new Error("Anthropic returned non-JSON content.");
   }
