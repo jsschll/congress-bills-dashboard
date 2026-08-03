@@ -258,6 +258,67 @@
     return "neutral";
   }
 
+  function normalizeBillNumber(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const match = raw.match(
+      /^(h\.?\s*r\.?|s\.?|s\.?\s*j\.?\s*res\.?|h\.?\s*j\.?\s*res\.?|s\.?\s*con\.?\s*res\.?|h\.?\s*con\.?\s*res\.?)\s*(\d+)/i
+    );
+    if (!match) return raw;
+    const kind = match[1].toLowerCase().replace(/\s+/g, "").replace(/\./g, "");
+    const number = match[2];
+    if (kind === "hr") return `H.R. ${number}`;
+    if (kind === "s") return `S. ${number}`;
+    if (kind === "sjres") return `S.J.Res. ${number}`;
+    if (kind === "hjres") return `H.J.Res. ${number}`;
+    if (kind === "sconres") return `S.Con.Res. ${number}`;
+    if (kind === "hconres") return `H.Con.Res. ${number}`;
+    return raw;
+  }
+
+  function formatVoteTitle(vote) {
+    const number = normalizeBillNumber(vote?.billNumber);
+    let title = String(vote?.title || "")
+      .replace(/^(seed|placeholder)\s*:\s*/i, "")
+      .trim();
+    if (!title) return number || "Congressional roll call";
+    if (number) {
+      const bare = number.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
+      const titleBare = title.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
+      if (titleBare.startsWith(bare)) {
+        if (/^[^:]+:\s*/.test(title)) return title.replace(/^[^:]+/, number);
+        return `${number}: ${title}`;
+      }
+      return `${number}: ${title}`;
+    }
+    return title;
+  }
+
+  function sentenceClamp(text, maxSentences = 2) {
+    const cleaned = String(text || "").trim();
+    if (!cleaned) return "";
+    const parts = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleaned];
+    return parts
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, maxSentences)
+      .join(" ");
+  }
+
+  function buildPlainEnglishSummary(vote) {
+    const fromSummary = sentenceClamp(vote?.plainEnglishSummary || "", 2);
+    if (fromSummary) return fromSummary;
+    const impacts = [
+      vote?.impacts?.wallet,
+      vote?.impacts?.community,
+      vote?.impacts?.rights,
+    ]
+      .map((text) => String(text || "").trim())
+      .filter(Boolean);
+    if (impacts.length) return sentenceClamp(impacts.slice(0, 2).join(" "), 2);
+    return "";
+  }
+
   function categorizeBill(bill = {}) {
     const haystack = [
       bill.title,
@@ -399,16 +460,33 @@
         else if (cast === "nay" || cast === "no") votePosition = "NO";
         else if (cast.includes("present")) votePosition = "ABSTAIN";
         const billNumber = vote.billNumber || vote.bill_number || null;
-        const rawTitle = vote.title || vote.voteQuestion || "Congressional roll call";
+        const normalizedNumber =
+          typeof normalizeBillNumber === "function"
+            ? normalizeBillNumber(billNumber)
+            : billNumber;
+        const rawTitle = String(
+          vote.title || vote.voteQuestion || "Congressional roll call"
+        )
+          .replace(/^(seed|placeholder)\s*:\s*/i, "")
+          .trim();
         const title =
-          billNumber &&
-          !String(rawTitle).toLowerCase().startsWith(String(billNumber).toLowerCase())
-            ? `${billNumber}: ${rawTitle}`
+          normalizedNumber &&
+          !String(rawTitle)
+            .replace(/\./g, "")
+            .replace(/\s+/g, "")
+            .toLowerCase()
+            .startsWith(
+              String(normalizedNumber)
+                .replace(/\./g, "")
+                .replace(/\s+/g, "")
+                .toLowerCase()
+            )
+            ? `${normalizedNumber}: ${rawTitle}`
             : rawTitle;
         return {
           votePosition,
           billId: String(vote.billId || vote.id || title),
-          billNumber,
+          billNumber: normalizedNumber,
           title,
           plainEnglishSummary:
             vote.shortPitch ||
@@ -1487,9 +1565,13 @@
     ];
 
     const impactMeta = {
-      Wallet: { icon: "💳", className: "is-wallet" },
-      Community: { icon: "🏙️", className: "is-community" },
-      Rights: { icon: "⚖️", className: "is-rights" },
+      wallet: { icon: "💳", label: "Wallet Impact", className: "is-wallet" },
+      community: {
+        icon: "🏙️",
+        label: "Community Impact",
+        className: "is-community",
+      },
+      rights: { icon: "⚖️", label: "Rights Impact", className: "is-rights" },
     };
 
     el.innerHTML = `
@@ -1522,41 +1604,45 @@
                   const positionLabel = String(vote.votePosition || "—")
                     .toUpperCase()
                     .replace(/_/g, " ");
+                  const billNumber = normalizeBillNumber(vote.billNumber);
+                  const displayTitle = formatVoteTitle(vote);
+                  const summary = buildPlainEnglishSummary(vote);
                   const impacts = [
-                    ["Wallet", vote.impacts?.wallet],
-                    ["Community", vote.impacts?.community],
-                    ["Rights", vote.impacts?.rights],
+                    ["wallet", vote.impacts?.wallet],
+                    ["community", vote.impacts?.community],
+                    ["rights", vote.impacts?.rights],
                   ].filter(([, text]) => text);
                   return `<li class="scorecard-vote">
                     <div class="scorecard-vote__top">
                       <div class="scorecard-vote__meta">
                         ${
-                          vote.billNumber
+                          billNumber
                             ? `<span class="scorecard-bill">${escapeHtml(
-                                vote.billNumber
+                                billNumber
                               )}</span>`
                             : ""
                         }
-                        <h4>${escapeHtml(
-                          vote.title || "Congressional roll call"
-                        )}</h4>
+                        ${
+                          vote.category
+                            ? `<span class="scorecard-vote__category">${escapeHtml(
+                                vote.category
+                              )}</span>`
+                            : ""
+                        }
+                        <h4>${escapeHtml(displayTitle)}</h4>
                       </div>
-                      <span class="scorecard-vote-pill is-${tone}">${escapeHtml(
+                      <span class="scorecard-vote-pill is-${tone}" aria-label="Voted ${escapeHtml(
                         positionLabel
-                      )}</span>
+                      )}">${escapeHtml(positionLabel)}</span>
                     </div>
-                    ${
-                      vote.plainEnglishSummary
-                        ? `<p>${escapeHtml(vote.plainEnglishSummary)}</p>`
-                        : ""
-                    }
                     ${
                       impacts.length
                         ? `<div class="scorecard-impacts">
                             ${impacts
-                              .map(([label, text]) => {
-                                const meta = impactMeta[label] || {
+                              .map(([kind, text]) => {
+                                const meta = impactMeta[kind] || {
                                   icon: "",
+                                  label: kind,
                                   className: "",
                                 };
                                 return `<span class="scorecard-impact-pill ${
@@ -1566,12 +1652,20 @@
                                     meta.icon
                                   }</span>
                                   <span class="scorecard-impact-pill__label">${escapeHtml(
-                                    label
+                                    meta.label
                                   )}</span>
                                 </span>`;
                               })
                               .join("")}
                           </div>`
+                        : ""
+                    }
+                    ${
+                      summary
+                        ? `<details class="scorecard-vote__summary">
+                            <summary>What this means</summary>
+                            <p>${escapeHtml(summary)}</p>
+                          </details>`
                         : ""
                     }
                   </li>`;
@@ -1582,7 +1676,7 @@
               <p>${
                 sourceVotes.length
                   ? "No roll calls match this filter."
-                  : "No recent recorded roll-call votes for this representative."
+                  : "No recent roll-call votes recorded for this representative."
               }</p>
             </div>`
       }

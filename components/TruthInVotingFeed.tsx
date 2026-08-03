@@ -19,6 +19,9 @@ const DEFAULT_TOPICS = [
   "Education",
 ] as const;
 
+const EMPTY_VOTES_MESSAGE =
+  "No recent roll-call votes recorded for this representative.";
+
 const VOTE_STYLES: Record<
   VotePosition | "OTHER",
   { label: string; className: string }
@@ -62,7 +65,7 @@ function normalizePosition(value?: string | null): VotePosition | "OTHER" {
   return "OTHER";
 }
 
-function sentenceClamp(text: string, maxSentences = 3): string {
+function sentenceClamp(text: string, maxSentences = 2): string {
   const cleaned = String(text || "").trim();
   if (!cleaned) return "";
   const parts = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleaned];
@@ -82,6 +85,53 @@ function formatVoteDate(value?: string | null): string | null {
     day: "numeric",
     year: "numeric",
   });
+}
+
+/** Normalize bill numbers toward "H.R. 3590" / "S. 100" style. */
+function normalizeBillNumber(value?: string | null): string | null {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const match = raw.match(
+    /^(h\.?\s*r\.?|s\.?|s\.?\s*j\.?\s*res\.?|h\.?\s*j\.?\s*res\.?|s\.?\s*con\.?\s*res\.?|h\.?\s*con\.?\s*res\.?)\s*(\d+)/i
+  );
+  if (!match) return raw;
+  const kind = match[1].toLowerCase().replace(/\s+/g, "").replace(/\./g, "");
+  const number = match[2];
+  if (kind === "hr") return `H.R. ${number}`;
+  if (kind === "s") return `S. ${number}`;
+  if (kind === "sjres") return `S.J.Res. ${number}`;
+  if (kind === "hjres") return `H.J.Res. ${number}`;
+  if (kind === "sconres") return `S.Con.Res. ${number}`;
+  if (kind === "hconres") return `H.Con.Res. ${number}`;
+  return raw;
+}
+
+/**
+ * Prefer "H.R. 3590: Patient Protection and Affordable Care Act" style titles.
+ * Never surfaces Seed:/Placeholder: mock prefixes.
+ */
+function formatVoteTitle(vote: ScorecardRecentVote): string {
+  const number = normalizeBillNumber(vote.billNumber);
+  let title = String(vote.title || "")
+    .replace(/^(seed|placeholder)\s*:\s*/i, "")
+    .trim();
+  if (!title) {
+    return number || "Congressional roll call";
+  }
+  if (number) {
+    const bare = number.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
+    const titleBare = title.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
+    if (titleBare.startsWith(bare)) {
+      const rest = title.replace(/^[^:]+:\s*/, "").trim();
+      if (rest && rest.toLowerCase() !== title.toLowerCase()) {
+        return `${number}: ${rest}`;
+      }
+      if (/^[^:]+:\s*/.test(title)) return title.replace(/^[^:]+/, number);
+      return `${number}: ${title}`;
+    }
+    return `${number}: ${title}`;
+  }
+  return title;
 }
 
 function topicKey(value: string): string {
@@ -128,19 +178,19 @@ const IMPACT_META: Record<
   { label: string; icon: string; className: string }
 > = {
   wallet: {
-    label: "Wallet",
+    label: "Wallet Impact",
     icon: "💳",
     className:
       "bg-amber-500/15 text-amber-800 ring-amber-500/25 dark:bg-amber-400/15 dark:text-amber-100 dark:ring-amber-300/25",
   },
   community: {
-    label: "Community",
+    label: "Community Impact",
     icon: "🏙️",
     className:
       "bg-sky-500/15 text-sky-800 ring-sky-500/25 dark:bg-sky-400/15 dark:text-sky-100 dark:ring-sky-300/25",
   },
   rights: {
-    label: "Rights",
+    label: "Rights Impact",
     icon: "⚖️",
     className:
       "bg-violet-500/15 text-violet-800 ring-violet-500/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-300/25",
@@ -155,6 +205,119 @@ function isPlaceholderVote(vote: ScorecardRecentVote): boolean {
   if (/-seed-/i.test(number) || /-ph-/i.test(number)) return true;
   if (/seeded placeholder|placeholder vote data/i.test(summary)) return true;
   return false;
+}
+
+function buildPlainEnglishSummary(vote: ScorecardRecentVote): string {
+  const fromSummary = sentenceClamp(vote.plainEnglishSummary || "", 2);
+  if (fromSummary) return fromSummary;
+
+  const impacts = [
+    vote.impacts?.wallet,
+    vote.impacts?.community,
+    vote.impacts?.rights,
+  ]
+    .map((text) => String(text || "").trim())
+    .filter(Boolean);
+  if (impacts.length) {
+    return sentenceClamp(impacts.slice(0, 2).join(" "), 2);
+  }
+  return "";
+}
+
+function VoteCard({ vote }: { vote: ScorecardRecentVote }) {
+  const [expanded, setExpanded] = useState(false);
+  const summaryId = useId();
+  const position = normalizePosition(vote.votePosition);
+  const style = VOTE_STYLES[position] || VOTE_STYLES.OTHER;
+  const summary = buildPlainEnglishSummary(vote);
+  const dateLabel = formatVoteDate(vote.voteDate);
+  const displayTitle = formatVoteTitle(vote);
+  const billNumber = normalizeBillNumber(vote.billNumber);
+  const impacts = (
+    [
+      ["wallet", vote.impacts?.wallet],
+      ["community", vote.impacts?.community],
+      ["rights", vote.impacts?.rights],
+    ] as Array<[ImpactKind, string | null | undefined]>
+  ).filter(([, text]) => Boolean(String(text || "").trim()));
+
+  return (
+    <li className="relative rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/50 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 pr-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            {billNumber ? (
+              <span className="rounded-md bg-slate-900/90 px-2 py-0.5 text-[0.7rem] font-bold tracking-wide text-white dark:bg-slate-100 dark:text-slate-900">
+                {billNumber}
+              </span>
+            ) : null}
+            {vote.category ? (
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {vote.category}
+              </span>
+            ) : null}
+            {dateLabel ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                {dateLabel}
+              </span>
+            ) : null}
+          </div>
+          <h4 className="text-base font-bold leading-snug text-slate-900 dark:text-white">
+            {displayTitle}
+          </h4>
+        </div>
+
+        <span
+          className={`ml-auto inline-flex shrink-0 items-center self-start rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ring-1 ring-inset ${style.className}`}
+          aria-label={`Voted ${style.label}`}
+        >
+          {style.label}
+        </span>
+      </div>
+
+      {impacts.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {impacts.map(([kind, text]) => (
+            <span
+              key={kind}
+              title={String(text)}
+              className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${IMPACT_META[kind].className}`}
+            >
+              <span className="shrink-0" aria-hidden="true">
+                {IMPACT_META[kind].icon}
+              </span>
+              <span className="shrink-0">{IMPACT_META[kind].label}</span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {summary ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-lg px-1 py-0.5 text-xs font-semibold text-slate-600 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 dark:text-slate-300 dark:hover:text-emerald-300"
+            aria-expanded={expanded}
+            aria-controls={summaryId}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            <span aria-hidden="true" className="text-[0.65rem]">
+              {expanded ? "▾" : "▸"}
+            </span>
+            {expanded ? "Hide plain-English summary" : "What this means"}
+          </button>
+          {expanded ? (
+            <p
+              id={summaryId}
+              className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+            >
+              {summary}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
 }
 
 /**
@@ -241,88 +404,17 @@ export function TruthInVotingFeed({
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {cleanedVotes.length
               ? "No roll calls match that topic yet."
-              : "No recent recorded roll-call votes for this representative."}
+              : EMPTY_VOTES_MESSAGE}
           </p>
         </div>
       ) : (
         <ul className="space-y-3">
-          {filtered.map((vote) => {
-            const position = normalizePosition(vote.votePosition);
-            const style = VOTE_STYLES[position] || VOTE_STYLES.OTHER;
-            const summary = sentenceClamp(
-              vote.plainEnglishSummary || vote.title || "",
-              3
-            );
-            const dateLabel = formatVoteDate(vote.voteDate);
-            const impacts = (
-              [
-                ["wallet", vote.impacts?.wallet],
-                ["community", vote.impacts?.community],
-                ["rights", vote.impacts?.rights],
-              ] as Array<[ImpactKind, string | null | undefined]>
-            ).filter(([, text]) => Boolean(String(text || "").trim()));
-
-            return (
-              <li
-                key={`${vote.billId}-${vote.votePosition}-${vote.voteDate || ""}`}
-                className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/50 sm:p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex flex-wrap items-center gap-2">
-                      {vote.billNumber ? (
-                        <span className="rounded-md bg-slate-900/90 px-2 py-0.5 text-[0.7rem] font-bold tracking-wide text-white dark:bg-slate-100 dark:text-slate-900">
-                          {vote.billNumber}
-                        </span>
-                      ) : null}
-                      {vote.category ? (
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                          {vote.category}
-                        </span>
-                      ) : null}
-                      {dateLabel ? (
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {dateLabel}
-                        </span>
-                      ) : null}
-                    </div>
-                    <h4 className="text-base font-bold leading-snug text-slate-900 dark:text-white">
-                      {vote.title || "Congressional roll call"}
-                    </h4>
-                  </div>
-
-                  <span
-                    className={`ml-auto inline-flex shrink-0 items-center self-start rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ring-1 ring-inset ${style.className}`}
-                  >
-                    {style.label}
-                  </span>
-                </div>
-
-                {summary ? (
-                  <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200">
-                    {summary}
-                  </p>
-                ) : null}
-
-                {impacts.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {impacts.map(([kind, text]) => (
-                      <span
-                        key={kind}
-                        title={String(text)}
-                        className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${IMPACT_META[kind].className}`}
-                      >
-                        <span className="shrink-0" aria-hidden="true">
-                          {IMPACT_META[kind].icon}
-                        </span>
-                        <span className="shrink-0">{IMPACT_META[kind].label}</span>
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
+          {filtered.map((vote) => (
+            <VoteCard
+              key={`${vote.billId}-${vote.votePosition}-${vote.voteDate || ""}`}
+              vote={vote}
+            />
+          ))}
         </ul>
       )}
     </section>
