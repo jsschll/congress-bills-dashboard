@@ -639,14 +639,38 @@ function cleanRawMatchTitle(title = "", billNumber = "") {
   return text || number || "Congressional roll call";
 }
 
+function formatAmendmentCodePill(bill = {}, voteCopy = null) {
+  const rawTitle = collapseMatchWs(
+    voteCopy?.title || bill.title || bill.bill_number || bill.billNumber || ""
+  );
+  const attribution = parseAmendmentAttribution(rawTitle);
+  if (attribution) {
+    return `${attribution.sponsor} Amdt. No. ${attribution.number}`;
+  }
+  const cleaned = cleanRawMatchTitle(
+    rawTitle,
+    bill.bill_number || bill.billNumber || ""
+  );
+  if (cleaned && !/^congressional roll call$/i.test(cleaned)) return cleaned;
+  return collapseMatchWs(bill.bill_number || bill.billNumber || "") || "";
+}
+
 /**
  * Build a plain-English Action Match card title.
- * Example: "Border security and immigration enforcement (Cortez Masto Amdt. 5463)"
+ * Prefers processed_votes.short_title when present.
  */
 function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
+  const shortTitle = collapseMatchWs(
+    voteCopy?.short_title || voteCopy?.shortTitle || ""
+  );
+  if (shortTitle && !/amdt\.?\s*(?:no\.?\s*)?\d+/i.test(shortTitle)) {
+    return shortTitle;
+  }
+
   const number = collapseMatchWs(bill.bill_number || bill.billNumber || "");
   const rawTitle = collapseMatchWs(bill.title || "");
   const pitch =
+    collapseMatchWs(voteCopy?.what_it_does || voteCopy?.whatItDoes || "") ||
     collapseMatchWs(voteCopy?.summary || "") ||
     collapseMatchWs(bill.short_pitch || bill.shortPitch || "");
   const attribution = parseAmendmentAttribution(rawTitle);
@@ -657,10 +681,9 @@ function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
     "Congressional roll call";
 
   if (attribution) {
-    // Avoid "Cortez Masto Amdt. 5463 (Cortez Masto Amdt. 5463)"
     const topicLooksLikeAmdt = /amdt\.?\s*(?:no\.?\s*)?\d+/i.test(topic);
     if (topicLooksLikeAmdt) return attribution.label;
-    return `${topic} (${attribution.label})`;
+    return topic;
   }
 
   if (number) {
@@ -668,12 +691,73 @@ function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
     const bareTopic = topic.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
     if (bareTopic.startsWith(bareNumber) || /^[^:]+:\s*/.test(topic)) {
       return topic.includes(":")
-        ? topic.replace(/^[^:]+/, number)
-        : `${number}: ${topic}`;
+        ? cleanRawMatchTitle(topic, number)
+        : topic;
     }
-    return `${number}: ${topic}`;
+    return topic;
   }
   return topic;
+}
+
+/**
+ * Structured Action Match impact fields for agree/differ cards.
+ */
+function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
+  const means = buildActionMatchVoteMeans(bill, voteCopy);
+  const short_title = humanizeActionMatchTitle(bill, voteCopy);
+  const raw_code = formatAmendmentCodePill(bill, voteCopy);
+  const what_it_does =
+    firstMatchSentence(
+      voteCopy?.what_it_does ||
+        voteCopy?.whatItDoes ||
+        voteCopy?.summary ||
+        bill.short_pitch ||
+        bill.shortPitch ||
+        "",
+      220
+    ) || "No plain-English summary is available for this roll call yet.";
+  const yea_impact =
+    collapseMatchWs(voteCopy?.yea_impact || voteCopy?.yeaImpact || "") ||
+    means.yea;
+  const nay_impact =
+    collapseMatchWs(voteCopy?.nay_impact || voteCopy?.nayImpact || "") ||
+    means.nay;
+
+  const userStance = String(matchRow?.user_stance || "").toLowerCase();
+  const memberVote = String(matchRow?.member_vote || "").toLowerCase();
+  const yourStanceLabel =
+    userStance === "support"
+      ? "Support"
+      : userStance === "oppose"
+        ? "Oppose"
+        : userStance || "Your stance";
+  const yourStanceImpact =
+    userStance === "oppose"
+      ? nay_impact
+      : userStance === "support"
+        ? yea_impact
+        : yea_impact;
+  const repIsNay = /^(nay|no)$/.test(memberVote);
+  const repIsYea = /^(yea|aye|yes)$/.test(memberVote);
+  const repStanceLabel = repIsNay ? "Nay" : repIsYea ? "Yea" : memberVote || "—";
+  const repStanceImpact = repIsNay
+    ? nay_impact
+    : repIsYea
+      ? yea_impact
+      : means.yea;
+
+  return {
+    short_title,
+    raw_code,
+    what_it_does,
+    yea_impact,
+    nay_impact,
+    your_stance_label: yourStanceLabel,
+    your_stance_impact: yourStanceImpact,
+    rep_stance_label: String(repStanceLabel)
+      .replace(/\b\w/g, (c) => c.toUpperCase()),
+    rep_stance_impact: repStanceImpact,
+  };
 }
 
 function buildActionMatchVoteMeans(bill = {}, voteCopy = null) {
@@ -753,12 +837,23 @@ async function enrichActionMatchRows(client, rows) {
   ];
   if (!ids.length) return list;
 
-  const { data, error } = await client
+  let data = null;
+  let error = null;
+  ({ data, error } = await client
     .from("processed_votes")
     .select(
-      "roll_call_id, title, summary, yea_means, nay_means, bill_number, official_url, vote_kind, vote_question"
+      "roll_call_id, title, summary, yea_means, nay_means, short_title, what_it_does, yea_impact, nay_impact, bill_number, official_url, vote_kind, vote_question"
     )
-    .in("roll_call_id", ids);
+    .in("roll_call_id", ids));
+  // Older DBs may not have the new impact columns yet.
+  if (error && /short_title|what_it_does|yea_impact|nay_impact/i.test(error.message || "")) {
+    ({ data, error } = await client
+      .from("processed_votes")
+      .select(
+        "roll_call_id, title, summary, yea_means, nay_means, bill_number, official_url, vote_kind, vote_question"
+      )
+      .in("roll_call_id", ids));
+  }
   if (error) {
     console.warn("processed_votes enrich failed:", error.message || error);
     return list;
@@ -772,16 +867,18 @@ async function enrichActionMatchRows(client, rows) {
   return list.map((row) => {
     const voteCopy = byId.get(String(row.bill_id || "")) || null;
     const bill = row.bill || {};
+    const impact = buildActionMatchImpact(bill, voteCopy, row);
     return {
       ...row,
       voteCopy,
-      displayTitle: humanizeActionMatchTitle(bill, voteCopy),
-      voteMeans: buildActionMatchVoteMeans(bill, voteCopy),
+      impact,
+      displayTitle: impact.short_title,
+      voteMeans: {
+        yea: impact.yea_impact,
+        nay: impact.nay_impact,
+      },
       detailHref: actionMatchDetailHref(bill, voteCopy),
-      detailSummary: firstMatchSentence(
-        voteCopy?.summary || bill.short_pitch || bill.shortPitch || bill.title || "",
-        280
-      ),
+      detailSummary: impact.what_it_does,
     };
   });
 }

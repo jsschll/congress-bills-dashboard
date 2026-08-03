@@ -14,6 +14,14 @@ export interface BillSummaryCard {
   yea_label: string;
   /** Action label (e.g. "Reject Safety Rules" or fallback "Oppose Measure"). */
   nay_label: string;
+  /** Short plain-English topic for Action Match cards. */
+  short_title?: string;
+  /** One-sentence real-world impact. */
+  what_it_does?: string;
+  /** What a Support / Yea vote advocates for. */
+  yea_impact?: string;
+  /** What an Oppose / Nay vote advocates for. */
+  nay_impact?: string;
   /** Where the card came from. */
   source?: "llm" | "heuristic";
 }
