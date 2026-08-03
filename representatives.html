@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Representative Scorecard · Article 1</title>
+    <meta
+      name="description"
+      content="Audit your senators and House representative — donor alignment, attendance, and Truth in Voting."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260804sc" />
+  </head>
+  <body class="page-app page-scorecard">
+    <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
+
+    <main class="page page--scorecard">
+      <header class="scorecard-page__header">
+        <p class="scorecard-page__eyebrow">Representative Scorecard</p>
+        <h1 id="scorecard-heading" class="scorecard-page__title">
+          Your federal representatives
+        </h1>
+        <p id="scorecard-lede" class="scorecard-page__lede">
+          Switch between your senators and House member to audit money,
+          attendance, and recent votes.
+        </p>
+      </header>
+
+      <p id="scorecard-status" class="scorecard-page__status" hidden></p>
+
+      <nav
+        id="scorecard-tabs"
+        class="scorecard-tabs"
+        role="tablist"
+        aria-label="Representatives"
+        hidden
+      ></nav>
+
+      <div id="scorecard-panel" class="scorecard-panel" hidden>
+        <section
+          id="scorecard-hero"
+          class="scorecard-hero"
+          aria-label="Representative overview"
+        ></section>
+
+        <div class="scorecard-grid">
+          <div class="scorecard-grid__left">
+            <section
+              id="scorecard-donor"
+              class="scorecard-card"
+              aria-label="Donor alignment"
+            ></section>
+            <section
+              id="scorecard-attendance"
+              class="scorecard-card"
+              aria-label="Attendance and activity"
+            ></section>
+          </div>
+          <div class="scorecard-grid__right">
+            <div class="scorecard-card scorecard-card--search">
+              <label class="scorecard-search__label" for="scorecard-vote-search"
+                >Search bills in feed</label
+              >
+              <input
+                id="scorecard-vote-search"
+                class="scorecard-search__input"
+                type="search"
+                placeholder="Filter by bill number, title, or keyword…"
+              />
+            </div>
+            <section
+              id="scorecard-votes"
+              class="scorecard-card"
+              aria-label="Truth in Voting feed"
+            ></section>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js"></script>
+    <script src="nav.js?v=20260804a1"></script>
+    <script src="representatives-scorecard.js?v=20260804sc"></script>
+    <script>
+      bootNav("politicians");
+      mountRepresentativesScorecard();
+    </script>
+  </body>
+</html>

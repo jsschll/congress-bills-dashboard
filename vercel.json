@@ -28,6 +28,10 @@
     {
       "source": "/api/deliver-notifications",
       "destination": "/api/jobs?route=deliver-notifications"
+    },
+    {
+      "source": "/representatives/:id",
+      "destination": "/representatives.html?id=:id"
     }
   ],
   "crons": [

@@ -1,5 +1,7 @@
 const {
+  getScorecardById,
   lookupRepresentativesByLocation,
+  orderRepresentativesForTabs,
 } = require("../../lib/services/scorecardService");
 
 function json(res, status, body) {
@@ -22,7 +24,14 @@ function readQuery(req) {
     (url.searchParams.get("address") ||
       url.searchParams.get("q") ||
       "").trim() || null;
-  return { zipCode, address };
+  const id =
+    (url.searchParams.get("id") || url.searchParams.get("representativeId") || "")
+      .trim() || null;
+  const bioguideId =
+    (url.searchParams.get("bioguideId") ||
+      url.searchParams.get("bioguide") ||
+      "").trim() || null;
+  return { zipCode, address, id, bioguideId };
 }
 
 module.exports = async function handler(req, res) {
@@ -34,11 +43,53 @@ module.exports = async function handler(req, res) {
     return json(res, 405, { ok: false, error: "Method not allowed" });
   }
 
-  const { zipCode, address } = readQuery(req);
+  const { zipCode, address, id, bioguideId } = readQuery(req);
 
   try {
+    // Single-rep scorecard by id / bioguide.
+    if (id || bioguideId) {
+      // If location is also present, return the full district set with active id.
+      if (zipCode || address) {
+        const payload = await lookupRepresentativesByLocation({
+          zipCode,
+          address,
+        });
+        const ordered = orderRepresentativesForTabs(
+          payload.representatives || []
+        );
+        const active =
+          ordered.find((rep) => rep.profile.id === id) ||
+          ordered.find(
+            (rep) =>
+              bioguideId &&
+              String(rep.profile.bioguideId || "").toUpperCase() ===
+                bioguideId.toUpperCase()
+          ) ||
+          ordered[0] ||
+          null;
+        return json(res, 200, {
+          ...payload,
+          representatives: ordered,
+          activeId: active?.profile?.id || null,
+          representative: active,
+        });
+      }
+
+      const single = await getScorecardById({ id, bioguideId, voteLimit: 25 });
+      return json(res, 200, {
+        ...single,
+        activeId: single.representative?.profile?.id || null,
+      });
+    }
+
     const payload = await lookupRepresentativesByLocation({ zipCode, address });
-    return json(res, 200, payload);
+    const ordered = orderRepresentativesForTabs(payload.representatives || []);
+    return json(res, 200, {
+      ...payload,
+      representatives: ordered,
+      activeId: ordered[0]?.profile?.id || null,
+      representative: ordered[0] || null,
+    });
   } catch (error) {
     const status = Number(error?.statusCode) || 500;
     const message = error?.message || "Representative lookup failed";
@@ -46,7 +97,7 @@ module.exports = async function handler(req, res) {
     return json(res, status, {
       ok: false,
       error: message,
-      query: { zipCode, address },
+      query: { zipCode, address, id, bioguideId },
     });
   }
 };
