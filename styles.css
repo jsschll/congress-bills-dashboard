@@ -2740,12 +2740,20 @@ body {
     0 22px 44px rgba(0, 0, 0, 0.35);
 }
 
+.home-feature__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 0.15rem;
+}
+
 .home-feature__icon {
   display: inline-grid;
   place-items: center;
+  flex-shrink: 0;
   width: 2.55rem;
   height: 2.55rem;
-  margin: 0 0 1rem;
+  margin: 0;
   border-radius: 0.7rem;
   color: var(--feature-accent-bright);
   background: rgba(16, 185, 129, 0.12);
@@ -2759,12 +2767,16 @@ body {
   display: block;
 }
 
+.home-feature__titles {
+  min-width: 0;
+}
+
 .home-feature__badge {
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.4rem;
   font-family: var(--home-font-body);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--feature-accent-bright);
 }
