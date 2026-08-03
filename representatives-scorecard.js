@@ -116,6 +116,13 @@
     const params = new URLSearchParams(global.location.search);
     return {
       id: (params.get("id") || "").trim() || null,
+      bioguideId:
+        (params.get("bioguideId") || params.get("bioguide") || "")
+          .trim()
+          .toUpperCase() || null,
+      politicianId:
+        (params.get("politicianId") || params.get("rosterId") || "").trim() ||
+        null,
       zipCode:
         (params.get("zipCode") || params.get("zip") || "").trim() || null,
       address:
@@ -1374,9 +1381,11 @@
     });
   }
 
-  async function fetchBundle({ id, zipCode, address }) {
+  async function fetchBundle({ id, bioguideId, politicianId, zipCode, address }) {
     const params = new URLSearchParams();
     if (id) params.set("id", id);
+    if (bioguideId) params.set("bioguideId", bioguideId);
+    if (politicianId) params.set("politicianId", politicianId);
     if (zipCode) params.set("zipCode", zipCode);
     if (address) params.set("address", address);
     const response = await fetch(`${ENDPOINT}?${params.toString()}`, {
@@ -1486,42 +1495,87 @@
         let payload = null;
         const zipCode = query.zipCode || session?.query?.zipCode || null;
         const address = query.address || session?.query?.address || null;
-        const id = query.id || session?.activeId || null;
+        const id = query.id || null;
+        const bioguideId = query.bioguideId || null;
+        const politicianId = query.politicianId || null;
+        const sessionActiveId = session?.activeId || null;
 
-        if (!id && !zipCode && !address && session?.representatives?.length) {
+        if (
+          !id &&
+          !bioguideId &&
+          !politicianId &&
+          !zipCode &&
+          !address &&
+          session?.representatives?.length
+        ) {
           payload = session;
-        } else if (!id && !zipCode && !address) {
+        } else if (
+          !id &&
+          !bioguideId &&
+          !politicianId &&
+          !zipCode &&
+          !address
+        ) {
           setStatus(
-            "Start from the home page ZIP lookup, or open with ?zipCode= or ?id=.",
+            "Start from the home page ZIP lookup, Politicians tab, or open with ?zipCode= / ?bioguideId= / ?id=.",
             "error"
           );
           return;
         } else {
-          payload = await fetchBundle({ id, zipCode, address });
+          payload = await fetchBundle({
+            id: id || (!bioguideId && !politicianId ? sessionActiveId : null),
+            bioguideId,
+            politicianId,
+            zipCode,
+            address,
+          });
         }
 
         state.data = payload;
         state.activeId =
           id ||
           payload.activeId ||
+          payload.representatives?.find(
+            (rep) =>
+              bioguideId &&
+              String(rep.profile.bioguideId || "").toUpperCase() === bioguideId
+          )?.profile?.id ||
+          payload.representatives?.find(
+            (rep) =>
+              politicianId &&
+              String(rep.profile.rosterPoliticianId || "") === politicianId
+          )?.profile?.id ||
           payload.representatives?.[0]?.profile?.id ||
           null;
 
         writeSession({
           ...payload,
           activeId: state.activeId,
+          query: {
+            zipCode,
+            address,
+            bioguideId,
+            politicianId,
+          },
         });
 
         if (heading) {
+          const singleName = payload.representative?.profile?.name;
           heading.textContent =
             payload.location?.formattedAddress ||
             payload.location?.state ||
+            singleName ||
             "Your federal representatives";
         }
-        if (lede && payload.counts) {
-          lede.textContent = `${payload.counts.total || 0} federal representative${
-            payload.counts.total === 1 ? "" : "s"
-          } — switch tabs to compare donor alignment, attendance, and votes.`;
+        if (lede) {
+          if (payload.counts) {
+            lede.textContent = `${payload.counts.total || 0} federal representative${
+              payload.counts.total === 1 ? "" : "s"
+            } — switch tabs to compare donor alignment, attendance, and votes.`;
+          } else if (payload.representatives?.length === 1) {
+            lede.textContent =
+              "Donor alignment, attendance, Action Match, and Truth in Voting for this member.";
+          }
         }
 
         setStatus("", "loading");

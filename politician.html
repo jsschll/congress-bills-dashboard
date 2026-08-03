@@ -13,6 +13,30 @@
     <link rel="stylesheet" href="styles.css?v=20260804a1" />
   </head>
   <body class="page-app page-politicians page-politician-profile">
+    <script>
+      // Federal House/Senate profiles use the Representative Scorecard
+      // (same layout as home ZIP lookup). Keep this page for executives /
+      // state / local / judiciary.
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var bioguide = (
+            params.get("bioguide") ||
+            params.get("bioguideId") ||
+            ""
+          )
+            .trim()
+            .toUpperCase();
+          if (bioguide) {
+            window.location.replace(
+              "representatives.html?bioguideId=" + encodeURIComponent(bioguide)
+            );
+          }
+        } catch (e) {
+          /* continue to legacy profile */
+        }
+      })();
+    </script>
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
     <main class="page page--politicians page--politician-profile">
@@ -193,7 +217,7 @@
     <script src="shared.js?v=20260729as"></script>
     <script src="nav.js?v=20260804a1"></script>
     <script src="engagement.js?v=20260803fc"></script>
-    <script src="politicians-shared.js?v=20260729an"></script>
+    <script src="politicians-shared.js?v=20260804sc3"></script>
     <script src="politician.js?v=20260803fc" defer></script>
   </body>
 </html>

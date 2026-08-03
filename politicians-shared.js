@@ -110,12 +110,21 @@ function politicianProfileHref(politician = {}) {
   const key = politician.external_key || "";
   const id = politician.id || politician.politician_id || "";
   const nationalId = politician.metadata?.national_official_id || "";
+  const chamber = String(politician.chamber || "").toLowerCase();
+  const level = String(politician.level || "").toLowerCase();
+  const isFederalLegislator =
+    Boolean(bioguide) ||
+    (level === "federal" && (chamber === "house" || chamber === "senate"));
 
-  // Prefer bioguide for federal legislators (Congress.gov enrichment).
+  // Federal House/Senate → same Representative Scorecard as home ZIP lookup.
   if (bioguide) {
-    return `politician.html?bioguide=${encodeURIComponent(
+    return `representatives.html?bioguideId=${encodeURIComponent(
       String(bioguide).toUpperCase()
     )}`;
+  }
+  if (isFederalLegislator && id) {
+    // Roster UUID — scorecard resolves politicians.id → representative_profiles.
+    return `representatives.html?politicianId=${encodeURIComponent(String(id))}`;
   }
 
   // National executives (President, cabinet, EOP) are keyed off national_officials,
