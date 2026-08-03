@@ -746,6 +746,8 @@ body {
 
 .app-nav__brand-text {
   line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .app-nav__links {
@@ -2532,6 +2534,18 @@ body {
   animation: home-rise 0.9s ease-out both;
 }
 
+.home-hero__eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--home-font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: rgba(244, 247, 250, 0.88);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+
 .home-hero__brand {
   margin: 0 0 1rem;
   font-family: var(--home-font-display);
@@ -2544,7 +2558,7 @@ body {
 
 .home-hero__title {
   margin: 0;
-  max-width: 16ch;
+  max-width: 18ch;
   font-family: var(--home-font-display);
   font-size: clamp(2.2rem, 5.4vw, 4.2rem);
   font-weight: 500;
@@ -2553,9 +2567,15 @@ body {
   text-shadow: 0 2px 22px rgba(0, 0, 0, 0.5);
 }
 
+.home-hero__title-brand {
+  display: inline;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
 .home-hero__lede {
   margin: 1.15rem 0 0;
-  max-width: 38rem;
+  max-width: 40rem;
   font-size: clamp(1.05rem, 1.7vw, 1.25rem);
   font-weight: 500;
   color: #f4f7fa;
@@ -2571,6 +2591,17 @@ body {
   gap: 0.7rem;
   max-width: 42rem;
   animation: home-rise 1s ease-out 0.15s both;
+}
+
+.home-hero__hint {
+  margin: 0.85rem 0 0;
+  max-width: 36rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(244, 247, 250, 0.82);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
+  animation: home-rise 1s ease-out 0.22s both;
 }
 
 .home-hero__input {
@@ -2763,6 +2794,7 @@ body {
   .home-hero__media,
   .home-hero__content,
   .home-hero__form,
+  .home-hero__hint,
   .home-feature {
     animation: none !important;
   }

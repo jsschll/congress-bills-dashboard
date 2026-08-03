@@ -80,7 +80,7 @@ function createNavShell(activePage = "home") {
     <div class="app-nav__inner">
       <a class="app-nav__brand" href="index.html">
         ${NAV_LOGO_SVG}
-        <span class="app-nav__brand-text">Congress Bills</span>
+        <span class="app-nav__brand-text">Article 1</span>
       </a>
       <div class="app-nav__links">
         ${link("home", "index.html", "Home")}

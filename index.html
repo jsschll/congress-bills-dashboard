@@ -3,30 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Congress Bills — Discover who represents you</title>
+    <title>Article 1 | Reclaiming the People's Branch</title>
+    <meta
+      name="description"
+      content="Article 1 exposes politician stock trades, tracks dark money, and gives you direct oversight of the people who represent you."
+    />
+    <meta property="og:title" content="Article 1 | Reclaiming the People's Branch" />
+    <meta
+      property="og:description"
+      content="Congress took an oath to represent you—not corporate PACs, mega-donors, or party bosses. Track your reps with Article 1."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260729y" />
+    <link rel="stylesheet" href="styles.css?v=20260804a1" />
   </head>
   <body class="page-home">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
-    <section class="home-hero" aria-label="Discover your representatives">
+    <section class="home-hero" aria-label="Reclaiming the People's Branch">
       <div class="home-hero__media" aria-hidden="true"></div>
       <div class="home-hero__shade" aria-hidden="true"></div>
       <div class="home-hero__content">
-        <p class="home-hero__brand">Congress Bills</p>
+        <p class="home-hero__eyebrow">RECLAIMING THE PEOPLE'S BRANCH</p>
         <h1 class="home-hero__title">
-          Discover Everyone Who Represents You — From Your HOA to the White
-          House
+          <span class="home-hero__title-brand">Article 1</span>
+          was built for the people. We're taking it back.
         </h1>
         <p class="home-hero__lede">
-          Enter an address to see the full map of power around you — local
-          boards, city hall, your county, statehouse, Congress, and beyond.
+          Congress took an oath to represent you—not corporate PACs,
+          mega-donors, or party bosses. Article 1 exposes politician stock
+          trades, tracks dark money, and gives you direct oversight of the
+          people who represent you.
         </p>
         <form
           id="home-address-form"
@@ -34,21 +45,25 @@
           aria-label="Look up your representatives"
         >
           <label class="visually-hidden" for="home-address-input"
-            >Street address or ZIP code</label
+            >ZIP code</label
           >
           <input
             id="home-address-input"
             class="home-hero__input"
             type="search"
             name="address"
-            placeholder="Street address or ZIP code"
-            autocomplete="street-address"
+            placeholder="Enter your ZIP code to audit your representatives..."
+            autocomplete="postal-code"
             required
           />
           <button class="home-hero__submit" type="submit">
-            Find my representatives
+            Track Your Reps
           </button>
         </form>
+        <p class="home-hero__hint">
+          Instant access to voting records, campaign funding, and direct
+          constituent outreach.
+        </p>
       </div>
     </section>
 
@@ -57,7 +72,7 @@
         <div class="home-features__intro">
           <h2 id="home-features-heading">Built for clarity, not noise</h2>
           <p>
-            Three ways Congress Bills helps you go from “Who’s in charge?” to
+            Three ways Article 1 helps you go from “Who’s in charge?” to
             “Here’s what they’re doing.”
           </p>
         </div>
@@ -99,7 +114,7 @@
 
     <script src="config.js"></script>
     <script src="shared.js"></script>
-    <script src="nav.js?v=20260803lg"></script>
+    <script src="nav.js?v=20260804a1"></script>
     <script src="politicians-shared.js?v=20260729f"></script>
     <script>
       bootNav("home");

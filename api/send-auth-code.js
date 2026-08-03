@@ -138,7 +138,7 @@ async function sendResendEmail({ to, subject, html, text }) {
   const apiKey = env("RESEND_API_KEY");
   const from =
     env("NOTIFY_FROM_EMAIL", "EMAIL_FROM") ||
-    "Congress Bills <onboarding@resend.dev>";
+    "Article 1 <onboarding@resend.dev>";
   if (!apiKey) {
     const err = new Error(
       "Email delivery is not configured (missing RESEND_API_KEY on Vercel)."
@@ -171,7 +171,7 @@ function codeEmail({ code, purpose, actionLink }) {
   const heading = isRecovery ? "Reset your password" : "Your sign-in code";
   const lead = isRecovery
     ? "Enter this code on the password reset page to choose a new password."
-    : "Enter this code on the Congress Bills sign-in page to finish signing in.";
+    : "Enter this code on the Article 1 sign-in page to finish signing in.";
   const linkLabel = isRecovery
     ? "Or open this link to reset your password"
     : "Or open this link to sign in";
@@ -184,7 +184,7 @@ function codeEmail({ code, purpose, actionLink }) {
       : "";
 
   return {
-    subject: `${code} is your Congress Bills ${
+    subject: `${code} is your Article 1 ${
       isRecovery ? "reset" : "sign-in"
     } code`,
     text: `${heading}\n\n${lead}\n\nCode: ${code}${linkBlock}\nThis code expires soon. If you did not request it, you can ignore this email.`,
