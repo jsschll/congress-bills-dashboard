@@ -34,6 +34,20 @@ const PARTY_BADGE: Record<PartyKind, string> = {
     "bg-slate-500/15 text-slate-700 ring-slate-500/25 dark:bg-slate-400/15 dark:text-slate-200 dark:ring-slate-300/25",
 };
 
+function officeBadgeLabel(profile: Pick<
+  PoliticianProfile,
+  "state" | "district" | "chamber"
+>): string {
+  if (profile.chamber === "Senate") return "U.S. Senator";
+  if (profile.chamber === "House") {
+    const state = String(profile.state || "").toUpperCase();
+    const district = String(profile.district || "").replace(/^0+/, "");
+    if (state && district) return `House - ${state}-${district}`;
+    return "U.S. Representative";
+  }
+  return profile.chamber || "Official";
+}
+
 function formatDistrictLabel(profile: Pick<
   PoliticianProfile,
   "state" | "district" | "chamber"
@@ -84,32 +98,56 @@ function matchTone(score: number): string {
   return "text-rose-600 dark:text-rose-300";
 }
 
+export type SocialLink = { label: string; url: string };
+
 export type RepresentativeHeroProps = {
   profile: PoliticianProfile;
+  /** Tenure line, e.g. "Elected 2002 · 24 Years Active". */
+  tenureLabel?: string | null;
+  /** Extra contact / social pills beyond phone + website. */
+  socialLinks?: SocialLink[];
+  /** Optional follow/note handlers (Page 2 actions). */
+  onFollowClick?: () => void;
+  onNoteClick?: () => void;
+  following?: boolean;
   /** 0–100 Action Match alignment with the signed-in user. */
   actionMatchScore?: number | null;
   /** Optional compared-vote count under the ring. */
   actionMatchCompared?: number | null;
+  /** When false, hide the compact Action Match ring (full scorecard lives below). */
+  showMatchRing?: boolean;
   className?: string;
 };
 
 /**
- * Scorecard header: identity, party, district, election, contact, Action Match.
+ * Scorecard header: badges, tenure, follow/note actions, contact, optional match ring.
  */
 export function RepresentativeHero({
   profile,
+  tenureLabel = null,
+  socialLinks = [],
+  onFollowClick,
+  onNoteClick,
+  following = false,
   actionMatchScore = null,
   actionMatchCompared = null,
+  showMatchRing = false,
   className = "",
 }: RepresentativeHeroProps) {
   const partyKind = classifyParty(profile.party);
   const score = clampScore(actionMatchScore);
   const phoneUrl = telHref(profile.phone);
   const webUrl = siteHref(profile.website);
+  const officeLabel = useMemo(() => officeBadgeLabel(profile), [profile]);
   const districtLabel = useMemo(
     () => formatDistrictLabel(profile),
     [profile]
   );
+  const tenure =
+    tenureLabel ||
+    (profile.nextElectionYear
+      ? `Next election ${profile.nextElectionYear}`
+      : "");
 
   const ringStyle =
     score == null
@@ -117,6 +155,15 @@ export function RepresentativeHero({
       : ({
           background: `conic-gradient(currentColor ${score * 3.6}deg, rgba(148,163,184,0.25) 0)`,
         } as React.CSSProperties);
+
+  const contactPills: SocialLink[] = [];
+  if (phoneUrl) contactPills.push({ label: "Phone", url: phoneUrl });
+  if (webUrl) contactPills.push({ label: "Official Website", url: webUrl });
+  for (const link of socialLinks) {
+    if (!link?.label || !link?.url) continue;
+    if (contactPills.some((item) => item.label === link.label)) continue;
+    contactPills.push(link);
+  }
 
   return (
     <section
@@ -144,16 +191,17 @@ export function RepresentativeHero({
 
           <div className="min-w-0 flex-1">
             <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold tracking-wide text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-300 dark:ring-emerald-300/30">
+                {officeLabel}
+              </span>
+              <span className="inline-flex items-center rounded-full bg-slate-500/15 px-2.5 py-0.5 text-xs font-bold tracking-wide text-slate-600 ring-1 ring-inset ring-slate-500/25 dark:text-slate-200 dark:ring-slate-300/25">
+                Federal
+              </span>
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold tracking-wide ring-1 ring-inset ${PARTY_BADGE[partyKind]}`}
+                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ring-1 ring-inset ${PARTY_BADGE[partyKind]}`}
               >
                 {partyLabel(partyKind, profile.party)}
               </span>
-              {profile.chamber ? (
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {profile.chamber}
-                </span>
-              ) : null}
             </div>
 
             <h2 className="truncate text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
@@ -161,113 +209,99 @@ export function RepresentativeHero({
             </h2>
             <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">
               {districtLabel}
-              {profile.nextElectionYear
-                ? ` · Next election ${profile.nextElectionYear}`
-                : ""}
             </p>
+            {tenure ? (
+              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                {tenure}
+              </p>
+            ) : null}
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {phoneUrl ? (
-                <a
-                  href={phoneUrl}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-800 transition hover:border-emerald-400/50 hover:bg-emerald-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-emerald-400/40 dark:hover:bg-slate-700"
+              {onFollowClick ? (
+                <button
+                  type="button"
+                  onClick={onFollowClick}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-extrabold transition ${
+                    following
+                      ? "border border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                      : "bg-emerald-400 text-emerald-950 hover:bg-emerald-300"
+                  }`}
                 >
-                  <PhoneIcon />
-                  Call
-                </a>
+                  {following ? "Following" : "+ Follow"}
+                </button>
               ) : null}
-              {webUrl ? (
-                <a
-                  href={webUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-800 transition hover:border-emerald-400/50 hover:bg-emerald-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-emerald-400/40 dark:hover:bg-slate-700"
+              {onNoteClick ? (
+                <button
+                  type="button"
+                  onClick={onNoteClick}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3.5 py-1.5 text-sm font-bold text-slate-800 transition hover:border-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 >
-                  <LinkIcon />
-                  Official site
-                </a>
+                  Private note
+                </button>
               ) : null}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {contactPills.map((pill) => (
+                <a
+                  key={pill.label}
+                  href={pill.url}
+                  target={pill.url.startsWith("tel:") ? undefined : "_blank"}
+                  rel={
+                    pill.url.startsWith("tel:")
+                      ? undefined
+                      : "noopener noreferrer"
+                  }
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 transition hover:border-emerald-400/50 hover:bg-emerald-50 dark:border-slate-600 dark:bg-slate-800 dark:text-emerald-300 dark:hover:border-emerald-400/40 dark:hover:bg-slate-700"
+                >
+                  {pill.label}
+                </a>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 justify-start sm:justify-end">
-          <div
-            className={`representative-hero__match flex flex-col items-center ${
-              score == null
-                ? "text-slate-400 dark:text-slate-500"
-                : matchTone(score)
-            }`}
-          >
+        {showMatchRing ? (
+          <div className="flex shrink-0 justify-start sm:justify-end">
             <div
-              className="relative grid h-[5.5rem] w-[5.5rem] place-items-center rounded-full p-[0.35rem]"
-              style={ringStyle}
-              role="img"
-              aria-label={
+              className={`representative-hero__match flex flex-col items-center ${
                 score == null
-                  ? "Action Match Score unavailable"
-                  : `Action Match Score ${score} percent`
-              }
+                  ? "text-slate-400 dark:text-slate-500"
+                  : matchTone(score)
+              }`}
             >
-              <div className="grid h-full w-full place-items-center rounded-full bg-white dark:bg-slate-900">
-                <div className="text-center leading-none">
-                  <div className="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
-                    {score == null ? "—" : `${score}%`}
+              <div
+                className="relative grid h-[5.5rem] w-[5.5rem] place-items-center rounded-full p-[0.35rem]"
+                style={ringStyle}
+                role="img"
+                aria-label={
+                  score == null
+                    ? "Action Match Score unavailable"
+                    : `Action Match Score ${score} percent`
+                }
+              >
+                <div className="grid h-full w-full place-items-center rounded-full bg-white dark:bg-slate-900">
+                  <div className="text-center leading-none">
+                    <div className="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
+                      {score == null ? "—" : `${score}%`}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <p className="mt-2 text-center text-[0.7rem] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-              Action Match
-            </p>
-            {actionMatchCompared != null ? (
-              <p className="mt-0.5 text-center text-xs text-slate-500 dark:text-slate-400">
-                {actionMatchCompared} compared vote
-                {actionMatchCompared === 1 ? "" : "s"}
+              <p className="mt-2 text-center text-[0.7rem] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                Action Match
               </p>
-            ) : null}
+              {actionMatchCompared != null ? (
+                <p className="mt-0.5 text-center text-xs text-slate-500 dark:text-slate-400">
+                  {actionMatchCompared} compared vote
+                  {actionMatchCompared === 1 ? "" : "s"}
+                </p>
+              ) : null}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </section>
-  );
-}
-
-function PhoneIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M2.5 5.5c0-1.2.9-2.2 2.1-2.3l2.2-.2c.9-.1 1.7.4 2 1.2l.9 2.3c.3.7.1 1.5-.5 2l-1.1.9a12.5 12.5 0 0 0 5.5 5.5l.9-1.1c.5-.6 1.3-.8 2-.5l2.3.9c.8.3 1.3 1.1 1.2 2l-.2 2.2c-.1 1.2-1.1 2.1-2.3 2.1C9.9 20.5 3.5 14.1 2.5 5.5Z"
-      />
-    </svg>
-  );
-}
-
-function LinkIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M10 6H7a4 4 0 0 0 0 8h3M14 18h3a4 4 0 0 0 0-8h-3M8 12h8"
-      />
-    </svg>
   );
 }
 

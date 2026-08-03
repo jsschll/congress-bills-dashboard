@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260804sc" />
+    <link rel="stylesheet" href="styles.css?v=20260804sc2" />
   </head>
   <body class="page-app page-scorecard">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -47,6 +47,22 @@
           class="scorecard-hero"
           aria-label="Representative overview"
         ></section>
+
+        <section
+          id="scorecard-match"
+          class="scorecard-match"
+          aria-labelledby="scorecard-match-title"
+          hidden
+        >
+          <div class="scorecard-match__header">
+            <h2 id="scorecard-match-title">Action Match Scorecard</h2>
+            <p id="scorecard-match-lede" class="scorecard-match__lede">
+              Your Support / Oppose stances compared to this official’s roll-call
+              votes.
+            </p>
+          </div>
+          <div id="scorecard-match-body"></div>
+        </section>
 
         <div class="scorecard-grid">
           <div class="scorecard-grid__left">
@@ -83,10 +99,68 @@
       </div>
     </main>
 
+    <div id="scorecard-notes-modal" class="politician-notes-modal" hidden>
+      <div class="politician-notes-modal__backdrop" data-close-notes="1"></div>
+      <div
+        class="politician-notes-modal__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scorecard-notes-title"
+      >
+        <header class="politician-notes-modal__header">
+          <div>
+            <h2 id="scorecard-notes-title">Private note</h2>
+            <p class="politician-notes-modal__lede">
+              One private notepad for this official. Only you can see it.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="politician-notes-modal__close"
+            data-close-notes="1"
+            aria-label="Close note"
+          >
+            ✕
+          </button>
+        </header>
+        <p id="scorecard-notes-status" class="status" hidden></p>
+        <div id="scorecard-notes-editor" class="politician-notes-editor">
+          <label class="politician-note-editor-label" for="scorecard-note-body"
+            >Your note</label
+          >
+          <textarea
+            id="scorecard-note-body"
+            class="politician-note-textarea"
+            rows="10"
+            maxlength="8000"
+            placeholder="Jot thoughts, meetings, follow-ups — keep adding to this note over time…"
+          ></textarea>
+          <div class="politician-notes-modal__actions">
+            <button
+              type="button"
+              id="scorecard-note-save"
+              class="refresh-btn"
+            >
+              Save note
+            </button>
+            <button
+              type="button"
+              id="scorecard-note-clear"
+              class="politician-note-clear-btn"
+              hidden
+            >
+              Clear note
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260804a1"></script>
-    <script src="representatives-scorecard.js?v=20260804sc"></script>
+    <script src="politicians-shared.js?v=20260729an"></script>
+    <script src="representatives-scorecard.js?v=20260804sc2"></script>
     <script>
       bootNav("politicians");
       mountRepresentativesScorecard();
