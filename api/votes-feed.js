@@ -8,7 +8,7 @@ const {
   PROCESSED_VOTES_SELECT,
 } = require("../lib/processed-votes-feed");
 
-const DEFAULT_LIMIT = 16;
+const DEFAULT_LIMIT = 48;
 
 function json(res, status, body) {
   res.statusCode = status;
