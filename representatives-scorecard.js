@@ -1278,21 +1278,25 @@
 
     const billLink = (row) => {
       const bill = row.bill || {};
-      const number = bill.bill_number || "";
-      const displayTitle =
+      const impact =
+        row.impact ||
+        (typeof buildActionMatchImpact === "function"
+          ? buildActionMatchImpact(bill, row.voteCopy, row)
+          : null);
+      const shortTitle =
+        impact?.short_title ||
         row.displayTitle ||
-        (typeof humanizeActionMatchTitle === "function"
-          ? humanizeActionMatchTitle(bill, row.voteCopy)
-          : bill.title || number || row.bill_id);
-      const means =
-        row.voteMeans ||
-        (typeof buildActionMatchVoteMeans === "function"
-          ? buildActionMatchVoteMeans(bill, row.voteCopy)
-          : { yea: "", nay: "" });
-      const summary =
+        bill.title ||
+        bill.bill_number ||
+        row.bill_id;
+      const rawCode =
+        impact?.raw_code ||
+        bill.bill_number ||
+        "";
+      const whatItDoes =
+        impact?.what_it_does ||
         row.detailSummary ||
         bill.short_pitch ||
-        bill.title ||
         "";
       const detailHref =
         row.detailHref ||
@@ -1302,15 +1306,19 @@
         )}`;
       const detailPayload = encodeURIComponent(
         JSON.stringify({
-          title: displayTitle,
-          number,
-          summary,
-          yea: means.yea || "",
-          nay: means.nay || "",
+          title: shortTitle,
+          number: rawCode,
+          summary: whatItDoes,
+          yea: impact?.yea_impact || row.voteMeans?.yea || "",
+          nay: impact?.nay_impact || row.voteMeans?.nay || "",
           href: detailHref,
           rawTitle: bill.title || "",
           stance: row.user_stance || "",
           memberVote: row.member_vote || "",
+          yourStanceLabel: impact?.your_stance_label || "",
+          yourStanceImpact: impact?.your_stance_impact || "",
+          repStanceLabel: impact?.rep_stance_label || "",
+          repStanceImpact: impact?.rep_stance_impact || "",
         })
       );
 
@@ -1321,24 +1329,24 @@
             class="scorecard-match-item__title"
             data-open-match-detail="${detailPayload}"
           >
+            <span class="scorecard-match-item__name">${escapeHtml(
+              shortTitle
+            )}</span>
             ${
-              number
-                ? `<span class="scorecard-match-item__bill">${escapeHtml(
-                    number
+              rawCode
+                ? `<span class="scorecard-match-item__code">${escapeHtml(
+                    rawCode
                   )}</span>`
                 : ""
             }
-            <span class="scorecard-match-item__name">${escapeHtml(
-              displayTitle
-            )}</span>
           </button>
           <button
             type="button"
             class="scorecard-match-item__info"
             data-toggle-match-means="1"
             aria-expanded="false"
-            aria-label="What Yea and Nay mean"
-            title="What Yea and Nay mean"
+            aria-label="What this vote means"
+            title="What this vote means"
           >ⓘ</button>
         </div>
         <p class="scorecard-match-item__stance">
@@ -1347,8 +1355,19 @@
           )}
         </p>
         <div class="scorecard-match-item__means" hidden>
-          <p><strong>Yea:</strong> ${escapeHtml(means.yea || "—")}</p>
-          <p><strong>Nay:</strong> ${escapeHtml(means.nay || "—")}</p>
+          <p><strong>What this vote means:</strong> ${escapeHtml(
+            whatItDoes || "—"
+          )}</p>
+          <p><strong>Your Stance (${escapeHtml(
+            impact?.your_stance_label || "Support"
+          )}):</strong> ${escapeHtml(
+            impact?.your_stance_impact || impact?.yea_impact || "—"
+          )}</p>
+          <p><strong>Representative Stance (${escapeHtml(
+            impact?.rep_stance_label || "—"
+          )}):</strong> ${escapeHtml(
+            impact?.rep_stance_impact || impact?.nay_impact || "—"
+          )}</p>
         </div>
       </li>`;
     };
@@ -1453,8 +1472,30 @@
         payload.summary ||
         "No plain-English summary is available for this roll call yet.";
     }
-    if (yeaEl) yeaEl.textContent = payload.yea || "—";
-    if (nayEl) nayEl.textContent = payload.nay || "—";
+    if (yeaEl) {
+      yeaEl.textContent =
+        payload.yourStanceImpact ||
+        payload.yea ||
+        "—";
+    }
+    if (nayEl) {
+      nayEl.textContent =
+        payload.repStanceImpact ||
+        payload.nay ||
+        "—";
+    }
+    const yeaLabelEl = $("scorecard-match-detail-yea-label");
+    const nayLabelEl = $("scorecard-match-detail-nay-label");
+    if (yeaLabelEl) {
+      yeaLabelEl.textContent = `Your Stance (${
+        payload.yourStanceLabel || "Support"
+      })`;
+    }
+    if (nayLabelEl) {
+      nayLabelEl.textContent = `Representative Stance (${
+        payload.repStanceLabel || "—"
+      })`;
+    }
     if (stanceEl) {
       const stance = payload.stance ? `You ${payload.stance}` : "";
       const member = payload.memberVote
