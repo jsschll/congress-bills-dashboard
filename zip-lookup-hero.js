@@ -248,7 +248,7 @@
         setHint(
           total
             ? `Found ${total} federal representative${total === 1 ? "" : "s"} for ${place}.`
-            : `No scorecard profiles yet for ${place}. Tables are ready — seed representative data to populate results.`,
+            : `No federal scorecard profiles matched ${place} yet. We’re syncing from your ZIP — try again in a moment, or enter a full street address if your ZIP spans districts.`,
           total ? "success" : "default"
         );
         renderResults(results, data.representatives || []);
