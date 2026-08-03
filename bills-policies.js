@@ -1072,7 +1072,7 @@ function renderBillCard(item) {
         <p class="policy-bill-card__meta">
           ${escapePolicyHtml(item.jurisdiction)} · Sponsor: ${
             item.primarySponsor?.bioguideId || item.primarySponsor?.bioguide_id
-              ? `<a class="politician-name-link" href="politician.html?bioguide=${encodeURIComponent(
+              ? `<a class="politician-name-link" href="representatives.html?bioguideId=${encodeURIComponent(
                   String(
                     item.primarySponsor.bioguideId ||
                       item.primarySponsor.bioguide_id

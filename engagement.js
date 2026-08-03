@@ -398,7 +398,7 @@
             : row.matched === false
               ? "voted differently"
               : "no comparable vote";
-        return `<li><a class="politician-name-link" href="politician.html?bioguide=${encodeURIComponent(
+        return `<li><a class="politician-name-link" href="representatives.html?bioguideId=${encodeURIComponent(
           String(row.bioguideId || "").toUpperCase()
         )}"><strong>${escapeHtml(
           row.name || row.bioguideId

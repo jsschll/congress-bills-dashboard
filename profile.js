@@ -567,7 +567,7 @@ function renderAlignmentChart(payload) {
     .slice(0, 8)
     .map((row) => {
       const score = row.score == null ? "—" : `${row.score}%`;
-      return `<li><a class="politician-name-link" href="politician.html?bioguide=${encodeURIComponent(
+      return `<li><a class="politician-name-link" href="representatives.html?bioguideId=${encodeURIComponent(
         String(row.bioguide_id || "").toUpperCase()
       )}"><strong>${escapeProfileHtml(
         row.politician_name || row.bioguide_id
