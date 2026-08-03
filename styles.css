@@ -5764,3 +5764,181 @@ body.politician-notes-modal-open {
   font-size: 0.9rem;
   line-height: 1.4;
 }
+
+/* —— Skeleton loading cards (stable layout while fetching) —— */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.skeleton-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0;
+  width: 100%;
+}
+
+.skeleton-list.politician-grid {
+  gap: 0.75rem;
+}
+
+.skeleton-bone {
+  display: block;
+  border-radius: 0.45rem;
+  background: linear-gradient(
+    90deg,
+    rgba(51, 65, 85, 0.55) 0%,
+    rgba(100, 116, 139, 0.45) 45%,
+    rgba(51, 65, 85, 0.55) 90%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.25s ease-in-out infinite;
+}
+
+.skeleton-bone--avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 0.55rem;
+}
+
+.skeleton-bone--title {
+  height: 1.15rem;
+  width: 70%;
+  border-radius: 0.4rem;
+}
+
+.skeleton-bone--line {
+  height: 0.85rem;
+  width: 100%;
+  margin-top: 0.15rem;
+}
+
+.skeleton-bone--chip {
+  height: 1.35rem;
+  width: 4.5rem;
+  border-radius: 999px;
+  margin-top: 0.15rem;
+}
+
+.skeleton-bone--btn {
+  height: 2rem;
+  width: 5.5rem;
+  border-radius: 999px;
+}
+
+.skeleton-bone--node {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  margin: 0 auto 0.25rem;
+}
+
+.skeleton-bone--w25 {
+  width: 25%;
+}
+.skeleton-bone--w30 {
+  width: 30%;
+}
+.skeleton-bone--w40 {
+  width: 40%;
+}
+.skeleton-bone--w45 {
+  width: 45%;
+}
+.skeleton-bone--w50 {
+  width: 50%;
+}
+.skeleton-bone--w60 {
+  width: 60%;
+}
+.skeleton-bone--w70 {
+  width: 70%;
+}
+.skeleton-bone--w75 {
+  width: 75%;
+}
+.skeleton-bone--w85 {
+  width: 85%;
+}
+.skeleton-bone--w90 {
+  width: 90%;
+}
+
+.politician-card--skeleton {
+  pointer-events: none;
+  min-height: 6.25rem;
+}
+
+.politician-card--skeleton .politician-card__body {
+  gap: 0.45rem;
+  align-content: center;
+}
+
+.politician-card--skeleton .politician-card__actions {
+  gap: 0.45rem;
+  min-width: 5.5rem;
+}
+
+.policy-bill-card--skeleton {
+  pointer-events: none;
+  min-height: 16.5rem;
+}
+
+.policy-bill-card--skeleton .policy-bill-card__header {
+  align-items: flex-start;
+}
+
+.policy-bill-card--skeleton .policy-bill-card__summary {
+  gap: 0.55rem;
+}
+
+.policy-bill-card--skeleton .skeleton-progress {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+
+.policy-bill-card--skeleton .policy-bill-card__step {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+}
+
+.search-result-card--skeleton {
+  pointer-events: none;
+  min-height: 9.5rem;
+  gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+  .politician-card--skeleton {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .politician-card--skeleton .politician-card__actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    min-width: 0;
+  }
+
+  .politician-card--skeleton .skeleton-bone--avatar {
+    width: 64px;
+    height: 64px;
+  }
+
+  .policy-bill-card--skeleton .skeleton-progress {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bone {
+    animation: none;
+    background: rgba(71, 85, 105, 0.55);
+  }
+}

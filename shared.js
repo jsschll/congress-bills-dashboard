@@ -534,3 +534,147 @@ async function uploadProfileAvatar(userId, file) {
   }
 }
 
+/** Skeleton loading placeholders — match real card layout to avoid jump. */
+function createSkeletonBone(extraClass = "") {
+  const bone = document.createElement("span");
+  bone.className = `skeleton-bone ${extraClass}`.trim();
+  bone.setAttribute("aria-hidden", "true");
+  return bone;
+}
+
+function createPoliticianCardSkeleton() {
+  const card = document.createElement("article");
+  card.className = "politician-card politician-card--skeleton skeleton-card";
+  card.setAttribute("aria-hidden", "true");
+
+  const media = document.createElement("div");
+  media.className = "politician-card__media";
+  media.append(createSkeletonBone("skeleton-bone--avatar"));
+
+  const body = document.createElement("div");
+  body.className = "politician-card__body";
+  body.append(
+    createSkeletonBone("skeleton-bone--title"),
+    createSkeletonBone("skeleton-bone--line skeleton-bone--w60"),
+    createSkeletonBone("skeleton-bone--chip")
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "politician-card__actions";
+  actions.append(
+    createSkeletonBone("skeleton-bone--btn"),
+    createSkeletonBone("skeleton-bone--btn")
+  );
+
+  card.append(media, body, actions);
+  return card;
+}
+
+function createPolicyBillCardSkeleton() {
+  const card = document.createElement("article");
+  card.className = "policy-bill-card policy-bill-card--skeleton skeleton-card";
+  card.setAttribute("aria-hidden", "true");
+
+  const header = document.createElement("div");
+  header.className = "policy-bill-card__header";
+  const headerMain = document.createElement("div");
+  const badges = document.createElement("div");
+  badges.className = "policy-bill-card__badges";
+  badges.append(
+    createSkeletonBone("skeleton-bone--chip"),
+    createSkeletonBone("skeleton-bone--chip")
+  );
+  headerMain.append(
+    badges,
+    createSkeletonBone("skeleton-bone--title skeleton-bone--w90"),
+    createSkeletonBone("skeleton-bone--line skeleton-bone--w40")
+  );
+  header.append(headerMain, createSkeletonBone("skeleton-bone--btn"));
+
+  const summary = document.createElement("div");
+  summary.className = "policy-bill-card__summary";
+  summary.append(
+    createSkeletonBone("skeleton-bone--line skeleton-bone--w25"),
+    createSkeletonBone("skeleton-bone--line"),
+    createSkeletonBone("skeleton-bone--line skeleton-bone--w85"),
+    createSkeletonBone("skeleton-bone--line skeleton-bone--w70")
+  );
+
+  const progress = document.createElement("div");
+  progress.className = "policy-bill-card__progress skeleton-progress";
+  for (let i = 0; i < 4; i += 1) {
+    const step = document.createElement("div");
+    step.className = "policy-bill-card__step";
+    step.append(
+      createSkeletonBone("skeleton-bone--node"),
+      createSkeletonBone("skeleton-bone--line skeleton-bone--w50")
+    );
+    progress.append(step);
+  }
+
+  card.append(
+    header,
+    summary,
+    progress,
+    createSkeletonBone("skeleton-bone--btn skeleton-bone--w30")
+  );
+  return card;
+}
+
+function createSearchResultCardSkeleton() {
+  const card = document.createElement("article");
+  card.className =
+    "search-result-card search-result-card--skeleton skeleton-card";
+  card.setAttribute("aria-hidden", "true");
+
+  const badges = document.createElement("div");
+  badges.className = "search-result-card__badges";
+  badges.append(
+    createSkeletonBone("skeleton-bone--chip"),
+    createSkeletonBone("skeleton-bone--chip"),
+    createSkeletonBone("skeleton-bone--chip")
+  );
+
+  card.append(
+    badges,
+    createSkeletonBone("skeleton-bone--title skeleton-bone--w85"),
+    createSkeletonBone("skeleton-bone--line skeleton-bone--w45"),
+    createSkeletonBone("skeleton-bone--line"),
+    createSkeletonBone("skeleton-bone--line skeleton-bone--w75"),
+    createSkeletonBone("skeleton-bone--btn skeleton-bone--w25")
+  );
+  return card;
+}
+
+function showSkeletonCards(container, { type = "bill", count = 4 } = {}) {
+  if (!container) return;
+  const factory =
+    type === "politician"
+      ? createPoliticianCardSkeleton
+      : type === "search"
+        ? createSearchResultCardSkeleton
+        : createPolicyBillCardSkeleton;
+
+  const wrap = document.createElement("div");
+  wrap.className =
+    type === "politician"
+      ? "politician-grid politician-grid--flat skeleton-list"
+      : "skeleton-list";
+  wrap.setAttribute("aria-busy", "true");
+  wrap.setAttribute(
+    "aria-label",
+    type === "politician"
+      ? "Loading politicians"
+      : type === "search"
+        ? "Loading legislation results"
+        : "Loading bills"
+  );
+
+  for (let i = 0; i < Math.max(1, count); i += 1) {
+    wrap.append(factory());
+  }
+
+  container.replaceChildren(wrap);
+}
+
+

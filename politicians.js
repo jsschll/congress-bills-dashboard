@@ -187,6 +187,9 @@ function applyFilters() {
 
 async function loadBrowseList() {
   setBrowseStatus("Loading politicians…", "loading");
+  if (typeof showSkeletonCards === "function" && politiciansGrid) {
+    showSkeletonCards(politiciansGrid, { type: "politician", count: 8 });
+  }
   try {
     const level = filterLevel.value;
     let list = [];
@@ -232,6 +235,7 @@ async function loadBrowseList() {
     applyFilters();
   } catch (error) {
     console.error(error);
+    if (politiciansGrid) politiciansGrid.replaceChildren();
     setBrowseStatus(error.message || "Could not load politicians.", "error");
   }
 }
