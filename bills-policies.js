@@ -1189,19 +1189,28 @@ function renderVoteCard(item) {
   const billNumber =
     item.billNumber ||
     (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "");
+  const chamberLabel =
+    String(item.chamber || item.jurisdiction || "")
+      .toLowerCase()
+      .includes("senate")
+      ? "Senate"
+      : "House";
 
   card.innerHTML = `
     <div class="policy-bill-card__header">
       <div>
-        ${
-          billNumber
-            ? `<div class="policy-bill-card__badges">
-          <span class="policy-bill-card__bill-number">${escapePolicyHtml(
-            billNumber
+        <div class="policy-bill-card__badges">
+          <span class="policy-bill-card__level">${escapePolicyHtml(
+            chamberLabel
           )}</span>
-        </div>`
-            : ""
-        }
+          ${
+            billNumber
+              ? `<span class="policy-bill-card__bill-number">${escapePolicyHtml(
+                  billNumber
+                )}</span>`
+              : ""
+          }
+        </div>
         <h2 class="policy-bill-card__title">${escapePolicyHtml(title)}</h2>
         ${
           dateLabel
@@ -1373,10 +1382,19 @@ function renderVotesFeed() {
   }
   if (votesFeedEmpty) votesFeedEmpty.hidden = true;
   votesFeedList.append(...votesItems.map(renderVoteCard));
+  const houseCount = votesItems.filter(
+    (item) => String(item.chamber || "").toLowerCase() === "house"
+  ).length;
+  const senateCount = votesItems.filter(
+    (item) => String(item.chamber || "").toLowerCase() === "senate"
+  ).length;
+  const chamberBits = [];
+  if (houseCount) chamberBits.push(`${houseCount} House`);
+  if (senateCount) chamberBits.push(`${senateCount} Senate`);
   setVotesFeedStatus(
-    `${votesItems.length} House vote${votesItems.length === 1 ? "" : "s"} from processed_votes${
-      votesQuizMode ? " · Quick Match" : ""
-    } (Senate votes appear on senator profiles)`,
+    `${votesItems.length} vote${votesItems.length === 1 ? "" : "s"} from processed_votes${
+      chamberBits.length ? ` (${chamberBits.join(" · ")})` : ""
+    }${votesQuizMode ? " · Quick Match" : ""}`,
     "success"
   );
 }

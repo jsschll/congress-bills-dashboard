@@ -4,11 +4,13 @@
  *
  * Usage:
  *   node scripts/run-sync-votes.js
- *   node scripts/run-sync-votes.js --limit=5
+ *   node scripts/run-sync-votes.js --limit=10
+ *   node scripts/run-sync-votes.js --limit=20 --chamber=senate
  *   node scripts/run-sync-votes.js --limit=10 --force
  *
  * Loads keys from .env.local / .env, then process.env.
  * --force re-formats rows even if they already exist in processed_votes.
+ * --chamber=house|senate|both (default both)
  */
 const fs = require("fs");
 const path = require("path");
@@ -70,6 +72,7 @@ async function main() {
   const { syncVotes } = require("../lib/sync-votes");
   const limit = Number(getArg("limit", 5));
   const congress = Number(getArg("congress", 119));
+  const chamber = String(getArg("chamber", "both")).toLowerCase();
   const force =
     args.includes("--force") ||
     String(getArg("force", "0")).toLowerCase() === "1" ||
@@ -77,13 +80,14 @@ async function main() {
     String(getArg("skipExisting", "1")).toLowerCase() === "0" ||
     String(getArg("skipExisting", "1")).toLowerCase() === "false";
   console.log(
-    `Syncing up to ${limit} House votes (congress ${congress}${
+    `Syncing up to ${limit} ${chamber} vote(s) (congress ${congress}${
       force ? ", force re-format" : ""
     })…`
   );
   const result = await syncVotes({
     limit,
     congress,
+    chamber,
     skipExisting: !force,
   });
   console.log(JSON.stringify(result, null, 2));

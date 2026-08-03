@@ -90,6 +90,9 @@ module.exports = async function handler(req, res) {
     const body = req.method === "POST" ? await readBody(req) : {};
     const limit = Number(req.query?.limit || body.limit || DEFAULT_LIMIT);
     const congress = Number(req.query?.congress || body.congress || 0) || undefined;
+    const chamber = String(
+      req.query?.chamber || body.chamber || "both"
+    ).toLowerCase();
     const skipExistingRaw = req.query?.skipExisting ?? body.skipExisting;
     const skipExisting =
       skipExistingRaw === undefined
@@ -99,7 +102,7 @@ module.exports = async function handler(req, res) {
             String(skipExistingRaw).toLowerCase() === "false"
           );
 
-    const result = await syncVotes({ limit, congress, skipExisting });
+    const result = await syncVotes({ limit, congress, chamber, skipExisting });
     return json(res, 200, {
       ok: true,
       ...result,
