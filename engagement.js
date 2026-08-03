@@ -723,6 +723,7 @@ Sincerely,
     }
 
     // Show logged vote immediately — don't wait for roll-call comparison.
+    roots.changeMode = false;
     applyLoggedStanceUI(roots, activeStance);
 
     await loadAlignment(client);
@@ -753,6 +754,24 @@ Sincerely,
     }
   }
 
+  function ensureLoggedPanel(roots) {
+    if (roots.loggedPanel && roots.loggedPanel.isConnected) return roots.loggedPanel;
+    const stances =
+      roots.stancesEl ||
+      roots.root?.querySelector(".policy-engage__stances");
+    if (!stances || !roots.root) return null;
+    let panel = roots.root.querySelector(".policy-engage__logged-panel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.className = "policy-engage__logged-panel";
+      panel.hidden = true;
+      stances.insertAdjacentElement("afterend", panel);
+    }
+    roots.loggedPanel = panel;
+    roots.stancesEl = stances;
+    return panel;
+  }
+
   function applyLoggedStanceUI(roots, mine) {
     const supportBtn = roots.supportBtn;
     const opposeBtn = roots.opposeBtn;
@@ -762,37 +781,59 @@ Sincerely,
     const opposeLabel = roots.opposeLabel || "Oppose Measure";
     const hasSupport = mine === "support";
     const hasOppose = mine === "oppose";
+    const hasVote = hasSupport || hasOppose;
+    const editing = roots.changeMode === true;
+    const panel = ensureLoggedPanel(roots);
+    const stances = roots.stancesEl;
 
-    supportBtn.classList.toggle("is-active", hasSupport);
-    opposeBtn.classList.toggle("is-active", hasOppose);
-    supportBtn.classList.toggle("is-logged", hasSupport);
-    opposeBtn.classList.toggle("is-logged", hasOppose);
-    supportBtn.classList.toggle("is-dimmed", hasOppose);
-    opposeBtn.classList.toggle("is-dimmed", hasSupport);
+    supportBtn.textContent = supportLabel;
+    opposeBtn.textContent = opposeLabel;
+    supportBtn.classList.toggle("is-active", hasSupport && editing);
+    opposeBtn.classList.toggle("is-active", hasOppose && editing);
+    supportBtn.classList.remove("is-logged", "is-dimmed");
+    opposeBtn.classList.remove("is-logged", "is-dimmed");
     supportBtn.setAttribute("aria-pressed", String(hasSupport));
     opposeBtn.setAttribute("aria-pressed", String(hasOppose));
 
-    // Show a clear "logged" label instead of leaving the idle button text.
-    supportBtn.textContent = hasSupport ? `✓ Logged: ${supportLabel}` : supportLabel;
-    opposeBtn.textContent = hasOppose ? `✓ Logged: ${opposeLabel}` : opposeLabel;
-
-    let status = roots.root?.querySelector(".policy-engage__logged");
-    if (!status && roots.root) {
-      status = document.createElement("p");
-      status.className = "policy-engage__logged";
-      const actions = roots.root.querySelector(".policy-engage__actions");
-      if (actions) actions.insertAdjacentElement("afterend", status);
-      else roots.root.prepend(status);
-      roots.loggedStatus = status;
+    if (hasVote && !editing) {
+      // Replace buttons with a clear logged message + Change option.
+      if (stances) stances.hidden = true;
+      if (panel) {
+        panel.hidden = false;
+        panel.classList.toggle("is-support", hasSupport);
+        panel.classList.toggle("is-oppose", hasOppose);
+        panel.innerHTML = `
+          <p class="policy-engage__logged-message">
+            ${hasSupport ? "You supported this" : "You opposed this"}
+          </p>
+          <button type="button" class="policy-engage__change">Change</button>
+        `;
+        panel.querySelector(".policy-engage__change")?.addEventListener(
+          "click",
+          () => {
+            roots.changeMode = true;
+            applyLoggedStanceUI(roots, mine);
+          }
+        );
+      }
+      return;
     }
-    if (status) {
-      if (hasSupport || hasOppose) {
-        const label = hasSupport ? supportLabel : opposeLabel;
-        status.hidden = false;
-        status.textContent = `Your vote is logged as “${label}”. Tap again to clear, or choose the other side to switch.`;
+
+    // Choosing / changing: show Support / Oppose buttons again.
+    if (stances) stances.hidden = false;
+    if (panel) {
+      if (editing && hasVote) {
+        panel.hidden = false;
+        panel.classList.remove("is-support", "is-oppose");
+        panel.innerHTML = `
+          <p class="policy-engage__logged-hint">
+            Choose Support or Oppose to update your vote.
+          </p>
+        `;
       } else {
-        status.hidden = true;
-        status.textContent = "";
+        panel.hidden = true;
+        panel.classList.remove("is-support", "is-oppose");
+        panel.innerHTML = "";
       }
     }
   }
@@ -858,6 +899,7 @@ Sincerely,
             opposeLabel
           )}</button>
         </div>
+        <div class="policy-engage__logged-panel" hidden></div>
         ${
           showTakeAction
             ? `<button type="button" class="refresh-btn policy-engage__take-action">Take Action</button>`
@@ -890,12 +932,15 @@ Sincerely,
       root: wrap,
       supportBtn: wrap.querySelector('[data-stance="support"]'),
       opposeBtn: wrap.querySelector('[data-stance="oppose"]'),
+      stancesEl: wrap.querySelector(".policy-engage__stances"),
+      loggedPanel: wrap.querySelector(".policy-engage__logged-panel"),
       communityBody: wrap.querySelector(".policy-engage__community-body"),
       voteBody: wrap.querySelector(".policy-engage__vote-body"),
       alignmentEl: wrap.querySelector(".policy-engage__alignment"),
       onStanceChange: options.onStanceChange || null,
       supportLabel,
       opposeLabel,
+      changeMode: false,
     };
 
     const mine = state.stances.get(item.id);
