@@ -1,4 +1,35 @@
 {
+  "framework": null,
+  "functions": {
+    "api/votes.js": {
+      "maxDuration": 60
+    },
+    "api/jobs.js": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/votes-feed",
+      "destination": "/api/votes?route=votes-feed"
+    },
+    {
+      "source": "/api/sync-votes",
+      "destination": "/api/votes?route=sync-votes"
+    },
+    {
+      "source": "/api/bill-vote-match",
+      "destination": "/api/votes?route=bill-vote-match"
+    },
+    {
+      "source": "/api/watch-bills",
+      "destination": "/api/jobs?route=watch-bills"
+    },
+    {
+      "source": "/api/deliver-notifications",
+      "destination": "/api/jobs?route=deliver-notifications"
+    }
+  ],
   "crons": [
     {
       "path": "/api/watch-bills",
