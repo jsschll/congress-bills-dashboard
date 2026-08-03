@@ -33,3 +33,6 @@ export type {
 
 export { TruthInVotingFeed } from "./TruthInVotingFeed";
 export type { TruthInVotingFeedProps } from "./TruthInVotingFeed";
+
+export { RepresentativesScorecardView } from "./RepresentativesScorecardView";
+export type { RepresentativesScorecardViewProps } from "./RepresentativesScorecardView";

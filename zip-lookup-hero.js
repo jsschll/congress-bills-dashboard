@@ -252,7 +252,26 @@
           total ? "success" : "default"
         );
         renderResults(results, data.representatives || []);
-      } catch (error) {
+        if (total > 0) {
+          try {
+            sessionStorage.setItem(
+              "article1.scorecardSession",
+              JSON.stringify({
+                ...data,
+                activeId: data.representatives[0]?.profile?.id || null,
+              })
+            );
+          } catch {
+            /* ignore */
+          }
+          const params = new URLSearchParams();
+          if (parsed.zipCode) params.set("zipCode", parsed.zipCode);
+          else if (parsed.address) params.set("address", parsed.address);
+          const firstId = data.representatives[0]?.profile?.id;
+          if (firstId) params.set("id", firstId);
+          window.location.href = `representatives.html?${params.toString()}`;
+          return;
+        }
         const message =
           error?.message || "Could not look up representatives.";
         scorecardStore.setError(query, message);

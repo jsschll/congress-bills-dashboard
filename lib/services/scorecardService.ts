@@ -113,10 +113,24 @@ export interface LookupRepresentativesOptions {
   supabase?: unknown;
 }
 
+export interface GetScorecardByIdOptions {
+  id?: string | null;
+  bioguideId?: string | null;
+  supabase?: unknown;
+  voteLimit?: number;
+}
+
 declare const service: {
   lookupRepresentativesByLocation(
     options?: LookupRepresentativesOptions
   ): Promise<RepresentativesLookupResult>;
+  getScorecardById(
+    options?: GetScorecardByIdOptions
+  ): Promise<{
+    ok: true;
+    representative: RepresentativeScorecardPayload;
+    representatives: RepresentativeScorecardPayload[];
+  }>;
   getSupabaseAdmin(): unknown;
   fetchFederalRepresentatives(
     supabase: unknown,
@@ -124,8 +138,12 @@ declare const service: {
   ): Promise<unknown[]>;
   buildScorecardPayload(
     supabase: unknown,
-    profileRow: unknown
+    profileRow: unknown,
+    options?: { voteLimit?: number }
   ): Promise<RepresentativeScorecardPayload>;
+  orderRepresentativesForTabs(
+    reps: RepresentativeScorecardPayload[]
+  ): RepresentativeScorecardPayload[];
   normalizeDistrict(value: string | number | null | undefined): string;
 };
 
@@ -135,9 +153,11 @@ const runtime = require("./scorecardService.js") as typeof service;
 
 export const lookupRepresentativesByLocation =
   runtime.lookupRepresentativesByLocation;
+export const getScorecardById = runtime.getScorecardById;
 export const getSupabaseAdmin = runtime.getSupabaseAdmin;
 export const fetchFederalRepresentatives = runtime.fetchFederalRepresentatives;
 export const buildScorecardPayload = runtime.buildScorecardPayload;
+export const orderRepresentativesForTabs = runtime.orderRepresentativesForTabs;
 export const normalizeDistrict = runtime.normalizeDistrict;
 
 export default runtime;
