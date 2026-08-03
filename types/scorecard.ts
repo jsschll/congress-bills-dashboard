@@ -38,6 +38,8 @@ export interface PoliticianProfile {
   website: string | null;
   photoUrl: string | null;
   nextElectionYear: number | null;
+  /** Optional link to public.politicians.id for follow / notes. */
+  rosterPoliticianId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -214,6 +216,7 @@ export function mapPoliticianProfileRow(
     website: row.website,
     photoUrl: row.photo_url,
     nextElectionYear: row.next_election_year,
+    rosterPoliticianId: row.politician_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

@@ -1,11 +1,55 @@
 /**
  * Vanilla Representative Scorecard dashboard.
- * Mirrors components/RepresentativesScorecardView.tsx for the static host.
+ * Page 1 layout + Page 2 hero badges / actions / Action Match Scorecard.
  */
 
 (function (global) {
   const SESSION_KEY = "article1.scorecardSession";
   const ENDPOINT = "/api/representatives/lookup";
+
+  const CATEGORY_RULES = [
+    {
+      key: "Immigration",
+      re: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i,
+    },
+    { key: "Taxes", re: /\b(tax|irs|tariff|revenue|duty|excise)\b/i },
+    {
+      key: "Family",
+      re: /\b(family|child|parent|marriage|adoption|foster)\b/i,
+    },
+    {
+      key: "Healthcare",
+      re: /\b(health|medicare|medicaid|hospital|drug|pharma|aca|insurance)\b/i,
+    },
+    { key: "Housing", re: /\b(hous(e|ing)|rent|mortgage|homeless|zoning)\b/i },
+    {
+      key: "Education",
+      re: /\b(school|educat|student|university|college|title ix)\b/i,
+    },
+    {
+      key: "Defense",
+      re: /\b(defense|military|veteran|armed forces|national security)\b/i,
+    },
+    {
+      key: "Environment",
+      re: /\b(climat|environment|energy|epa|clean air|water)\b/i,
+    },
+  ];
+
+  /** @type {Map<string, object>} */
+  const enrichCache = new Map();
+  /** @type {Set<string>} */
+  let followedPoliticianIds = new Set();
+  /** @type {{ id?: string } | null} */
+  let followUser = null;
+  /** @type {object | null} */
+  let activeRosterPerson = null;
+  /** @type {{ id?: string, body?: string } | null} */
+  let politicianNote = null;
+  /** @type {Element | null} */
+  let notesModalLastFocus = null;
+  let notePopoverHideTimer = 0;
+  let notesBound = false;
 
   function $(id) {
     return document.getElementById(id);
@@ -51,6 +95,21 @@
     if (kind === "republican") return "Republican";
     if (kind === "independent") return "Independent";
     return String(raw || "Nonpartisan");
+  }
+
+  function partyClassName(party) {
+    if (typeof partyClass === "function") return partyClass(party);
+    const kind = partyKind(party);
+    if (kind === "democrat") return "party--dem";
+    if (kind === "republican") return "party--rep";
+    return "party--other";
+  }
+
+  function authNextHref() {
+    const next = encodeURIComponent(
+      `${global.location.pathname}${global.location.search}`
+    );
+    return `auth.html?next=${next}`;
   }
 
   function readQuery() {
@@ -99,6 +158,31 @@
     return district ? `${state}-${district}` : `${state} · At-Large`;
   }
 
+  function officeBadgeLabel(profile, overview) {
+    if (overview?.office_title) return String(overview.office_title);
+    if (profile.chamber === "Senate") return "U.S. Senator";
+    if (profile.chamber === "House") {
+      const state = String(profile.state || "").toUpperCase();
+      const district = String(profile.district || "").replace(/^0+/, "");
+      if (state && district) return `House - ${state}-${district}`;
+      return "U.S. Representative";
+    }
+    return profile.chamber || "Official";
+  }
+
+  function tenureLabel(profile, overview) {
+    if (overview?.tenure?.label) return String(overview.tenure.label);
+    const elected = overview?.tenure?.electedYear;
+    const years = overview?.tenure?.yearsActive;
+    if (elected != null && years != null) {
+      return `Elected ${elected} · ${years} Year${years === 1 ? "" : "s"} Active`;
+    }
+    if (profile.nextElectionYear) {
+      return `Next election ${profile.nextElectionYear}`;
+    }
+    return "";
+  }
+
   function tabLabel(rep, senateIndex) {
     if (rep.profile.chamber === "Senate") return `Senate ${senateIndex}`;
     if (rep.profile.chamber === "House") {
@@ -116,19 +200,599 @@
     return "neutral";
   }
 
-  function renderHero(el, profile) {
-    if (!el || !profile) return;
-    const kind = partyKind(profile.party);
-    const phone = String(profile.phone || "").replace(/[^\d+]/g, "");
-    const site = String(profile.website || "").trim();
-    const siteUrl = site
-      ? /^https?:\/\//i.test(site)
-        ? site
-        : `https://${site}`
+  function categorizeBill(bill = {}) {
+    const haystack = [
+      bill.title,
+      bill.bill_number,
+      bill.billNumber,
+      ...(bill.tags || []),
+      bill.policyArea,
+      bill.short_pitch,
+      bill.category,
+      bill.plainEnglishSummary,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    for (const rule of CATEGORY_RULES) {
+      if (rule.re.test(haystack)) return rule.key;
+    }
+    return bill.category || "Other";
+  }
+
+  function siteHref(website) {
+    const site = String(website || "").trim();
+    if (!site) return "";
+    return /^https?:\/\//i.test(site) ? site : `https://${site}`;
+  }
+
+  function buildContactPills(profile, enrich) {
+    const overview = enrich?.overview || {};
+    const roster = enrich?.roster || {};
+    const phone =
+      profile.phone || overview.phone || enrich?.contact?.phone || "";
+    const website =
+      profile.website ||
+      overview.website_url ||
+      enrich?.contact?.website ||
+      "";
+    const siteUrl = siteHref(website);
+    const social =
+      typeof mapPoliticianSocialLinks === "function"
+        ? mapPoliticianSocialLinks(roster)
+        : [];
+    const fromCongress = Array.isArray(enrich?.contact?.social)
+      ? enrich.contact.social
+      : [];
+
+    const pills = [];
+    if (phone) {
+      pills.push({
+        label: "Phone",
+        href: `tel:${String(phone).replace(/[^\d+]/g, "")}`,
+      });
+    }
+    if (siteUrl) {
+      pills.push({
+        label: "Official Website",
+        href: siteUrl,
+        external: true,
+      });
+    }
+
+    const seen = new Set(pills.map((p) => p.label));
+    for (const link of [...social, ...fromCongress]) {
+      const label = String(link.label || "").trim();
+      const url = String(link.url || "").trim();
+      if (!label || !url || seen.has(label)) continue;
+      seen.add(label);
+      pills.push({ label, href: url, external: true });
+    }
+    return pills;
+  }
+
+  async function loadEnrichment(profile) {
+    const bioguide = String(profile?.bioguideId || "")
+      .trim()
+      .toUpperCase();
+    const cacheKey = bioguide || profile?.id || profile?.name || "";
+    if (cacheKey && enrichCache.has(cacheKey)) {
+      return enrichCache.get(cacheKey);
+    }
+
+    const result = {
+      overview: null,
+      contact: null,
+      roster: null,
+    };
+
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    if (client) {
+      let query = client
+        .from("politicians")
+        .select(
+          "id,name,party,bioguide_id,external_key,level,chamber,state,district,office_title,photo_url,website_url,phone,metadata"
+        );
+      if (profile.rosterPoliticianId) {
+        query = query.eq("id", profile.rosterPoliticianId);
+      } else if (bioguide) {
+        query = query.ilike("bioguide_id", bioguide);
+      } else {
+        query = null;
+      }
+      if (query) {
+        const { data } = await query.limit(1).maybeSingle();
+        if (data) result.roster = data;
+      }
+    }
+
+    if (bioguide) {
+      try {
+        const params = new URLSearchParams({ bioguide });
+        if (typeof API_KEY === "string" && API_KEY.trim()) {
+          params.set("api_key", API_KEY.trim());
+        }
+        const response = await fetch(
+          `/api/politician-profile?${params.toString()}`
+        );
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+          result.overview = data.overview || null;
+          result.contact = data.contact || null;
+        }
+      } catch (error) {
+        console.warn("Scorecard profile enrich failed:", error);
+      }
+    }
+
+    if (cacheKey) enrichCache.set(cacheKey, result);
+    return result;
+  }
+
+  async function loadMatchRows(bioguide) {
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    const user = typeof getUser === "function" ? await getUser() : null;
+    if (!client || !user || !bioguide) return { user: null, rows: [] };
+
+    const { data, error } = await client
+      .from("stance_vote_matches")
+      .select(
+        "bill_id, user_stance, member_vote, matched, roll_call_number, congress, vote_result, bill:bill_id(id, bill_number, title, tags, official_url, short_pitch, level)"
+      )
+      .eq("user_id", user.id)
+      .ilike("bioguide_id", bioguide)
+      .not("member_vote", "is", null)
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      console.warn(error);
+      return { user, rows: [] };
+    }
+    return { user, rows: data || [] };
+  }
+
+  function toRosterPerson(profile, enrich) {
+    const roster = enrich?.roster || {};
+    const overview = enrich?.overview || {};
+    const bioguide = String(
+      profile.bioguideId || roster.bioguide_id || overview.bioguide_id || ""
+    )
+      .trim()
+      .toUpperCase();
+    return {
+      id:
+        profile.rosterPoliticianId ||
+        roster.id ||
+        null,
+      name: profile.name || roster.name || overview.name,
+      party: profile.party || roster.party || overview.party,
+      bioguide_id: bioguide || null,
+      bioguideId: bioguide || null,
+      external_key:
+        roster.external_key || (bioguide ? `federal:${bioguide}` : null),
+      level: roster.level || overview.level || "federal",
+      chamber:
+        roster.chamber ||
+        (profile.chamber === "Senate"
+          ? "senate"
+          : profile.chamber === "House"
+            ? "house"
+            : profile.chamber),
+      state: profile.state || roster.state || overview.state,
+      district: profile.district || roster.district || overview.district,
+      office_title:
+        overview.office_title ||
+        roster.office_title ||
+        officeBadgeLabel(profile, overview),
+      photo_url: profile.photoUrl || roster.photo_url || overview.photo_url,
+      website_url: profile.website || roster.website_url || overview.website_url,
+      phone: profile.phone || roster.phone || overview.phone,
+      metadata: roster.metadata || {},
+      tenure: overview.tenure || null,
+    };
+  }
+
+  async function ensureFollowState() {
+    followUser = typeof getUser === "function" ? await getUser() : null;
+    followedPoliticianIds = new Set();
+    if (followUser && typeof loadFollowedPoliticianIds === "function") {
+      followedPoliticianIds = await loadFollowedPoliticianIds(followUser.id);
+    }
+  }
+
+  function syncFollowButton() {
+    const button = $("scorecard-follow-btn");
+    if (!button) return;
+    const id = activeRosterPerson?.id
+      ? String(activeRosterPerson.id)
       : "";
-    const photo = profile.photoUrl
+    const following = Boolean(id && followedPoliticianIds.has(id));
+    const label = button.querySelector(".politician-profile-follow-btn__label");
+    const icon = button.querySelector(".politician-profile-follow-btn__icon");
+    if (label) label.textContent = following ? "Following" : "Follow";
+    if (icon) icon.textContent = following ? "✓" : "+";
+    button.classList.toggle("is-following", following);
+    button.setAttribute("aria-pressed", following ? "true" : "false");
+    button.title = following
+      ? "Unfollow this official"
+      : "Follow this official to see their actions in My Feed";
+  }
+
+  function bindFollowButton() {
+    const button = $("scorecard-follow-btn");
+    if (!button || button.dataset.bound === "1") return;
+    button.dataset.bound = "1";
+    syncFollowButton();
+
+    button.addEventListener("click", async () => {
+      if (!followUser) {
+        global.location.href = authNextHref();
+        return;
+      }
+      if (!activeRosterPerson) return;
+      button.disabled = true;
+      try {
+        let id = activeRosterPerson.id;
+        if (!id && typeof upsertPoliticianRecord === "function") {
+          const record = await upsertPoliticianRecord(activeRosterPerson);
+          id = record?.id || null;
+          if (id) activeRosterPerson.id = id;
+        }
+        if (!id) throw new Error("Could not resolve this official to follow.");
+        id = String(id);
+        if (followedPoliticianIds.has(id)) {
+          await unfollowPolitician(followUser.id, id);
+          followedPoliticianIds.delete(id);
+        } else {
+          await followPolitician(followUser.id, id);
+          followedPoliticianIds.add(id);
+        }
+        syncFollowButton();
+      } catch (error) {
+        console.error(error);
+        setStatus(error.message || "Could not update follow.", "error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  function noteHasContent() {
+    return Boolean(String(politicianNote?.body || "").trim());
+  }
+
+  function setNotesStatus(message, type = "loading") {
+    const el = $("scorecard-notes-status");
+    if (!el) return;
+    el.hidden = !message;
+    el.textContent = message || "";
+    el.dataset.type = type;
+  }
+
+  function refreshNoteUi() {
+    const button = $("scorecard-note-open");
+    const label = button?.querySelector(".politician-profile-note-btn__label");
+    const preview = $("scorecard-note-preview");
+    const editBtn = document.querySelector(
+      "#scorecard-note-popover [data-note-action='edit']"
+    );
+    const clearBtn = $("scorecard-note-clear");
+    const text = noteHasContent() ? "Your note" : "Private note";
+    if (label) label.textContent = text;
+    if (button) {
+      button.setAttribute(
+        "aria-label",
+        noteHasContent()
+          ? `Your private note for ${activeRosterPerson?.name || "this official"}`
+          : `Private note for ${activeRosterPerson?.name || "this official"}`
+      );
+    }
+    if (preview) {
+      if (noteHasContent()) {
+        preview.textContent = String(politicianNote.body);
+        preview.classList.remove("is-empty");
+      } else {
+        preview.textContent =
+          "No note yet. Add a private note for this official.";
+        preview.classList.add("is-empty");
+      }
+    }
+    if (editBtn) {
+      editBtn.textContent = noteHasContent() ? "Edit note" : "Add note";
+    }
+    const bodyInput = $("scorecard-note-body");
+    const modal = $("scorecard-notes-modal");
+    if (bodyInput && modal && !modal.hidden) {
+      bodyInput.value = String(politicianNote?.body || "");
+    }
+    if (clearBtn) clearBtn.hidden = !noteHasContent();
+  }
+
+  function getNoteWrap() {
+    return $("scorecard-note-wrap");
+  }
+
+  function getNotePopover() {
+    return $("scorecard-note-popover");
+  }
+
+  function showNotePopover() {
+    const wrap = getNoteWrap();
+    const popover = getNotePopover();
+    const button = $("scorecard-note-open");
+    if (!wrap || !popover) return;
+    global.clearTimeout(notePopoverHideTimer);
+    popover.hidden = false;
+    wrap.classList.add("is-open");
+    button?.setAttribute("aria-expanded", "true");
+  }
+
+  function hideNotePopover({ immediate = false } = {}) {
+    const run = () => {
+      const wrap = getNoteWrap();
+      const popover = getNotePopover();
+      const button = $("scorecard-note-open");
+      if (!popover) return;
+      popover.hidden = true;
+      wrap?.classList.remove("is-open");
+      button?.setAttribute("aria-expanded", "false");
+    };
+    global.clearTimeout(notePopoverHideTimer);
+    if (immediate) run();
+    else notePopoverHideTimer = global.setTimeout(run, 140);
+  }
+
+  function bindNotePopover() {
+    const wrap = getNoteWrap();
+    if (!wrap || wrap.dataset.bound === "1") return;
+    wrap.dataset.bound = "1";
+    wrap.addEventListener("mouseenter", () => showNotePopover());
+    wrap.addEventListener("mouseleave", () => hideNotePopover());
+    wrap.addEventListener("focusin", () => showNotePopover());
+    wrap.addEventListener("focusout", (event) => {
+      if (!wrap.contains(event.relatedTarget)) hideNotePopover();
+    });
+  }
+
+  function openNotesModal() {
+    const modal = $("scorecard-notes-modal");
+    if (!modal) return;
+    hideNotePopover({ immediate: true });
+    notesModalLastFocus = document.activeElement;
+    const bodyInput = $("scorecard-note-body");
+    if (bodyInput) bodyInput.value = String(politicianNote?.body || "");
+    const clearBtn = $("scorecard-note-clear");
+    if (clearBtn) clearBtn.hidden = !noteHasContent();
+    modal.hidden = false;
+    document.body.classList.add("politician-notes-modal-open");
+    bodyInput?.focus?.();
+  }
+
+  function closeNotesModal() {
+    const modal = $("scorecard-notes-modal");
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    document.body.classList.remove("politician-notes-modal-open");
+    setNotesStatus("", "loading");
+    if (notesModalLastFocus && typeof notesModalLastFocus.focus === "function") {
+      notesModalLastFocus.focus();
+    } else {
+      $("scorecard-note-open")?.focus();
+    }
+  }
+
+  async function resolveRosterId(person) {
+    if (person?.id && /^[0-9a-f-]{36}$/i.test(String(person.id))) {
+      return String(person.id);
+    }
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    if (!client || !person) return null;
+    const bioguide = String(person.bioguide_id || person.bioguideId || "").trim();
+    if (bioguide) {
+      const { data } = await client
+        .from("politicians")
+        .select("id")
+        .ilike("bioguide_id", bioguide)
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) {
+        person.id = data.id;
+        return String(data.id);
+      }
+    }
+    if (typeof upsertPoliticianRecord === "function" && person.name) {
+      try {
+        const record = await upsertPoliticianRecord(person);
+        if (record?.id) {
+          person.id = record.id;
+          return String(record.id);
+        }
+      } catch (error) {
+        console.warn(error);
+      }
+    }
+    return null;
+  }
+
+  async function loadNoteForPerson(person, user) {
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    if (!client || !user || !person) {
+      politicianNote = null;
+      refreshNoteUi();
+      return;
+    }
+    const politicianId = await resolveRosterId(person);
+    const name = String(person.name || "").trim();
+    const byId = new Map();
+    const selectCols =
+      "id, kind, title, body, politician_id, politician_name, action_date, created_at, updated_at";
+
+    if (politicianId) {
+      const { data, error } = await client
+        .from("civic_actions")
+        .select(selectCols)
+        .eq("user_id", user.id)
+        .eq("kind", "note")
+        .eq("politician_id", politicianId);
+      if (error) console.warn(error);
+      for (const row of data || []) byId.set(row.id, row);
+    }
+    if (name) {
+      const { data, error } = await client
+        .from("civic_actions")
+        .select(selectCols)
+        .eq("user_id", user.id)
+        .eq("kind", "note")
+        .eq("politician_name", name);
+      if (error) console.warn(error);
+      for (const row of data || []) byId.set(row.id, row);
+    }
+
+    const rows = [...byId.values()].sort((a, b) =>
+      String(b.updated_at || b.created_at || "").localeCompare(
+        String(a.updated_at || a.created_at || "")
+      )
+    );
+    politicianNote = rows[0] || null;
+    refreshNoteUi();
+  }
+
+  async function saveNote() {
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    const user = typeof getUser === "function" ? await getUser() : null;
+    if (!client || !user) {
+      global.location.href = authNextHref();
+      return;
+    }
+    const bodyInput = $("scorecard-note-body");
+    const body = String(bodyInput?.value || "").trim();
+    if (!body) {
+      setNotesStatus("Write something before saving.", "error");
+      return;
+    }
+    const politicianId = await resolveRosterId(activeRosterPerson);
+    const politicianName =
+      String(activeRosterPerson?.name || "").trim() || null;
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
+
+    try {
+      if (politicianNote?.id) {
+        const { error } = await client
+          .from("civic_actions")
+          .update({
+            body,
+            title: null,
+            politician_id: politicianId || politicianNote.politician_id || null,
+            politician_name: politicianName,
+            action_date: today,
+            updated_at: now,
+          })
+          .eq("id", politicianNote.id)
+          .eq("user_id", user.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await client
+          .from("civic_actions")
+          .insert({
+            user_id: user.id,
+            kind: "note",
+            title: null,
+            body,
+            politician_id: politicianId,
+            politician_name: politicianName,
+            action_date: today,
+            contact_method: null,
+          })
+          .select(
+            "id, kind, title, body, politician_id, politician_name, action_date, created_at, updated_at"
+          )
+          .maybeSingle();
+        if (error) throw error;
+        politicianNote = data;
+      }
+      await loadNoteForPerson(activeRosterPerson, user);
+      setNotesStatus("Note saved.", "success");
+    } catch (error) {
+      console.error(error);
+      setNotesStatus(error.message || "Could not save note.", "error");
+    }
+  }
+
+  async function clearNote() {
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    const user = typeof getUser === "function" ? await getUser() : null;
+    if (!client || !user || !politicianNote?.id) return;
+    try {
+      const { error } = await client
+        .from("civic_actions")
+        .delete()
+        .eq("id", politicianNote.id)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      politicianNote = null;
+      const bodyInput = $("scorecard-note-body");
+      if (bodyInput) bodyInput.value = "";
+      refreshNoteUi();
+      setNotesStatus("Note cleared.", "success");
+    } catch (error) {
+      console.error(error);
+      setNotesStatus(error.message || "Could not clear note.", "error");
+    }
+  }
+
+  function ensureNotesHandlers() {
+    if (notesBound) return;
+    notesBound = true;
+    const modal = $("scorecard-notes-modal");
+    modal?.addEventListener("click", (event) => {
+      if (event.target?.dataset?.closeNotes) closeNotesModal();
+    });
+    $("scorecard-note-save")?.addEventListener("click", () => {
+      saveNote();
+    });
+    $("scorecard-note-clear")?.addEventListener("click", () => {
+      clearNote();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeNotesModal();
+    });
+  }
+
+  function bindHeroActions() {
+    ensureNotesHandlers();
+    bindFollowButton();
+    bindNotePopover();
+    syncFollowButton();
+    refreshNoteUi();
+
+    const hero = $("scorecard-hero");
+    if (!hero || hero.dataset.noteClicks === "1") return;
+    hero.dataset.noteClicks = "1";
+    hero.addEventListener("click", (event) => {
+      const openBtn = event.target.closest("#scorecard-note-open");
+      const action = event.target.closest("[data-note-action]");
+      if (action) {
+        const kind = action.dataset.noteAction;
+        if (kind === "open" || kind === "edit") openNotesModal();
+        return;
+      }
+      if (openBtn) {
+        if (global.matchMedia("(hover: none)").matches) openNotesModal();
+        else showNotePopover();
+      }
+    });
+  }
+
+  function renderHero(el, profile, enrich) {
+    if (!el || !profile) return;
+    const overview = enrich?.overview || {};
+    const kind = partyKind(profile.party || overview.party);
+    const partyText = partyLabel(kind, profile.party || overview.party);
+    const photoUrl =
+      profile.photoUrl || overview.photo_url || enrich?.roster?.photo_url || "";
+    const photo = photoUrl
       ? `<img class="scorecard-hero__photo" src="${escapeHtml(
-          profile.photoUrl
+          photoUrl
         )}" alt="" />`
       : `<div class="scorecard-hero__photo scorecard-hero__photo--fallback" aria-hidden="true">${escapeHtml(
           String(profile.name || "")
@@ -137,53 +801,263 @@
             .map((p) => p[0] || "")
             .join("")
         )}</div>`;
+    const tenure = tenureLabel(profile, overview);
+    const role = districtLabel(profile);
+    const pills = buildContactPills(profile, enrich);
 
     el.innerHTML = `
-      <div class="scorecard-hero__main">
-        ${photo}
-        <div class="scorecard-hero__copy">
-          <div class="scorecard-hero__badges">
-            <span class="scorecard-party is-${kind}">${escapeHtml(
-              partyLabel(kind, profile.party)
-            )}</span>
-            ${
-              profile.chamber
-                ? `<span class="scorecard-hero__chamber">${escapeHtml(
-                    profile.chamber
-                  )}</span>`
-                : ""
-            }
+      <div class="scorecard-hero__media">${photo}</div>
+      <div class="scorecard-hero__body">
+        <div class="scorecard-hero__badges">
+          <span class="scorecard-hero__badge">${escapeHtml(
+            officeBadgeLabel(profile, overview)
+          )}</span>
+          <span class="scorecard-hero__badge scorecard-hero__badge--level">Federal</span>
+          <span class="politician-card__party ${partyClassName(
+            profile.party || overview.party
+          )}">${escapeHtml(partyText)}</span>
+        </div>
+        <h2 class="scorecard-hero__name">${escapeHtml(profile.name)}</h2>
+        <p class="scorecard-hero__role">${escapeHtml(role)}</p>
+        ${
+          tenure
+            ? `<p class="scorecard-hero__tenure">${escapeHtml(tenure)}</p>`
+            : ""
+        }
+        <div class="politician-profile-actions">
+          <div class="politician-profile-actions__row">
+            <button
+              type="button"
+              id="scorecard-follow-btn"
+              class="politician-profile-follow-btn"
+              aria-pressed="false"
+            >
+              <span class="politician-profile-follow-btn__icon" aria-hidden="true">+</span>
+              <span class="politician-profile-follow-btn__label">Follow</span>
+            </button>
+            <div class="politician-profile-note-wrap" id="scorecard-note-wrap">
+              <button
+                type="button"
+                id="scorecard-note-open"
+                class="politician-profile-note-btn"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="scorecard-note-popover"
+              >
+                <span class="politician-profile-note-btn__icon" aria-hidden="true">📝</span>
+                <span class="politician-profile-note-btn__label">Private note</span>
+              </button>
+              <div
+                id="scorecard-note-popover"
+                class="politician-profile-note-popover"
+                role="dialog"
+                aria-label="Private note preview"
+                hidden
+              >
+                <p class="politician-profile-note-popover__kicker">Your private note</p>
+                <div
+                  id="scorecard-note-preview"
+                  class="politician-profile-note-popover__body"
+                ></div>
+                <div class="politician-profile-note-popover__actions">
+                  <button type="button" class="refresh-btn" data-note-action="open">
+                    Open
+                  </button>
+                  <button
+                    type="button"
+                    class="politician-profile-note-popover__secondary"
+                    data-note-action="edit"
+                  >
+                    Add note
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <h2 class="scorecard-hero__name">${escapeHtml(profile.name)}</h2>
-          <p class="scorecard-hero__meta">
-            ${escapeHtml(districtLabel(profile))}
-            ${
-              profile.nextElectionYear
-                ? ` · Next election ${escapeHtml(profile.nextElectionYear)}`
-                : ""
-            }
+          <p class="politician-profile-follow__hint">
+            Follow for My Feed updates · Notes stay private to you
           </p>
-          <div class="scorecard-hero__actions">
-            ${
-              phone
-                ? `<a class="scorecard-btn" href="tel:${escapeHtml(
-                    phone
-                  )}">Call</a>`
-                : ""
-            }
-            ${
-              siteUrl
-                ? `<a class="scorecard-btn" href="${escapeHtml(
-                    siteUrl
-                  )}" target="_blank" rel="noopener noreferrer">Official site</a>`
-                : ""
-            }
-          </div>
+        </div>
+        <div class="politician-profile-contact" aria-label="Contact links">
+          ${
+            pills.length
+              ? pills
+                  .map((pill) => {
+                    const extra = pill.external
+                      ? ' target="_blank" rel="noopener noreferrer"'
+                      : "";
+                    return `<a class="politician-profile-contact__link" href="${escapeHtml(
+                      pill.href
+                    )}"${extra}>${escapeHtml(pill.label)}</a>`;
+                  })
+                  .join("")
+              : `<span class="politician-profile-contact__empty">No public contact links on file.</span>`
+          }
         </div>
       </div>
-      <div class="scorecard-hero__match" aria-label="Action Match Score">
-        <div class="scorecard-match-ring"><span>—</span></div>
-        <p>Action Match</p>
+    `;
+
+    bindHeroActions();
+  }
+
+  function renderMatch(section, bodyEl, ledeEl, profile, matchPayload) {
+    if (!section || !bodyEl) return;
+    section.hidden = false;
+    const chamberLabel =
+      profile.chamber === "Senate" ? "Senate" : "House";
+    const personName = profile.name || "this official";
+    const { user, rows } = matchPayload || { user: null, rows: [] };
+
+    if (ledeEl) {
+      ledeEl.textContent =
+        profile.chamber === "Senate"
+          ? "Your Support / Oppose stances compared to this senator’s Senate roll-call votes."
+          : "Your Support / Oppose stances compared to this official’s House roll-call votes.";
+    }
+
+    if (!user) {
+      bodyEl.innerHTML = `
+        <p class="politician-profile-empty">
+          <a href="${escapeHtml(authNextHref())}">Sign in</a>
+          and Support or Oppose bills to build your Action Match Score with ${escapeHtml(
+            personName
+          )}.
+        </p>
+        <p class="politician-quick-match">
+          <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
+        </p>`;
+      return;
+    }
+
+    const compared = (rows || []).filter((row) => row.matched != null);
+    const matched = compared.filter((row) => row.matched === true);
+    const score =
+      compared.length === 0
+        ? null
+        : Math.round((matched.length / compared.length) * 100);
+    const agree = compared.filter((row) => row.matched === true);
+    const differ = compared.filter((row) => row.matched === false);
+
+    const categoryMap = new Map();
+    for (const row of compared) {
+      const bill = row.bill || {};
+      const category = categorizeBill(bill);
+      const entry = categoryMap.get(category) || {
+        key: category,
+        compared: 0,
+        matched: 0,
+      };
+      entry.compared += 1;
+      if (row.matched === true) entry.matched += 1;
+      categoryMap.set(category, entry);
+    }
+    const categories = [...categoryMap.values()].sort(
+      (a, b) => b.compared - a.compared
+    );
+
+    const billLink = (row) => {
+      const bill = row.bill || {};
+      const title = bill.title || bill.bill_number || row.bill_id;
+      const number = bill.bill_number || "";
+      const href = bill.official_url || "#";
+      return `<li>
+        <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">
+          <strong>${escapeHtml(number)}</strong>
+          ${escapeHtml(title)}
+        </a>
+        <span>You ${escapeHtml(row.user_stance)} · They voted ${escapeHtml(
+          row.member_vote || "—"
+        )}</span>
+      </li>`;
+    };
+
+    if (compared.length === 0) {
+      bodyEl.innerHTML = `
+        <div class="politician-match-hero politician-match-hero--empty">
+          <div class="politician-match-hero__score">
+            <span class="politician-match-hero__value">—</span>
+            <span class="politician-match-hero__label">Action Match Score</span>
+          </div>
+          <p class="politician-match-hero__meta">
+            Support or Oppose votes in Truth in Voting (or take the quiz) to calculate your Action Match Score with ${escapeHtml(
+              personName
+            )}.
+          </p>
+        </div>
+        <p class="politician-quick-match">
+          <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
+          <span class="politician-quick-match__hint">Or Support / Oppose recent ${escapeHtml(
+            chamberLabel
+          )} votes in the Truth in Voting feed.</span>
+        </p>`;
+      return;
+    }
+
+    const topicPills = categories
+      .slice(0, 6)
+      .map((row) => {
+        const pct = Math.round((row.matched / row.compared) * 100);
+        return `<span class="scorecard-match-pill">${escapeHtml(
+          row.key
+        )} · ${pct}%</span>`;
+      })
+      .join("");
+
+    bodyEl.innerHTML = `
+      <div class="politician-match-hero">
+        <div class="politician-match-hero__score ${
+          score >= 70 ? "is-high" : score >= 40 ? "is-mid" : "is-low"
+        }">
+          <span class="politician-match-hero__value">${score}%</span>
+          <span class="politician-match-hero__label">Action Match Score</span>
+        </div>
+        <p class="politician-match-hero__meta">
+          ${matched.length} of ${compared.length} comparable ${escapeHtml(
+            chamberLabel
+          )} roll calls match your stance.
+        </p>
+      </div>
+
+      ${
+        topicPills
+          ? `<div class="scorecard-match-pills" aria-label="Topic breakdown">${topicPills}</div>`
+          : ""
+      }
+
+      <div class="politician-match-categories" aria-label="Category breakdown">
+        ${categories
+          .map((row) => {
+            const pct = Math.round((row.matched / row.compared) * 100);
+            return `<div class="politician-match-categories__row">
+              <span>${escapeHtml(row.key)}</span>
+              <div class="politician-match-categories__track"><i style="width:${pct}%"></i></div>
+              <strong>${pct}%</strong>
+            </div>`;
+          })
+          .join("")}
+      </div>
+
+      <div class="politician-match-split">
+        <div>
+          <h3>Where You Agree</h3>
+          <ul class="politician-profile-list">
+            ${
+              agree.length
+                ? agree.slice(0, 12).map(billLink).join("")
+                : `<li class="politician-profile-empty">No matching votes yet.</li>`
+            }
+          </ul>
+        </div>
+        <div>
+          <h3>Where You Differ</h3>
+          <ul class="politician-profile-list">
+            ${
+              differ.length
+                ? differ.slice(0, 12).map(billLink).join("")
+                : `<li class="politician-profile-empty">No diverging votes yet.</li>`
+            }
+          </ul>
+        </div>
       </div>
     `;
   }
@@ -528,9 +1402,11 @@
       data: null,
       activeId: query.id || session?.activeId || null,
       voteQuery: "",
+      paintToken: 0,
     };
 
-    function paint() {
+    async function paint() {
+      const token = ++state.paintToken;
       const reps = state.data?.representatives || [];
       const active =
         reps.find((rep) => rep.profile.id === state.activeId) || reps[0] || null;
@@ -552,10 +1428,39 @@
         });
         paint();
       });
-      renderHero($("scorecard-hero"), active.profile);
+
+      // Immediate paint with profile we already have.
+      renderHero($("scorecard-hero"), active.profile, null);
       renderDonor($("scorecard-donor"), active.campaignFinance);
       renderAttendance($("scorecard-attendance"), active.attendance);
       renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery);
+      renderMatch(
+        $("scorecard-match"),
+        $("scorecard-match-body"),
+        $("scorecard-match-lede"),
+        active.profile,
+        { user: followUser, rows: [] }
+      );
+
+      const [enrich, matchPayload] = await Promise.all([
+        loadEnrichment(active.profile),
+        loadMatchRows(active.profile.bioguideId),
+      ]);
+      if (token !== state.paintToken) return;
+
+      activeRosterPerson = toRosterPerson(active.profile, enrich);
+      renderHero($("scorecard-hero"), active.profile, enrich);
+      renderMatch(
+        $("scorecard-match"),
+        $("scorecard-match-body"),
+        $("scorecard-match-lede"),
+        active.profile,
+        matchPayload
+      );
+      await loadNoteForPerson(activeRosterPerson, followUser);
+      if (token !== state.paintToken) return;
+      syncFollowButton();
+      refreshNoteUi();
     }
 
     if (search) {
@@ -576,6 +1481,8 @@
       tabs.hidden = true;
 
       try {
+        await ensureFollowState();
+
         let payload = null;
         const zipCode = query.zipCode || session?.query?.zipCode || null;
         const address = query.address || session?.query?.address || null;
@@ -618,7 +1525,7 @@
         }
 
         setStatus("", "loading");
-        paint();
+        await paint();
       } catch (error) {
         setStatus(error?.message || "Could not load scorecards.", "error");
       }
