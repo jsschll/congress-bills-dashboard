@@ -515,6 +515,45 @@ async function fetchClientFederalFeed(limit = 12) {
   return items;
 }
 
+/** Overlay Claude summaries from processed_votes onto federal News/My Feed cards. */
+async function enrichItemsWithProcessedVotes(items = []) {
+  if (!items.length) return items;
+  if (typeof applyProcessedSummariesToBillItems !== "function") return items;
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  if (!client) return items;
+
+  const numbers = [];
+  for (const item of items) {
+    if (String(item.level || "").toLowerCase() !== "federal") continue;
+    const key =
+      typeof billItemLookupKey === "function" ? billItemLookupKey(item) : "";
+    if (!key) continue;
+    const num = key.split(":")[2];
+    if (num) numbers.push(num);
+  }
+  const unique = [...new Set(numbers)];
+  if (!unique.length) return items;
+
+  try {
+    const { data, error } = await client
+      .from("processed_votes")
+      .select(
+        typeof PROCESSED_VOTES_FEED_SELECT === "string"
+          ? PROCESSED_VOTES_FEED_SELECT
+          : "roll_call_id, summary, bill_number, legislation_number, bill_type, congress, vote_date, vote_kind, summary_source"
+      )
+      .in("legislation_number", unique)
+      .not("summary", "eq", "")
+      .order("vote_date", { ascending: false })
+      .limit(Math.min(250, Math.max(40, unique.length * 8)));
+    if (error) throw error;
+    applyProcessedSummariesToBillItems(items, data || []);
+  } catch (error) {
+    console.warn("Could not enrich feed with processed_votes:", error);
+  }
+  return items;
+}
+
 async function fetchBillsFeedPayload(limit = 16, stateCode = "") {
   const query = new URLSearchParams({ limit: String(limit) });
   if (stateCode) query.set("state", stateCode);
@@ -541,6 +580,7 @@ async function fetchBillsFeedPayload(limit = 16, stateCode = "") {
       const response = await fetch(`${endpoint}?${query.toString()}`);
       const payload = await response.json().catch(() => ({}));
       if (response.ok && Array.isArray(payload.items)) {
+        await enrichItemsWithProcessedVotes(payload.items);
         return payload;
       }
       lastError = new Error(payload.error || `Feed request failed (${response.status})`);
@@ -550,6 +590,7 @@ async function fetchBillsFeedPayload(limit = 16, stateCode = "") {
   }
 
   const clientItems = await fetchClientFederalFeed(limit);
+  await enrichItemsWithProcessedVotes(clientItems);
   return {
     ok: true,
     generatedAt: new Date().toISOString(),

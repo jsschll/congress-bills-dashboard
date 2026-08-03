@@ -1,5 +1,6 @@
 const CONGRESS_API = "https://api.congress.gov/v3";
 const CONGRESS = 119;
+const { createClient } = require("@supabase/supabase-js");
 const {
   isProceduralLegislation,
   classifyVoteKind,
@@ -10,6 +11,10 @@ const {
 const {
   fetchRecentSenateVotesForMember,
 } = require("../lib/senate-votes");
+const {
+  applyProcessedSummaryToVoteItem,
+  PROCESSED_VOTES_SELECT,
+} = require("../lib/processed-votes-feed");
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -504,8 +509,71 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
   return found;
 }
 
+function getSupabaseAdmin() {
+  const url = env("SUPABASE_URL") || "https://inosruobpxnqcfxxosqr.supabase.co";
+  const key =
+    env("SUPABASE_SERVICE_ROLE_KEY") ||
+    env("SUPABASE_ANON_KEY") ||
+    env("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function rollCallIdForVote(vote = {}) {
+  const existing = String(vote.rollCallId || vote.roll_call_id || "").trim();
+  if (existing) return existing;
+  const congress = Number(vote.congress || CONGRESS);
+  const session = Number(vote.sessionNumber || vote.session_number || 1);
+  const roll = Number(vote.rollCallNumber || vote.roll_call_number || 0);
+  if (!roll) return "";
+  const chamber = String(vote.chamber || vote.jurisdiction || "house").toLowerCase();
+  const prefix = chamber.includes("senate") ? "senate-vote" : "house-vote";
+  return `${prefix}-${congress}-${session}-${roll}`;
+}
+
+async function enrichVoteCardsFromProcessedVotes(found = []) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase || !found.length) return new Set();
+
+  const ids = [];
+  for (const vote of found) {
+    const id = rollCallIdForVote(vote);
+    if (id) {
+      vote.rollCallId = id;
+      ids.push(id);
+    }
+  }
+  const unique = [...new Set(ids)];
+  if (!unique.length) return new Set();
+
+  try {
+    const { data, error } = await supabase
+      .from("processed_votes")
+      .select(PROCESSED_VOTES_SELECT)
+      .in("roll_call_id", unique);
+    if (error) throw error;
+    const byId = new Map(
+      (data || []).map((row) => [String(row.roll_call_id), row])
+    );
+    const matched = new Set();
+    for (const vote of found) {
+      const row = byId.get(rollCallIdForVote(vote));
+      if (!row || !String(row.summary || "").trim()) continue;
+      applyProcessedSummaryToVoteItem(vote, row);
+      matched.add(rollCallIdForVote(vote));
+    }
+    return matched;
+  } catch (error) {
+    console.warn("processed_votes vote enrich failed:", error);
+    return new Set();
+  }
+}
+
 async function enrichVoteCards(found, apiKey) {
-  // Attach official CRS text only — no LLM rewrite at runtime.
+  // Prefer Claude cards from processed_votes; CRS only for the rest.
+  const matched = await enrichVoteCardsFromProcessedVotes(found);
   const enrichCount = Math.min(found.length, 8);
   const chunkEnrich = 4;
   for (let i = 0; i < enrichCount; i += chunkEnrich) {
@@ -513,6 +581,7 @@ async function enrichVoteCards(found, apiKey) {
     await Promise.all(
       chunk.map(async (vote) => {
         try {
+          if (matched.has(rollCallIdForVote(vote))) return;
           if (!vote.hasLinkedBill) {
             vote.shortPitch =
               vote.shortPitch || vote.title || vote.voteQuestion || "";

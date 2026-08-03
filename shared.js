@@ -283,6 +283,125 @@ function mapProcessedVoteToFeedItem(row = {}) {
 const PROCESSED_VOTES_FEED_SELECT =
   "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
 
+function normalizeLegislationType(type) {
+  return String(type || "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .trim();
+}
+
+function processedBillLookupKey(congress, billType, legislationNumber) {
+  const c = Number(congress || 0);
+  const t = normalizeLegislationType(billType);
+  const n = String(legislationNumber || "").replace(/\D/g, "");
+  if (!c || !t || !n) return "";
+  return `${c}:${t}:${n}`;
+}
+
+function parseBillNumberParts(billNumber) {
+  const match = String(billNumber || "")
+    .trim()
+    .match(/^([A-Za-z.]+)\s*(\d+)$/);
+  if (!match) return null;
+  return {
+    billType: normalizeLegislationType(match[1]),
+    legislationNumber: match[2],
+  };
+}
+
+function billItemLookupKey(item = {}) {
+  const id = String(item.id || item.billId || "").toLowerCase();
+  const fromId = id.match(/federal-(?:bill-)?(\d{2,3})-([a-z]+)-(\d+)/);
+  if (fromId) {
+    return processedBillLookupKey(fromId[1], fromId[2], fromId[3]);
+  }
+  const parts = parseBillNumberParts(item.billNumber || item.bill_number);
+  const congress = Number(item.congress || item.bill_congress || 0);
+  if (parts && congress) {
+    return processedBillLookupKey(
+      congress,
+      parts.billType,
+      parts.legislationNumber
+    );
+  }
+  if (item.bill_type && item.bill_number && congress) {
+    return processedBillLookupKey(congress, item.bill_type, item.bill_number);
+  }
+  return "";
+}
+
+function voteDateMs(row = {}) {
+  const raw = row.vote_date || row.updated_at || "";
+  if (!raw) return 0;
+  const date = new Date(String(raw).includes("T") ? raw : `${raw}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function preferProcessedRow(candidate, existing) {
+  if (!existing) return true;
+  const candFinal =
+    String(candidate.vote_kind || "").toLowerCase() === "final_passage" ? 1 : 0;
+  const existFinal =
+    String(existing.vote_kind || "").toLowerCase() === "final_passage" ? 1 : 0;
+  if (candFinal !== existFinal) return candFinal > existFinal;
+  const dateDiff = voteDateMs(candidate) - voteDateMs(existing);
+  if (dateDiff) return dateDiff > 0;
+  return (
+    String(candidate.summary || "").trim().length >
+    String(existing.summary || "").trim().length
+  );
+}
+
+function indexProcessedVotesByBill(rows = []) {
+  const map = new Map();
+  for (const row of rows) {
+    if (!String(row?.summary || "").trim()) continue;
+    let key = processedBillLookupKey(
+      row.congress,
+      row.bill_type,
+      row.legislation_number
+    );
+    if (!key) {
+      const parts = parseBillNumberParts(row.bill_number || row.bill_id);
+      if (parts) {
+        key = processedBillLookupKey(
+          row.congress,
+          parts.billType,
+          parts.legislationNumber
+        );
+      }
+    }
+    if (!key) continue;
+    const prev = map.get(key);
+    if (preferProcessedRow(row, prev)) map.set(key, row);
+  }
+  return map;
+}
+
+function applyProcessedSummaryToBillItem(item, row) {
+  if (!item || !row) return item;
+  const summary = String(row.summary || "").trim();
+  if (!summary) return item;
+  item.shortPitch = summary;
+  item.summary = summary;
+  item.officialSummary = summary;
+  item.summarySource = String(row.summary_source || "processed_votes");
+  return item;
+}
+
+function applyProcessedSummariesToBillItems(items = [], rows = []) {
+  if (!items.length || !rows.length) return items;
+  const byBill = indexProcessedVotesByBill(rows);
+  for (const item of items) {
+    if (String(item.level || "").toLowerCase() !== "federal") continue;
+    const key = billItemLookupKey(item);
+    if (!key) continue;
+    const row = byBill.get(key);
+    if (row) applyProcessedSummaryToBillItem(item, row);
+  }
+  return items;
+}
+
 const AVATAR_PRESETS = [
   { id: "slate", label: "Slate", from: "#334155", to: "#0f172a" },
   { id: "emerald", label: "Emerald", from: "#059669", to: "#064e3b" },

@@ -1,3 +1,9 @@
+const { createClient } = require("@supabase/supabase-js");
+const {
+  fetchProcessedVotesMatchingBills,
+  applyProcessedSummariesToBillItems,
+} = require("../lib/processed-votes-feed");
+
 const API_BASE = "https://api.congress.gov/v3";
 const OPENSTATES_BASE = "https://v3.openstates.org";
 const CONGRESS = 119;
@@ -676,6 +682,26 @@ function curatedCityAndDistrictItems() {
   ];
 }
 
+function env(...keys) {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value && String(value).trim()) return String(value).trim();
+  }
+  return "";
+}
+
+function getSupabaseAdmin() {
+  const url = env("SUPABASE_URL") || "https://inosruobpxnqcfxxosqr.supabase.co";
+  const key =
+    env("SUPABASE_SERVICE_ROLE_KEY") ||
+    env("SUPABASE_ANON_KEY") ||
+    env("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 async function fetchFederalBills(apiKey, limit) {
   const listUrl = `${API_BASE}/bill/${CONGRESS}?limit=${limit}&sort=updateDate+desc&format=json&api_key=${apiKey}`;
   const listData = await fetchJson(listUrl);
@@ -683,6 +709,20 @@ async function fetchFederalBills(apiKey, limit) {
   const items = [];
   for (const bill of bills) {
     items.push(await toBillItem(bill, apiKey));
+  }
+  return items;
+}
+
+/** Prefer Claude cards from processed_votes when a matching roll call exists. */
+async function enrichFederalItemsWithProcessedVotes(items = []) {
+  if (!items.length) return items;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return items;
+  try {
+    const rows = await fetchProcessedVotesMatchingBills(supabase, items);
+    applyProcessedSummariesToBillItems(items, rows);
+  } catch (error) {
+    console.warn("Could not overlay processed_votes summaries:", error);
   }
   return items;
 }
@@ -705,6 +745,7 @@ module.exports = async function handler(req, res) {
     let federalCoverage = "coming soon";
     if (apiKey) {
       federalItems = await fetchFederalBills(apiKey, limit);
+      await enrichFederalItemsWithProcessedVotes(federalItems);
       federalCoverage = "live";
     }
 
