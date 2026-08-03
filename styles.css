@@ -2604,6 +2604,100 @@ body {
   animation: home-rise 1s ease-out 0.22s both;
 }
 
+.home-hero__hint[data-tone="error"],
+.zip-lookup-hero__hint[data-tone="error"] {
+  color: #fecaca;
+}
+
+.home-hero__hint[data-tone="success"],
+.zip-lookup-hero__hint[data-tone="success"] {
+  color: #d1fae5;
+}
+
+.home-hero__hint[data-tone="loading"],
+.zip-lookup-hero__hint[data-tone="loading"] {
+  color: #a7f3d0;
+}
+
+.zip-lookup-hero__wrap {
+  margin-top: 1.75rem;
+  max-width: 42rem;
+  animation: home-rise 1s ease-out 0.15s both;
+}
+
+.zip-lookup-hero__form.is-loading .home-hero__input,
+.zip-lookup-hero__form.is-loading .zip-lookup-hero__input {
+  opacity: 0.85;
+}
+
+.zip-lookup-hero__submit[data-loading="true"] {
+  cursor: wait;
+  gap: 0.55rem;
+}
+
+.zip-lookup-hero__spinner {
+  display: inline-block;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 999px;
+  border: 2px solid rgba(15, 23, 42, 0.18);
+  border-top-color: #059669;
+  animation: zip-lookup-spin 0.7s linear infinite;
+  vertical-align: -0.15em;
+}
+
+.zip-lookup-hero__spinner--on-dark {
+  border-color: rgba(255, 255, 255, 0.28);
+  border-top-color: #fff;
+}
+
+@keyframes zip-lookup-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.zip-lookup-hero__results {
+  list-style: none;
+  margin: 0.95rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.zip-lookup-hero__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+  color: #ecfdf5;
+  font-size: 0.9rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  animation: home-rise 0.45s ease-out both;
+}
+
+.zip-lookup-hero__chip-name {
+  font-weight: 700;
+}
+
+.zip-lookup-hero__chip-meta {
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zip-lookup-hero__spinner {
+    animation: none;
+    border-top-color: transparent;
+    opacity: 0.7;
+  }
+}
+
 .home-hero__input {
   flex: 1 1 16rem;
   min-width: 0;

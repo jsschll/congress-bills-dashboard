@@ -19,7 +19,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260804feat2" />
+    <link rel="stylesheet" href="styles.css?v=20260804zip" />
   </head>
   <body class="page-home">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -39,31 +39,51 @@
           trades, tracks dark money, and gives you direct oversight of the
           people who represent you.
         </p>
-        <form
-          id="home-address-form"
-          class="home-hero__form"
-          aria-label="Look up your representatives"
-        >
-          <label class="visually-hidden" for="home-address-input"
-            >ZIP code</label
+        <div class="zip-lookup-hero__wrap">
+          <form
+            id="home-address-form"
+            class="home-hero__form zip-lookup-hero__form"
+            aria-label="Look up your representatives"
           >
-          <input
-            id="home-address-input"
-            class="home-hero__input"
-            type="search"
-            name="address"
-            placeholder="Enter your ZIP code to audit your representatives..."
-            autocomplete="postal-code"
-            required
-          />
-          <button class="home-hero__submit" type="submit">
-            Track Your Reps
-          </button>
-        </form>
-        <p class="home-hero__hint">
-          Instant access to voting records, campaign funding, and direct
-          constituent outreach.
-        </p>
+            <label class="visually-hidden" for="home-address-input"
+              >ZIP code or street address</label
+            >
+            <input
+              id="home-address-input"
+              class="home-hero__input zip-lookup-hero__input"
+              type="search"
+              name="address"
+              placeholder="Enter your ZIP code to audit your representatives..."
+              autocomplete="postal-code"
+              inputmode="text"
+              aria-describedby="home-address-hint"
+              required
+            />
+            <button
+              id="home-address-submit"
+              class="home-hero__submit zip-lookup-hero__submit"
+              type="submit"
+            >
+              Track Your Reps
+            </button>
+          </form>
+          <p
+            id="home-address-hint"
+            class="home-hero__hint zip-lookup-hero__hint"
+            data-default-text="Instant access to voting records, campaign funding, and direct constituent outreach."
+            role="status"
+            aria-live="polite"
+          >
+            Instant access to voting records, campaign funding, and direct
+            constituent outreach.
+          </p>
+          <ul
+            id="home-address-results"
+            class="zip-lookup-hero__results"
+            hidden
+            aria-label="Matched representatives"
+          ></ul>
+        </div>
       </div>
     </section>
 
@@ -160,13 +180,16 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260804a1"></script>
-    <script src="politicians-shared.js?v=20260729f"></script>
+    <script src="zip-lookup-hero.js?v=20260804zip"></script>
     <script>
       bootNav("home");
-      mountAddressLookup({
+      mountZipLookupHero({
         formId: "home-address-form",
         inputId: "home-address-input",
-        destination: "politicians",
+        submitId: "home-address-submit",
+        hintId: "home-address-hint",
+        resultsId: "home-address-results",
+        endpoint: "/api/representatives/lookup",
       });
     </script>
   </body>
