@@ -790,7 +790,49 @@
     });
   }
 
-  function renderHero(el, profile, enrich) {
+  function summarizeMatch(matchPayload) {
+    const { user, rows } = matchPayload || { user: null, rows: [] };
+    const compared = (rows || []).filter((row) => row.matched != null);
+    const matched = compared.filter((row) => row.matched === true);
+    const score =
+      !user || compared.length === 0
+        ? null
+        : Math.round((matched.length / compared.length) * 100);
+    return {
+      user: user || null,
+      compared: compared.length,
+      matched: matched.length,
+      score,
+      rows: rows || [],
+    };
+  }
+
+  function matchScoreToneClass(score) {
+    if (score == null) return "";
+    if (score >= 70) return "is-high";
+    if (score >= 40) return "is-mid";
+    return "is-low";
+  }
+
+  function renderHeroMatchBadge(summary) {
+    const score = summary?.score;
+    const tone = matchScoreToneClass(score);
+    const value = score == null ? "—" : `${score}%`;
+    const aria =
+      score == null
+        ? "Action Match Score unavailable"
+        : `Action Match Score ${score} percent`;
+    return `
+      <div class="scorecard-hero__match" aria-label="${escapeHtml(aria)}">
+        <div class="politician-match-hero__score ${tone}">
+          <span class="politician-match-hero__value">${escapeHtml(value)}</span>
+          <span class="politician-match-hero__label">Action Match Score</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderHero(el, profile, enrich, matchSummary) {
     if (!el || !profile) return;
     const overview = enrich?.overview || {};
     const kind = partyKind(profile.party || overview.party);
@@ -902,6 +944,7 @@
           }
         </div>
       </div>
+      ${renderHeroMatchBadge(matchSummary)}
     `;
 
     bindHeroActions();
@@ -913,6 +956,7 @@
     const chamberLabel =
       profile.chamber === "Senate" ? "Senate" : "House";
     const personName = profile.name || "this official";
+    const summary = summarizeMatch(matchPayload);
     const { user, rows } = matchPayload || { user: null, rows: [] };
 
     if (ledeEl) {
@@ -933,15 +977,12 @@
         <p class="politician-quick-match">
           <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
         </p>`;
-      return;
+      return summary;
     }
 
     const compared = (rows || []).filter((row) => row.matched != null);
     const matched = compared.filter((row) => row.matched === true);
-    const score =
-      compared.length === 0
-        ? null
-        : Math.round((matched.length / compared.length) * 100);
+    const score = summary.score;
     const agree = compared.filter((row) => row.matched === true);
     const differ = compared.filter((row) => row.matched === false);
 
@@ -980,24 +1021,18 @@
 
     if (compared.length === 0) {
       bodyEl.innerHTML = `
-        <div class="politician-match-hero politician-match-hero--empty">
-          <div class="politician-match-hero__score">
-            <span class="politician-match-hero__value">—</span>
-            <span class="politician-match-hero__label">Action Match Score</span>
-          </div>
-          <p class="politician-match-hero__meta">
-            Support or Oppose votes in Truth in Voting (or take the quiz) to calculate your Action Match Score with ${escapeHtml(
-              personName
-            )}.
-          </p>
-        </div>
+        <p class="politician-match-hero__meta">
+          Support or Oppose votes in Truth in Voting (or take the quiz) to calculate your Action Match Score with ${escapeHtml(
+            personName
+          )}. Your score appears in the profile card above.
+        </p>
         <p class="politician-quick-match">
           <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
           <span class="politician-quick-match__hint">Or Support / Oppose recent ${escapeHtml(
             chamberLabel
           )} votes in the Truth in Voting feed.</span>
         </p>`;
-      return;
+      return summary;
     }
 
     const topicPills = categories
@@ -1011,19 +1046,13 @@
       .join("");
 
     bodyEl.innerHTML = `
-      <div class="politician-match-hero">
-        <div class="politician-match-hero__score ${
-          score >= 70 ? "is-high" : score >= 40 ? "is-mid" : "is-low"
-        }">
-          <span class="politician-match-hero__value">${score}%</span>
-          <span class="politician-match-hero__label">Action Match Score</span>
-        </div>
-        <p class="politician-match-hero__meta">
-          ${matched.length} of ${compared.length} comparable ${escapeHtml(
-            chamberLabel
-          )} roll calls match your stance.
-        </p>
-      </div>
+      <p class="scorecard-match__summary">
+        ${matched.length} of ${compared.length} comparable ${escapeHtml(
+          chamberLabel
+        )} roll calls match your stance${
+          score == null ? "" : ` · <strong>${score}% Action Match</strong>`
+        }.
+      </p>
 
       ${
         topicPills
@@ -1067,6 +1096,7 @@
         </div>
       </div>
     `;
+    return summary;
   }
 
   function renderDonor(el, finance) {
@@ -1439,7 +1469,13 @@
       });
 
       // Immediate paint with profile we already have.
-      renderHero($("scorecard-hero"), active.profile, null);
+      const pendingMatch = { user: followUser, rows: [] };
+      renderHero(
+        $("scorecard-hero"),
+        active.profile,
+        null,
+        summarizeMatch(pendingMatch)
+      );
       renderDonor($("scorecard-donor"), active.campaignFinance);
       renderAttendance($("scorecard-attendance"), active.attendance);
       renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery);
@@ -1448,7 +1484,7 @@
         $("scorecard-match-body"),
         $("scorecard-match-lede"),
         active.profile,
-        { user: followUser, rows: [] }
+        pendingMatch
       );
 
       const [enrich, matchPayload] = await Promise.all([
@@ -1458,7 +1494,8 @@
       if (token !== state.paintToken) return;
 
       activeRosterPerson = toRosterPerson(active.profile, enrich);
-      renderHero($("scorecard-hero"), active.profile, enrich);
+      const matchSummary = summarizeMatch(matchPayload);
+      renderHero($("scorecard-hero"), active.profile, enrich, matchSummary);
       renderMatch(
         $("scorecard-match"),
         $("scorecard-match-body"),

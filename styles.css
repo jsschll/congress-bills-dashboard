@@ -6162,7 +6162,7 @@ body.politician-notes-modal-open {
   position: relative;
   z-index: 3;
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 1.15rem;
   align-items: start;
   margin-bottom: 1rem;
@@ -6172,6 +6172,28 @@ body.politician-notes-modal-open {
 .scorecard-hero:has(.politician-profile-note-wrap.is-open),
 .scorecard-hero:has(.politician-profile-note-wrap:hover) {
   z-index: 20;
+}
+
+.scorecard-hero__match {
+  justify-self: end;
+  align-self: start;
+  flex-shrink: 0;
+}
+
+.scorecard-hero__match .politician-match-hero__score {
+  width: 7.5rem;
+  height: 7.5rem;
+}
+
+.scorecard-match__summary {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.scorecard-match__summary strong {
+  color: #6ee7b7;
 }
 
 .scorecard-hero__media {
