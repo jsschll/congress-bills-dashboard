@@ -1393,6 +1393,10 @@ async function fetchVotesFeed({ force = false } = {}) {
   const limit = votesQuizMode ? 8 : 48;
   const kind = votesQuizMode ? "final_passage" : "";
   setVotesFeedStatus("Loading recent votes…", "loading");
+  if (votesFeedEmpty) votesFeedEmpty.hidden = true;
+  if (typeof showSkeletonCards === "function" && votesFeedList) {
+    showSkeletonCards(votesFeedList, { type: "bill", count: 4 });
+  }
 
   try {
     votesItems = await fetchVotesFromProcessedTable({
@@ -1582,7 +1586,11 @@ async function loadForYouSuggestions({ force = false } = {}) {
   }
 
   setForYouStatus("Finding related items…", "loading");
-  forYouList.replaceChildren();
+  if (typeof showSkeletonCards === "function") {
+    showSkeletonCards(forYouList, { type: "bill", count: 3 });
+  } else {
+    forYouList.replaceChildren();
+  }
 
   const notifications = await ensureNotificationsLoaded();
   const excludeKeys = new Set(notifications.map(notificationBillKey));
@@ -1892,6 +1900,10 @@ async function resolveLocationIfNeeded() {
 
 async function loadBillsPoliciesPage() {
   setPolicyFeedStatus("Loading bills, laws & policies…", "loading");
+  if (policyFeedEmpty) policyFeedEmpty.hidden = true;
+  if (typeof showSkeletonCards === "function" && policyFeedList) {
+    showSkeletonCards(policyFeedList, { type: "bill", count: 4 });
+  }
   await resolveLocationIfNeeded();
 
   const [payload] = await Promise.all([
@@ -1910,6 +1922,14 @@ async function refreshWithFilters({ resolveLocation = false } = {}) {
   persistFilters();
   syncFilterControls();
   setPolicyFeedStatus("Updating feed…", "loading");
+  if (policyFeedEmpty) policyFeedEmpty.hidden = true;
+  if (
+    typeof showSkeletonCards === "function" &&
+    policyFeedList &&
+    (activeTab === "all" || activeTab === "mine")
+  ) {
+    showSkeletonCards(policyFeedList, { type: "bill", count: 4 });
+  }
   try {
     if (resolveLocation || (filterState.locationOn && !filterState.resolved)) {
       await resolveLocationIfNeeded();

@@ -253,6 +253,11 @@ async function runSearch({ debounce = false } = {}) {
     query ? `Searching for “${query}”…` : "Loading recent federal documents…",
     "loading"
   );
+  emptyEl.hidden = true;
+  summaryEl.hidden = true;
+  if (typeof showSkeletonCards === "function") {
+    showSkeletonCards(resultsEl, { type: "search", count: 5 });
+  }
 
   try {
     const response = await fetch(`/api/legislation-search?${params.toString()}`);

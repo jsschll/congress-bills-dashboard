@@ -3255,7 +3255,11 @@ function mountAddressResultsPage({
   }
 
   (async () => {
-    results.replaceChildren();
+    if (typeof showSkeletonCards === "function") {
+      showSkeletonCards(results, { type: "politician", count: 6 });
+    } else {
+      results.replaceChildren();
+    }
     setStatus("Looking up representatives…", "loading");
 
     try {
