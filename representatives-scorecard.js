@@ -558,14 +558,16 @@
       ? String(activeRosterPerson.id)
       : "";
     const following = Boolean(id && followedPoliticianIds.has(id));
-    const label = button.querySelector(".politician-profile-follow-btn__label");
-    const icon = button.querySelector(".politician-profile-follow-btn__icon");
-    if (label) label.textContent = following ? "Following" : "Follow";
-    if (icon) icon.textContent = following ? "✓" : "+";
     button.classList.toggle("is-following", following);
     button.setAttribute("aria-pressed", following ? "true" : "false");
+    button.setAttribute(
+      "aria-label",
+      following
+        ? `Following ${activeRosterPerson?.name || "this official"}. Activate to unfollow.`
+        : `Follow ${activeRosterPerson?.name || "this official"}`
+    );
     button.title = following
-      ? "Unfollow this official"
+      ? "Following — hover to unfollow"
       : "Follow this official to see their actions in My Feed";
   }
 
@@ -1008,8 +1010,15 @@
               class="politician-profile-follow-btn"
               aria-pressed="false"
             >
-              <span class="politician-profile-follow-btn__icon" aria-hidden="true">+</span>
-              <span class="politician-profile-follow-btn__label">Follow</span>
+              <span class="politician-profile-follow-btn__icon" aria-hidden="true">
+                <span class="politician-profile-follow-btn__icon-plus">+</span>
+                <span class="politician-profile-follow-btn__icon-check">✓</span>
+              </span>
+              <span class="politician-profile-follow-btn__label">
+                <span class="politician-profile-follow-btn__label-follow">Follow</span>
+                <span class="politician-profile-follow-btn__label-following">Following</span>
+                <span class="politician-profile-follow-btn__label-unfollow">Unfollow</span>
+              </span>
             </button>
             <div class="politician-profile-note-wrap" id="scorecard-note-wrap">
               <button

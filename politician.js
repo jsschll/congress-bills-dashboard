@@ -431,8 +431,15 @@ function renderOverview(person, congress) {
             class="politician-profile-follow-btn"
             aria-pressed="false"
           >
-            <span class="politician-profile-follow-btn__icon" aria-hidden="true">+</span>
-            <span class="politician-profile-follow-btn__label">Follow</span>
+            <span class="politician-profile-follow-btn__icon" aria-hidden="true">
+              <span class="politician-profile-follow-btn__icon-plus">+</span>
+              <span class="politician-profile-follow-btn__icon-check">✓</span>
+            </span>
+            <span class="politician-profile-follow-btn__label">
+              <span class="politician-profile-follow-btn__label-follow">Follow</span>
+              <span class="politician-profile-follow-btn__label-following">Following</span>
+              <span class="politician-profile-follow-btn__label-unfollow">Unfollow</span>
+            </span>
           </button>
           <div class="politician-profile-note-wrap" id="politician-note-wrap">
             <button
@@ -506,15 +513,16 @@ function syncFollowButton() {
   const following = Boolean(
     activePerson?.id && followedPoliticianIds.has(String(activePerson.id))
   );
-  const label = button.querySelector(".politician-profile-follow-btn__label");
-  const icon = button.querySelector(".politician-profile-follow-btn__icon");
-  if (label) label.textContent = following ? "Following" : "Follow";
-  else button.textContent = following ? "Following" : "Follow";
-  if (icon) icon.textContent = following ? "✓" : "+";
   button.classList.toggle("is-following", following);
   button.setAttribute("aria-pressed", following ? "true" : "false");
+  button.setAttribute(
+    "aria-label",
+    following
+      ? `Following ${activePerson?.name || "this official"}. Activate to unfollow.`
+      : `Follow ${activePerson?.name || "this official"}`
+  );
   button.title = following
-    ? "Unfollow this official"
+    ? "Following — hover to unfollow"
     : "Follow this official to see their actions in My Feed";
 }
 

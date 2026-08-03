@@ -5283,7 +5283,7 @@ a.politician-badge--match {
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(16, 185, 129, 0.28);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease,
-    color 0.15s ease;
+    color 0.15s ease, border-color 0.15s ease;
 }
 
 .politician-profile-follow-btn__icon {
@@ -5297,6 +5297,12 @@ a.politician-badge--match {
   line-height: 1;
 }
 
+.politician-profile-follow-btn__icon-check,
+.politician-profile-follow-btn__label-following,
+.politician-profile-follow-btn__label-unfollow {
+  display: none;
+}
+
 .politician-profile-follow-btn:hover,
 .politician-profile-follow-btn:focus-visible {
   transform: translateY(-1px);
@@ -5304,26 +5310,56 @@ a.politician-badge--match {
   outline: none;
 }
 
+/* Active / Following — muted, no glow */
 .politician-profile-follow-btn.is-following {
-  background: linear-gradient(135deg, #34d399 0%, #2dd4bf 100%);
-  border-color: transparent;
-  color: #042f2e;
-  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.34),
-    0 0 0 1px rgba(110, 231, 183, 0.35);
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(52, 211, 153, 0.38);
+  color: #cbd5e1;
+  box-shadow: none;
+  font-weight: 700;
 }
 
 .politician-profile-follow-btn.is-following .politician-profile-follow-btn__icon {
-  background: rgba(4, 47, 46, 0.14);
-  color: #042f2e;
+  background: rgba(52, 211, 153, 0.14);
+  color: #6ee7b7;
 }
 
+.politician-profile-follow-btn.is-following .politician-profile-follow-btn__icon-plus,
+.politician-profile-follow-btn.is-following .politician-profile-follow-btn__label-follow {
+  display: none;
+}
+
+.politician-profile-follow-btn.is-following .politician-profile-follow-btn__icon-check,
+.politician-profile-follow-btn.is-following .politician-profile-follow-btn__label-following {
+  display: inline;
+}
+
+/* Hover while Following → Unfollow (danger cue) */
 .politician-profile-follow-btn.is-following:hover,
 .politician-profile-follow-btn.is-following:focus-visible {
-  transform: translateY(-1px);
-  border-color: transparent;
-  color: #042f2e;
-  box-shadow: 0 14px 28px rgba(16, 185, 129, 0.42),
-    0 0 0 1px rgba(167, 243, 208, 0.45);
+  transform: none;
+  background: rgba(127, 29, 29, 0.22);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+  box-shadow: none;
+}
+
+.politician-profile-follow-btn.is-following:hover .politician-profile-follow-btn__icon,
+.politician-profile-follow-btn.is-following:focus-visible .politician-profile-follow-btn__icon {
+  background: rgba(248, 113, 113, 0.16);
+  color: #fca5a5;
+}
+
+.politician-profile-follow-btn.is-following:hover .politician-profile-follow-btn__icon-check,
+.politician-profile-follow-btn.is-following:focus-visible .politician-profile-follow-btn__icon-check,
+.politician-profile-follow-btn.is-following:hover .politician-profile-follow-btn__label-following,
+.politician-profile-follow-btn.is-following:focus-visible .politician-profile-follow-btn__label-following {
+  display: none;
+}
+
+.politician-profile-follow-btn.is-following:hover .politician-profile-follow-btn__label-unfollow,
+.politician-profile-follow-btn.is-following:focus-visible .politician-profile-follow-btn__label-unfollow {
+  display: inline;
 }
 
 .politician-profile-follow-btn:disabled {
