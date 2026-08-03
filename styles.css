@@ -2643,42 +2643,80 @@ body {
 }
 
 .page--home {
-  padding-top: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .home-features {
-  padding: 4rem 0 2.5rem;
+  --feature-card-bg: #0f172a;
+  --feature-card-bg-lift: #1e293b;
+  --feature-heading: #ffffff;
+  --feature-body: #94a3b8;
+  --feature-label: #e2e8f0;
+  --feature-accent: #10b981;
+  --feature-accent-bright: #22c55e;
+  margin: 0;
+  padding: 4.25rem 0 3rem;
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(16, 185, 129, 0.12), transparent 42%),
+    radial-gradient(ellipse at 85% 100%, rgba(34, 197, 94, 0.08), transparent 40%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 55%, #111827 100%);
+  color: var(--feature-label);
 }
 
 .home-features__intro {
-  max-width: 38rem;
-  margin-bottom: 2rem;
+  max-width: 42rem;
+  margin: 0 auto 2.25rem;
+  padding: 0 1rem;
   animation: home-rise 0.8s ease-out both;
 }
 
 .home-features__intro h2 {
   margin: 0;
   font-family: var(--home-font-display);
-  font-size: clamp(1.8rem, 3vw, 2.5rem);
-  letter-spacing: -0.02em;
-  color: var(--home-ink);
+  font-size: clamp(1.85rem, 3.2vw, 2.65rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--feature-heading);
 }
 
 .home-features__intro p {
-  margin: 0.75rem 0 0;
-  color: var(--muted);
+  margin: 0.85rem 0 0;
+  color: var(--feature-body);
   font-size: 1.08rem;
+  line-height: 1.55;
 }
 
 .home-features__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.5rem 2rem;
-  border-top: 1px solid var(--home-mist);
-  padding-top: 1.75rem;
+  gap: 1.25rem;
+  width: min(1100px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .home-feature {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.45rem 1.35rem 1.35rem;
+  border-radius: 1rem;
+  background: var(--feature-card-bg-lift);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.4),
+    0 18px 40px rgba(0, 0, 0, 0.28);
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease;
   animation: home-rise 0.85s ease-out both;
 }
 
@@ -2692,6 +2730,45 @@ body {
   animation-delay: 0.25s;
 }
 
+.home-feature:hover {
+  transform: translateY(-3px);
+  background: #243447;
+  border-color: rgba(34, 197, 94, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(16, 185, 129, 0.28),
+    0 0 28px rgba(16, 185, 129, 0.18),
+    0 22px 44px rgba(0, 0, 0, 0.35);
+}
+
+.home-feature__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  margin: 0 0 1rem;
+  border-radius: 0.7rem;
+  color: var(--feature-accent-bright);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.12);
+}
+
+.home-feature__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: block;
+}
+
+.home-feature__badge {
+  margin: 0 0 0.55rem;
+  font-family: var(--home-font-body);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--feature-accent-bright);
+}
+
 .home-feature__index {
   margin: 0 0 0.65rem;
   font-family: var(--home-font-display);
@@ -2703,14 +2780,35 @@ body {
 .home-feature h3 {
   margin: 0;
   font-family: var(--home-font-display);
-  font-size: 1.45rem;
-  color: var(--home-ink);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--feature-heading);
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-.home-feature p {
+.home-feature > p {
   margin: 0.7rem 0 0;
-  color: var(--muted);
+  color: var(--feature-body);
+  line-height: 1.55;
+  flex: 1;
+}
+
+.home-feature__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1.15rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #6ee7b7;
+  text-decoration: none;
+  transition: color 0.18s ease, gap 0.18s ease;
+}
+
+.home-feature__cta:hover {
+  color: #a7f3d0;
+  gap: 0.5rem;
 }
 
 .home-bills {
@@ -2798,18 +2896,28 @@ body {
   .home-feature {
     animation: none !important;
   }
+
+  .home-feature:hover {
+    transform: none;
+  }
 }
 
 .home-features__more {
-  margin: 2.25rem 0 0;
+  width: min(1100px, calc(100% - 2rem));
+  margin: 2.25rem auto 0;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--home-mist);
-  color: var(--muted);
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  color: var(--feature-body);
   font-size: 1.02rem;
 }
 
 .home-features__more a {
   font-weight: 600;
+  color: #6ee7b7;
+}
+
+.home-features__more a:hover {
+  color: #a7f3d0;
 }
 
 /* —— Politicians dark theme —— */
