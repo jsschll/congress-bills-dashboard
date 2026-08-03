@@ -1320,7 +1320,8 @@ async function fetchVotesFromProcessedTable({ limit = 16, subject = "", kind = "
 
 async function fetchVotesFeed({ force = false } = {}) {
   if (votesLoaded && !force) return votesItems;
-  const limit = votesQuizMode ? 8 : 16;
+  // Show a wider window of processed_votes (House cards synced daily).
+  const limit = votesQuizMode ? 8 : 48;
   const kind = votesQuizMode ? "final_passage" : "";
   setVotesFeedStatus("Loading recent votes…", "loading");
 
@@ -1373,9 +1374,9 @@ function renderVotesFeed() {
   if (votesFeedEmpty) votesFeedEmpty.hidden = true;
   votesFeedList.append(...votesItems.map(renderVoteCard));
   setVotesFeedStatus(
-    `${votesItems.length} processed vote${votesItems.length === 1 ? "" : "s"}${
+    `${votesItems.length} House vote${votesItems.length === 1 ? "" : "s"} from processed_votes${
       votesQuizMode ? " · Quick Match" : ""
-    }`,
+    } (Senate votes appear on senator profiles)`,
     "success"
   );
 }

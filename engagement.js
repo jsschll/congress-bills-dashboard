@@ -231,6 +231,11 @@
     const chamber = String(item.chamber || item.jurisdiction || "").toLowerCase();
     if (chamber.includes("senate")) return "senate";
     if (chamber.includes("house")) return "house";
+    // Final-passage Senate bills often use ids like federal-119-s-2.
+    const type = String(item.legislationType || "").toLowerCase();
+    if (type === "s" || type === "sjres" || type === "sconres" || type === "sres") {
+      return "senate";
+    }
     return "house";
   }
 
@@ -993,9 +998,30 @@ Sincerely,
     });
 
     if (mine) {
-      fetchVoteMatch(item, mine).then((payload) => {
-        roots.voteBody.innerHTML = renderWhoVotedHtml(mine, payload);
-      });
+      // Repair older null matches (e.g. senator compared via House API) and
+      // refresh Who Voted / Action Match without requiring another click.
+      (async () => {
+        try {
+          const client = getSupabase();
+          const user = await getUser();
+          const payload = await fetchVoteMatch(item, mine);
+          if (roots.voteBody) {
+            roots.voteBody.innerHTML = renderWhoVotedHtml(mine, payload);
+          }
+          if (client && user && payload?.hasRollCall) {
+            await persistVoteMatches(client, user, item, mine, payload);
+            if (typeof roots.onStanceChange === "function") {
+              await roots.onStanceChange({
+                item,
+                stance: mine,
+                votePayload: payload,
+              });
+            }
+          }
+        } catch (error) {
+          console.warn(error);
+        }
+      })();
     }
   }
 
