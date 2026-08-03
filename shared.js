@@ -655,20 +655,24 @@ function formatAmendmentCodePill(bill = {}, voteCopy = null) {
   return collapseMatchWs(bill.bill_number || bill.billNumber || "") || "";
 }
 
+function looksLikeAmendmentCode(text = "") {
+  return /amdt\.?\s*(?:no\.?\s*)?\d+/i.test(String(text || ""));
+}
+
 /**
  * Build a plain-English Action Match card title.
- * Prefers processed_votes.short_title when present.
+ * Priority: Claude short_title → topic from plain_summary → raw title.
  */
 function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
   const shortTitle = collapseMatchWs(
     voteCopy?.short_title || voteCopy?.shortTitle || ""
   );
-  if (shortTitle && !/amdt\.?\s*(?:no\.?\s*)?\d+/i.test(shortTitle)) {
+  if (shortTitle && !looksLikeAmendmentCode(shortTitle)) {
     return shortTitle;
   }
 
   const number = collapseMatchWs(bill.bill_number || bill.billNumber || "");
-  const rawTitle = collapseMatchWs(bill.title || "");
+  const rawTitle = collapseMatchWs(voteCopy?.title || bill.title || "");
   const pitch =
     collapseMatchWs(
       voteCopy?.plain_summary ||
@@ -679,30 +683,144 @@ function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
     ) ||
     collapseMatchWs(voteCopy?.summary || "") ||
     collapseMatchWs(bill.short_pitch || bill.shortPitch || "");
-  const attribution = parseAmendmentAttribution(rawTitle);
-  const topic =
-    topicFromPitch(pitch) ||
-    cleanRawMatchTitle(rawTitle, number) ||
-    number ||
+  const fromPitch = topicFromPitch(pitch);
+  if (fromPitch && !looksLikeAmendmentCode(fromPitch)) {
+    return fromPitch;
+  }
+
+  // Explicit fallback: raw Senate/House title string.
+  return rawTitle || number || "Congressional roll call";
+}
+
+/**
+ * Resolve header/body copy for an Action Match agree/differ card.
+ */
+function resolveActionMatchCardCopy(row = {}) {
+  const bill = row.bill || {};
+  const voteCopy = row.voteCopy || null;
+  const impact =
+    row.impact || buildActionMatchImpact(bill, voteCopy, row);
+  const claudeTitle = collapseMatchWs(
+    voteCopy?.short_title || voteCopy?.shortTitle || ""
+  );
+  const impactTitle = collapseMatchWs(
+    impact.short_title || row.displayTitle || ""
+  );
+  const shortTitle =
+    (claudeTitle && !looksLikeAmendmentCode(claudeTitle) ? claudeTitle : "") ||
+    (impactTitle && !looksLikeAmendmentCode(impactTitle) ? impactTitle : "") ||
+    collapseMatchWs(bill.title || voteCopy?.title || "") ||
+    collapseMatchWs(bill.bill_number || bill.billNumber || row.bill_id || "") ||
     "Congressional roll call";
+  const rawCode = collapseMatchWs(
+    impact.raw_code || formatAmendmentCodePill(bill, voteCopy)
+  );
+  const plainSummary =
+    firstMatchSentence(
+      voteCopy?.plain_summary ||
+        voteCopy?.plainSummary ||
+        impact.plain_summary ||
+        impact.what_it_does ||
+        row.detailSummary ||
+        voteCopy?.summary ||
+        bill.short_pitch ||
+        bill.shortPitch ||
+        "",
+      280
+    ) || "No plain-English summary is available for this roll call yet.";
+  const detailHref =
+    row.detailHref || actionMatchDetailHref(bill, voteCopy);
+  return {
+    bill,
+    voteCopy,
+    impact,
+    shortTitle,
+    rawCode,
+    showCode:
+      Boolean(rawCode) &&
+      rawCode.toLowerCase() !== String(shortTitle).toLowerCase(),
+    plainSummary,
+    detailHref,
+    yourStanceLabel: impact.your_stance_label || "Your stance",
+    yourStanceImpact:
+      impact.your_stance_impact || impact.yea_impact || "—",
+    repStanceLabel: impact.rep_stance_label || "—",
+    repStanceImpact: impact.rep_stance_impact || impact.nay_impact || "—",
+    yeaImpact: impact.yea_impact || "",
+    nayImpact: impact.nay_impact || "",
+  };
+}
 
-  if (attribution) {
-    const topicLooksLikeAmdt = /amdt\.?\s*(?:no\.?\s*)?\d+/i.test(topic);
-    if (topicLooksLikeAmdt) return attribution.label;
-    return topic;
-  }
+/**
+ * Render one Where You Agree / Differ list item using Claude vote fields.
+ * @param {object} row
+ * @param {(value: unknown) => string} escapeHtmlFn
+ */
+function renderActionMatchScorecardItem(row, escapeHtmlFn) {
+  const esc =
+    typeof escapeHtmlFn === "function"
+      ? escapeHtmlFn
+      : (value) => String(value ?? "");
+  const copy = resolveActionMatchCardCopy(row);
+  const detailPayload = encodeURIComponent(
+    JSON.stringify({
+      title: copy.shortTitle,
+      number: copy.rawCode,
+      summary: copy.plainSummary,
+      yea: copy.yeaImpact,
+      nay: copy.nayImpact,
+      href: copy.detailHref,
+      rawTitle: copy.bill.title || "",
+      stance: row.user_stance || "",
+      memberVote: row.member_vote || "",
+      yourStanceLabel: copy.yourStanceLabel,
+      yourStanceImpact: copy.yourStanceImpact,
+      repStanceLabel: copy.repStanceLabel,
+      repStanceImpact: copy.repStanceImpact,
+    })
+  );
 
-  if (number) {
-    const bareNumber = number.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
-    const bareTopic = topic.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
-    if (bareTopic.startsWith(bareNumber) || /^[^:]+:\s*/.test(topic)) {
-      return topic.includes(":")
-        ? cleanRawMatchTitle(topic, number)
-        : topic;
-    }
-    return topic;
-  }
-  return topic;
+  return `<li class="scorecard-match-item">
+      <div class="scorecard-match-item__top">
+        <button
+          type="button"
+          class="scorecard-match-item__title"
+          data-open-match-detail="${detailPayload}"
+        >
+          <span class="scorecard-match-item__name">${esc(
+            copy.shortTitle
+          )}</span>
+          ${
+            copy.showCode
+              ? `<span class="scorecard-match-item__code">${esc(
+                  copy.rawCode
+                )}</span>`
+              : ""
+          }
+        </button>
+        <button
+          type="button"
+          class="scorecard-match-item__info"
+          data-open-match-detail="${detailPayload}"
+          aria-label="Open roll-call detail"
+          title="Open roll-call detail"
+        >ⓘ</button>
+      </div>
+      <p class="scorecard-match-item__summary">${esc(copy.plainSummary)}</p>
+      <p class="scorecard-match-item__stance">
+        You ${esc(row.user_stance)} · They voted ${esc(
+          row.member_vote || "—"
+        )}
+      </p>
+      <div class="scorecard-match-item__breakdown">
+        <p><strong>Your Stance (${esc(
+          copy.yourStanceLabel
+        )}):</strong> ${esc(copy.yourStanceImpact)}</p>
+        <p><strong>Rep Stance (${esc(
+          copy.repStanceLabel
+        )}):</strong> ${esc(copy.repStanceImpact)}</p>
+      </div>
+    </li>`;
 }
 
 /**
