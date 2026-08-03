@@ -41,7 +41,7 @@ Set these for Production/Preview (Project Settings → Environment Variables, th
 - `GOOGLE_CIVIC_API_KEY` — optional for Politicians lookup; **required for live Election & Voting Center** polling places / contests (Representatives API was turned down in April 2025, but Elections + voterinfo still work)
 - `OPENSTATES_API_KEY` — state bill feed + optional enrichment for state / municipal officials ([Open States](https://openstates.org/accounts/login/))
 - `RESEND_API_KEY` — required for notification **email** delivery and for **auth email codes** / password-reset codes (Forgot password + Sign in with email code). Get a key at [resend.com](https://resend.com)
-- `NOTIFY_FROM_EMAIL` — optional verified sender, e.g. `Congress Bills <alerts@yourdomain.com>` (defaults to Resend onboarding sender). Must be allowed by your Resend domain.
+- `NOTIFY_FROM_EMAIL` — optional verified sender, e.g. `Article 1 <alerts@yourdomain.com>` (defaults to Resend onboarding sender). Must be allowed by your Resend domain.
 - `SITE_URL` — optional canonical site URL used in email links
 - `OPENAI_API_KEY` — required for `/api/sync-votes` (formats vote cards with `gpt-4o-mini` into `processed_votes`). Also used by `/api/format-bill-summary`. Optional overrides: `OPENAI_MODEL` (default `gpt-4o-mini`), `OPENAI_BASE_URL` for OpenAI-compatible providers.
 - `CRON_SECRET` or `SYNC_VOTES_SECRET` — optional. When set, `/api/sync-votes` requires `Authorization: Bearer <secret>`.

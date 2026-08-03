@@ -497,7 +497,7 @@ function renderOverview(person, congress) {
   bindFollowButton(person);
   bindNotePopover();
   refreshNoteUi();
-  document.title = `${person.name || "Politician"} · Congress Bills`;
+  document.title = `${person.name || "Politician"} · Article 1`;
 }
 
 function syncFollowButton() {

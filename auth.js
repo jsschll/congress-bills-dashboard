@@ -52,7 +52,7 @@ function showAuthView(view) {
   const subtitle = document.getElementById("auth-subtitle");
 
   if (view === "signup") {
-    document.title = "Create account · Congress Bills";
+    document.title = "Create account · Article 1";
     title.textContent = "Create account";
     subtitle.textContent =
       "Choose a username and password. We’ll email you a link to verify your account.";
@@ -61,7 +61,7 @@ function showAuthView(view) {
   }
 
   if (view === "forgot") {
-    document.title = "Forgot password · Congress Bills";
+    document.title = "Forgot password · Article 1";
     title.textContent = "Forgot password";
     subtitle.textContent =
       "Enter your email or username and we’ll send a reset link.";
@@ -70,7 +70,7 @@ function showAuthView(view) {
   }
 
   if (view === "reset") {
-    document.title = "Choose a new password · Congress Bills";
+    document.title = "Choose a new password · Article 1";
     title.textContent = "Choose a new password";
     subtitle.textContent =
       "Pick a new password for your account. You’ll stay signed in after saving.";
@@ -79,7 +79,7 @@ function showAuthView(view) {
   }
 
   if (view === "otp") {
-    document.title = "Sign in with email code · Congress Bills";
+    document.title = "Sign in with email code · Article 1";
     title.textContent = "Sign in with email code";
     subtitle.textContent =
       "We’ll email a one-time code. No password needed for this sign-in.";
@@ -88,7 +88,7 @@ function showAuthView(view) {
   }
 
   if (view === "otp-verify") {
-    document.title = "Enter email code · Congress Bills";
+    document.title = "Enter email code · Article 1";
     title.textContent = "Enter your email code";
     subtitle.textContent =
       "Type the code from your inbox to finish signing in.";
@@ -103,7 +103,7 @@ function showAuthView(view) {
     return;
   }
 
-  document.title = "Sign in · Congress Bills";
+  document.title = "Sign in · Article 1";
   title.textContent = "Sign in";
   subtitle.textContent =
     "Sign in with your email or username and password, or request a one-time code by email.";
