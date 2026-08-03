@@ -30,6 +30,7 @@ alter table public.processed_votes
   add column if not exists yea_label text,
   add column if not exists nay_label text,
   add column if not exists short_title text,
+  add column if not exists plain_summary text,
   add column if not exists what_it_does text,
   add column if not exists yea_impact text,
   add column if not exists nay_impact text,

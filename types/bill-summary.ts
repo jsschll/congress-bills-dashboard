@@ -16,7 +16,9 @@ export interface BillSummaryCard {
   nay_label: string;
   /** Short plain-English topic for Action Match cards. */
   short_title?: string;
-  /** One-sentence real-world impact. */
+  /** One-sentence plain-English summary of what the measure does. */
+  plain_summary?: string;
+  /** Legacy alias of plain_summary. */
   what_it_does?: string;
   /** What a Support / Yea vote advocates for. */
   yea_impact?: string;

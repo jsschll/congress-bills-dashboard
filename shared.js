@@ -281,7 +281,7 @@ function mapProcessedVoteToFeedItem(row = {}) {
 }
 
 const PROCESSED_VOTES_FEED_SELECT =
-  "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
+  "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, short_title, plain_summary, what_it_does, yea_impact, nay_impact, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
 
 function normalizeLegislationType(type) {
   return String(type || "")
@@ -670,7 +670,13 @@ function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
   const number = collapseMatchWs(bill.bill_number || bill.billNumber || "");
   const rawTitle = collapseMatchWs(bill.title || "");
   const pitch =
-    collapseMatchWs(voteCopy?.what_it_does || voteCopy?.whatItDoes || "") ||
+    collapseMatchWs(
+      voteCopy?.plain_summary ||
+        voteCopy?.plainSummary ||
+        voteCopy?.what_it_does ||
+        voteCopy?.whatItDoes ||
+        ""
+    ) ||
     collapseMatchWs(voteCopy?.summary || "") ||
     collapseMatchWs(bill.short_pitch || bill.shortPitch || "");
   const attribution = parseAmendmentAttribution(rawTitle);
@@ -706,9 +712,11 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
   const means = buildActionMatchVoteMeans(bill, voteCopy);
   const short_title = humanizeActionMatchTitle(bill, voteCopy);
   const raw_code = formatAmendmentCodePill(bill, voteCopy);
-  const what_it_does =
+  const plain_summary =
     firstMatchSentence(
-      voteCopy?.what_it_does ||
+      voteCopy?.plain_summary ||
+        voteCopy?.plainSummary ||
+        voteCopy?.what_it_does ||
         voteCopy?.whatItDoes ||
         voteCopy?.summary ||
         bill.short_pitch ||
@@ -716,6 +724,7 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
         "",
       220
     ) || "No plain-English summary is available for this roll call yet.";
+  const what_it_does = plain_summary;
   const yea_impact =
     collapseMatchWs(voteCopy?.yea_impact || voteCopy?.yeaImpact || "") ||
     means.yea;
@@ -749,6 +758,7 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
   return {
     short_title,
     raw_code,
+    plain_summary,
     what_it_does,
     yea_impact,
     nay_impact,
@@ -842,11 +852,23 @@ async function enrichActionMatchRows(client, rows) {
   ({ data, error } = await client
     .from("processed_votes")
     .select(
-      "roll_call_id, title, summary, yea_means, nay_means, short_title, what_it_does, yea_impact, nay_impact, bill_number, official_url, vote_kind, vote_question"
+      "roll_call_id, title, summary, yea_means, nay_means, short_title, plain_summary, what_it_does, yea_impact, nay_impact, bill_number, official_url, vote_kind, vote_question"
     )
     .in("roll_call_id", ids));
-  // Older DBs may not have the new impact columns yet.
-  if (error && /short_title|what_it_does|yea_impact|nay_impact/i.test(error.message || "")) {
+  // Older DBs may not have plain_summary yet — retry without it.
+  if (error && /plain_summary/i.test(error.message || "")) {
+    ({ data, error } = await client
+      .from("processed_votes")
+      .select(
+        "roll_call_id, title, summary, yea_means, nay_means, short_title, what_it_does, yea_impact, nay_impact, bill_number, official_url, vote_kind, vote_question"
+      )
+      .in("roll_call_id", ids));
+  }
+  // Older DBs may not have the impact columns yet.
+  if (
+    error &&
+    /short_title|what_it_does|yea_impact|nay_impact/i.test(error.message || "")
+  ) {
     ({ data, error } = await client
       .from("processed_votes")
       .select(
@@ -878,7 +900,7 @@ async function enrichActionMatchRows(client, rows) {
         nay: impact.nay_impact,
       },
       detailHref: actionMatchDetailHref(bill, voteCopy),
-      detailSummary: impact.what_it_does,
+      detailSummary: impact.plain_summary || impact.what_it_does,
     };
   });
 }

@@ -776,7 +776,11 @@ function renderMatchScorecard({ user, rows }, person) {
       row.bill_id;
     const rawCode = impact?.raw_code || bill.bill_number || "";
     const whatItDoes =
-      impact?.what_it_does || row.detailSummary || bill.short_pitch || "";
+      impact?.plain_summary ||
+      impact?.what_it_does ||
+      row.detailSummary ||
+      bill.short_pitch ||
+      "";
     const detailHref =
       row.detailHref ||
       bill.official_url ||

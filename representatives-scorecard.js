@@ -1294,6 +1294,7 @@
         bill.bill_number ||
         "";
       const whatItDoes =
+        impact?.plain_summary ||
         impact?.what_it_does ||
         row.detailSummary ||
         bill.short_pitch ||
