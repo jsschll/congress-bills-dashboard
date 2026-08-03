@@ -1,5 +1,8 @@
 const CONGRESS_API = "https://api.congress.gov/v3";
 const CONGRESS = 119;
+const {
+  fetchSenateRollCallMemberVotes,
+} = require("../lib/senate-votes");
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -45,17 +48,21 @@ function stanceMatchesVote(stance, voteCast) {
   return null;
 }
 
-function extractRollCallsFromActions(actions = []) {
+function extractRollCallsFromActions(actions = [], chamber = "house") {
   const found = [];
+  const wantSenate = chamber === "senate";
   for (const action of actions) {
     const text = String(action.text || "");
-    const house =
-      /house/i.test(text) ||
-      String(action.sourceSystem?.name || "").toLowerCase().includes("house");
+    const source = String(action.sourceSystem?.name || "").toLowerCase();
+    const isSenate =
+      /senate/i.test(text) || source.includes("senate");
+    const isHouse =
+      /house/i.test(text) || source.includes("house");
+    if (wantSenate ? !isSenate : !isHouse) continue;
     const match = text.match(/roll\s*(?:call\s*)?(?:no\.?|number)?\s*(\d{1,4})/i);
-    if (house && match) {
+    if (match) {
       found.push({
-        chamber: "house",
+        chamber: wantSenate ? "senate" : "house",
         rollCallNumber: Number(match[1]),
         actionDate: action.actionDate || "",
         text,
@@ -65,13 +72,52 @@ function extractRollCallsFromActions(actions = []) {
   return found;
 }
 
+function parseSenateVoteId(billId = "") {
+  const match = String(billId)
+    .toLowerCase()
+    .match(/^senate-vote-(\d{2,3})-(\d+)-(\d+)$/);
+  if (!match) return null;
+  return {
+    congress: Number(match[1]),
+    sessionNumber: Number(match[2]),
+    rollCallNumber: Number(match[3]),
+    chamber: "senate",
+  };
+}
+
+function parseHouseVoteId(billId = "") {
+  const match = String(billId)
+    .toLowerCase()
+    .match(/^house-vote-(\d{2,3})-(\d+)-(\d+)$/);
+  if (!match) return null;
+  return {
+    congress: Number(match[1]),
+    sessionNumber: Number(match[2]),
+    rollCallNumber: Number(match[3]),
+    chamber: "house",
+  };
+}
+
+function resolveChamber(req, billId) {
+  const explicit = String(req.query.chamber || "").trim().toLowerCase();
+  if (explicit === "senate" || explicit === "house") return explicit;
+  if (parseSenateVoteId(billId)) return "senate";
+  if (parseHouseVoteId(billId)) return "house";
+  const jurisdiction = String(req.query.jurisdiction || "").toLowerCase();
+  if (jurisdiction.includes("senate")) return "senate";
+  return "house";
+}
+
 async function findHouseVotesForBill(apiKey, congress, type, number) {
   const votes = [];
 
   try {
     const actionsUrl = `${CONGRESS_API}/bill/${congress}/${type}/${number}/actions?format=json&limit=250&api_key=${encodeURIComponent(apiKey)}`;
     const actionsData = await fetchJson(actionsUrl);
-    const fromActions = extractRollCallsFromActions(actionsData.actions || []);
+    const fromActions = extractRollCallsFromActions(
+      actionsData.actions || [],
+      "house"
+    );
     for (const entry of fromActions) {
       // Prefer session 1; try both if needed later
       votes.push({
@@ -139,6 +185,157 @@ async function fetchMemberVotes(apiKey, congress, session, rollCall) {
   }
 }
 
+async function findSenateVotesForBill(apiKey, congress, type, number) {
+  const votes = [];
+  try {
+    const actionsUrl = `${CONGRESS_API}/bill/${congress}/${type}/${number}/actions?format=json&limit=250&api_key=${encodeURIComponent(apiKey)}`;
+    const actionsData = await fetchJson(actionsUrl);
+    const fromActions = extractRollCallsFromActions(
+      actionsData.actions || [],
+      "senate"
+    );
+    for (const entry of fromActions) {
+      votes.push({
+        congress,
+        sessionNumber: 1,
+        rollCallNumber: entry.rollCallNumber,
+        source: "actions",
+      });
+      votes.push({
+        congress,
+        sessionNumber: 2,
+        rollCallNumber: entry.rollCallNumber,
+        source: "actions",
+      });
+    }
+  } catch (error) {
+    console.warn(error);
+  }
+
+  const seen = new Set();
+  return votes.filter((vote) => {
+    const key = `${vote.congress}-${vote.sessionNumber}-${vote.rollCallNumber}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return Boolean(vote.rollCallNumber);
+  });
+}
+
+async function handleSenateMatch({
+  billId,
+  stance,
+  bioguides,
+  congress,
+  type,
+  number,
+  preferredRoll,
+  preferredSession,
+  apiKey,
+}) {
+  const senateVote = parseSenateVoteId(billId);
+  let voteRefs = [];
+
+  if (senateVote) {
+    voteRefs.push({
+      congress: senateVote.congress,
+      sessionNumber: senateVote.sessionNumber,
+      rollCallNumber: senateVote.rollCallNumber,
+      source: "billId",
+    });
+  }
+
+  if (preferredRoll) {
+    const preferred = {
+      congress: congress || senateVote?.congress || CONGRESS,
+      sessionNumber: preferredSession || senateVote?.sessionNumber || 1,
+      rollCallNumber: preferredRoll,
+      source: "request",
+    };
+    voteRefs = [
+      preferred,
+      ...(preferredSession
+        ? []
+        : [
+            { ...preferred, sessionNumber: 1 },
+            { ...preferred, sessionNumber: 2 },
+          ]),
+      ...voteRefs,
+    ];
+  }
+
+  if (type && number) {
+    const fromBill = await findSenateVotesForBill(
+      apiKey,
+      congress || CONGRESS,
+      type,
+      number
+    );
+    voteRefs = [...voteRefs, ...fromBill];
+  }
+
+  const seen = new Set();
+  voteRefs = voteRefs.filter((vote) => {
+    const key = `${vote.congress}-${vote.sessionNumber}-${vote.rollCallNumber}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return Boolean(vote.rollCallNumber);
+  });
+
+  if (!voteRefs.length) {
+    return {
+      billId,
+      chamber: "senate",
+      congress,
+      type,
+      number,
+      hasRollCall: false,
+      message: "No Senate roll call found for this bill yet.",
+      members: [],
+      tallies: null,
+    };
+  }
+
+  for (const ref of voteRefs) {
+    try {
+      const payload = await fetchSenateRollCallMemberVotes({
+        congress: ref.congress,
+        sessionNumber: ref.sessionNumber,
+        rollCallNumber: ref.rollCallNumber,
+        bioguides,
+      });
+      if (!payload?.members?.length && !payload?.tallies?.total) continue;
+
+      const members = (payload.members || []).map((row) => ({
+        ...row,
+        matched: stance ? stanceMatchesVote(stance, row.voteCast) : null,
+      }));
+
+      return {
+        billId,
+        chamber: "senate",
+        congress: payload.congress,
+        sessionNumber: payload.sessionNumber,
+        rollCallNumber: payload.rollCallNumber,
+        hasRollCall: true,
+        result: payload.result || "",
+        tallies: payload.tallies,
+        members,
+        sourceUrl: payload.sourceUrl,
+      };
+    } catch (error) {
+      console.warn(error);
+    }
+  }
+
+  return {
+    billId,
+    chamber: "senate",
+    hasRollCall: false,
+    message: "Senate roll call referenced but member votes unavailable.",
+    members: [],
+  };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   if (req.method !== "GET") return json(res, 405, { error: "Method not allowed" });
@@ -159,7 +356,10 @@ module.exports = async function handler(req, res) {
     .split(",")
     .map((part) => part.trim().toUpperCase())
     .filter(Boolean);
+  const chamber = resolveChamber(req, billId);
 
+  const senateVote = parseSenateVoteId(billId);
+  const houseVote = parseHouseVoteId(billId);
   const parsed =
     parseBillId(billId) ||
     (req.query.congress && req.query.type && req.query.number
@@ -170,8 +370,11 @@ module.exports = async function handler(req, res) {
         }
       : null);
 
-  if (!parsed) {
-    return json(res, 400, { error: "Provide billId like federal-119-hr-1" });
+  if (!parsed && !senateVote && !houseVote && !Number(req.query.rollCallNumber || 0)) {
+    return json(res, 400, {
+      error:
+        "Provide billId like federal-119-hr-1, senate-vote-119-1-42, or rollCallNumber.",
+    });
   }
   if (stance && !["support", "oppose"].includes(stance)) {
     return json(res, 400, { error: "stance must be support or oppose" });
@@ -179,19 +382,55 @@ module.exports = async function handler(req, res) {
 
   const preferredRoll = Number(req.query.rollCallNumber || req.query.roll || 0);
   const preferredSession = Number(req.query.sessionNumber || req.query.session || 0);
+  const congress =
+    parsed?.congress ||
+    senateVote?.congress ||
+    houseVote?.congress ||
+    Number(req.query.congress) ||
+    CONGRESS;
 
   try {
-    let voteRefs = await findHouseVotesForBill(
-      apiKey,
-      parsed.congress || CONGRESS,
-      parsed.type,
-      parsed.number
-    );
+    if (chamber === "senate") {
+      const senatePayload = await handleSenateMatch({
+        billId,
+        stance,
+        bioguides,
+        congress,
+        type: parsed?.type || "",
+        number: parsed?.number || "",
+        preferredRoll: preferredRoll || senateVote?.rollCallNumber || 0,
+        preferredSession:
+          preferredSession || senateVote?.sessionNumber || 0,
+        apiKey,
+      });
+      return json(res, 200, senatePayload);
+    }
+
+    let voteRefs = [];
+    if (houseVote) {
+      voteRefs.push({
+        congress: houseVote.congress,
+        sessionNumber: houseVote.sessionNumber,
+        rollCallNumber: houseVote.rollCallNumber,
+        source: "billId",
+      });
+    }
+    if (parsed?.type && parsed?.number) {
+      voteRefs = [
+        ...voteRefs,
+        ...(await findHouseVotesForBill(
+          apiKey,
+          parsed.congress || CONGRESS,
+          parsed.type,
+          parsed.number
+        )),
+      ];
+    }
 
     if (preferredRoll) {
       const preferred = {
-        congress: parsed.congress || CONGRESS,
-        sessionNumber: preferredSession || 1,
+        congress: congress || CONGRESS,
+        sessionNumber: preferredSession || houseVote?.sessionNumber || 1,
         rollCallNumber: preferredRoll,
         source: "request",
       };
@@ -218,9 +457,10 @@ module.exports = async function handler(req, res) {
     if (!voteRefs.length) {
       return json(res, 200, {
         billId,
-        congress: parsed.congress,
-        type: parsed.type,
-        number: parsed.number,
+        chamber: "house",
+        congress: parsed?.congress || congress,
+        type: parsed?.type,
+        number: parsed?.number,
         hasRollCall: false,
         message: "No House roll call found for this bill yet.",
         members: [],
@@ -247,6 +487,7 @@ module.exports = async function handler(req, res) {
     if (!chosen) {
       return json(res, 200, {
         billId,
+        chamber: "house",
         hasRollCall: false,
         message: "Roll call referenced but member votes unavailable.",
         members: [],
@@ -286,6 +527,7 @@ module.exports = async function handler(req, res) {
 
     return json(res, 200, {
       billId,
+      chamber: "house",
       congress: chosen.congress,
       sessionNumber: chosen.sessionNumber,
       rollCallNumber: chosen.rollCallNumber,

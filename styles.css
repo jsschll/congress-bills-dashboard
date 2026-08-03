@@ -3986,6 +3986,66 @@ body {
   color: #fca5a5;
 }
 
+.policy-engage__stance:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.policy-engage__logged-panel {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.policy-engage__logged-panel[hidden] {
+  display: none;
+}
+
+.policy-engage__logged-panel.is-oppose {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.policy-engage__logged-message {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #86efac;
+}
+
+.policy-engage__logged-panel.is-oppose .policy-engage__logged-message {
+  color: #fca5a5;
+}
+
+.policy-engage__logged-hint {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.policy-engage__change {
+  border: 1px solid #475569;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.policy-engage__change:hover {
+  border-color: #94a3b8;
+  color: #fff;
+}
+
 .policy-engage__alignment {
   margin-left: auto;
   font-size: 0.82rem;

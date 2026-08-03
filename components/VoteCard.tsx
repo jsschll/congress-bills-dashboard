@@ -200,26 +200,49 @@ export function VoteCard({
         aria-label="How would you vote?"
       >
         <p className="bill-summary-card__prompt">How would you vote?</p>
-        <button
-          type="button"
-          className={`bill-summary-card__btn is-yea ${
-            userStance === "yea" ? "is-active" : ""
-          }`}
-          disabled={!onVote || pending !== null}
-          onClick={() => handleVote("yea")}
-        >
-          {pending === "yea" ? "Saving…" : yeaLabel}
-        </button>
-        <button
-          type="button"
-          className={`bill-summary-card__btn is-nay ${
-            userStance === "nay" ? "is-active" : ""
-          }`}
-          disabled={!onVote || pending !== null}
-          onClick={() => handleVote("nay")}
-        >
-          {pending === "nay" ? "Saving…" : nayLabel}
-        </button>
+        {userStance && !pending ? (
+          <div
+            className={`bill-summary-card__logged-panel is-${userStance}`}
+          >
+            <p className="bill-summary-card__logged-message">
+              {userStance === "yea"
+                ? "You supported this"
+                : "You opposed this"}
+            </p>
+            <button
+              type="button"
+              className="bill-summary-card__change"
+              disabled={!onVote}
+              onClick={() => handleVote(userStance)}
+              title="Clear vote so you can choose again"
+            >
+              Change
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`bill-summary-card__btn is-yea ${
+                userStance === "yea" ? "is-active" : ""
+              }`}
+              disabled={!onVote || pending !== null}
+              onClick={() => handleVote("yea")}
+            >
+              {pending === "yea" ? "Saving…" : yeaLabel}
+            </button>
+            <button
+              type="button"
+              className={`bill-summary-card__btn is-nay ${
+                userStance === "nay" ? "is-active" : ""
+              }`}
+              disabled={!onVote || pending !== null}
+              onClick={() => handleVote("nay")}
+            >
+              {pending === "nay" ? "Saving…" : nayLabel}
+            </button>
+          </>
+        )}
       </div>
     </article>
   );

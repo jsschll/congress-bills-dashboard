@@ -224,9 +224,93 @@
       .map((id) => String(id).toUpperCase());
   }
 
+  function resolveItemChamber(item = {}) {
+    const id = String(item.id || item.billId || "").toLowerCase();
+    if (id.startsWith("senate-vote-")) return "senate";
+    if (id.startsWith("house-vote-")) return "house";
+    const chamber = String(item.chamber || item.jurisdiction || "").toLowerCase();
+    if (chamber.includes("senate")) return "senate";
+    if (chamber.includes("house")) return "house";
+    return "house";
+  }
+
+  function normalizeMatchVoteCast(voteCast = "") {
+    const value = String(voteCast || "").toLowerCase();
+    if (value === "yea" || value === "aye" || value === "yes") return "Yea";
+    if (value === "nay" || value === "no") return "Nay";
+    if (value.includes("present")) return "Present";
+    if (value.includes("not voting") || value === "nv") return "Not Voting";
+    return voteCast || null;
+  }
+
+  function stanceMatchesMemberVote(stance, voteCast) {
+    const vote = String(voteCast || "").toLowerCase();
+    if (!vote || vote.includes("present") || vote.includes("not voting") || vote === "nv") {
+      return null;
+    }
+    if (stance === "support") {
+      return vote === "yea" || vote === "aye" || vote === "yes";
+    }
+    if (stance === "oppose") {
+      return vote === "nay" || vote === "no";
+    }
+    return null;
+  }
+
+  /**
+   * Profile Activity cards already include this politician’s recorded vote.
+   * Use that for instant Action Match without waiting on the wrong chamber API.
+   */
+  function matchFromItemVoteCast(item, stance, bioguides) {
+    const cast = normalizeMatchVoteCast(item?.voteCast || item?.memberVote);
+    if (!cast || !bioguides.length) return null;
+    const chamber = resolveItemChamber(item);
+    return {
+      billId: item.id,
+      chamber,
+      hasRollCall: true,
+      congress: item.congress || null,
+      sessionNumber: item.sessionNumber || null,
+      rollCallNumber: item.rollCallNumber || null,
+      result: item.result || "",
+      members: bioguides.map((bioguide) => ({
+        bioguideId: bioguide,
+        name: null,
+        party: null,
+        state: null,
+        voteCast: cast,
+        matched: stance ? stanceMatchesMemberVote(stance, cast) : null,
+      })),
+      sourceUrl: item.clerkUrl || item.officialUrl || item.senateUrl || null,
+      source: "item-vote-cast",
+    };
+  }
+
   async function fetchVoteMatch(item, stance) {
+    const chamber = resolveItemChamber(item);
+    const fromItem = Array.isArray(item.compareBioguides)
+      ? item.compareBioguides
+      : [];
+    const bios = [
+      ...new Set(
+        [
+          ...(chamber === "senate" ? [] : houseRepBioguides()),
+          ...fromItem,
+        ]
+          .map((id) => String(id || "").toUpperCase())
+          .filter(Boolean)
+      ),
+    ];
+
+    // Instant path for politician Activity Feed cards (voteCast already known).
+    if (fromItem.length && (item.voteCast || item.memberVote)) {
+      const local = matchFromItemVoteCast(item, stance, fromItem.map((id) => String(id).toUpperCase()));
+      if (local?.hasRollCall) return local;
+    }
+
     const params = new URLSearchParams();
     params.set("billId", item.id);
+    params.set("chamber", chamber);
     if (stance) params.set("stance", stance);
     if (item.rollCallNumber) {
       params.set("rollCallNumber", String(item.rollCallNumber));
@@ -237,16 +321,12 @@
     if (item.congress) {
       params.set("congress", String(item.congress));
     }
-    const fromItem = Array.isArray(item.compareBioguides)
-      ? item.compareBioguides
-      : [];
-    const bios = [
-      ...new Set(
-        [...houseRepBioguides(), ...fromItem]
-          .map((id) => String(id || "").toUpperCase())
-          .filter(Boolean)
-      ),
-    ];
+    if (item.legislationType) {
+      params.set("type", String(item.legislationType).toLowerCase());
+    }
+    if (item.legislationNumber) {
+      params.set("number", String(item.legislationNumber));
+    }
     if (bios.length) params.set("bioguides", bios.join(","));
     if (typeof API_KEY === "string" && API_KEY.trim()) {
       params.set("api_key", API_KEY.trim());
@@ -642,12 +722,18 @@ Sincerely,
       activeStance = nextStance;
     }
 
+    // Show logged vote immediately — don't wait for roll-call comparison.
+    roots.changeMode = false;
+    applyLoggedStanceUI(roots, activeStance);
+
     await loadAlignment(client);
     let votePayload = null;
     if (activeStance && String(item.level || "").toLowerCase() === "federal") {
+      const chamber = resolveItemChamber(item);
       if (roots.voteBody) {
-        roots.voteBody.innerHTML =
-          `<p class="policy-engage__vote-empty">Checking House roll call…</p>`;
+        roots.voteBody.innerHTML = `<p class="policy-engage__vote-empty">Checking ${
+          chamber === "senate" ? "Senate" : "House"
+        } roll call…</p>`;
       }
       votePayload = await fetchVoteMatch(item, activeStance);
       await persistVoteMatches(client, user, item, activeStance, votePayload);
@@ -668,16 +754,95 @@ Sincerely,
     }
   }
 
-  async function refreshMountedCard(item, roots, votePayload = null) {
+  function ensureLoggedPanel(roots) {
+    if (roots.loggedPanel && roots.loggedPanel.isConnected) return roots.loggedPanel;
+    const stances =
+      roots.stancesEl ||
+      roots.root?.querySelector(".policy-engage__stances");
+    if (!stances || !roots.root) return null;
+    let panel = roots.root.querySelector(".policy-engage__logged-panel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.className = "policy-engage__logged-panel";
+      panel.hidden = true;
+      stances.insertAdjacentElement("afterend", panel);
+    }
+    roots.loggedPanel = panel;
+    roots.stancesEl = stances;
+    return panel;
+  }
+
+  function applyLoggedStanceUI(roots, mine) {
     const supportBtn = roots.supportBtn;
     const opposeBtn = roots.opposeBtn;
+    if (!supportBtn || !opposeBtn) return;
+
+    const supportLabel = roots.supportLabel || "Support Measure";
+    const opposeLabel = roots.opposeLabel || "Oppose Measure";
+    const hasSupport = mine === "support";
+    const hasOppose = mine === "oppose";
+    const hasVote = hasSupport || hasOppose;
+    const editing = roots.changeMode === true;
+    const panel = ensureLoggedPanel(roots);
+    const stances = roots.stancesEl;
+
+    supportBtn.textContent = supportLabel;
+    opposeBtn.textContent = opposeLabel;
+    supportBtn.classList.toggle("is-active", hasSupport && editing);
+    opposeBtn.classList.toggle("is-active", hasOppose && editing);
+    supportBtn.classList.remove("is-logged", "is-dimmed");
+    opposeBtn.classList.remove("is-logged", "is-dimmed");
+    supportBtn.setAttribute("aria-pressed", String(hasSupport));
+    opposeBtn.setAttribute("aria-pressed", String(hasOppose));
+
+    if (hasVote && !editing) {
+      // Replace buttons with a clear logged message + Change option.
+      if (stances) stances.hidden = true;
+      if (panel) {
+        panel.hidden = false;
+        panel.classList.toggle("is-support", hasSupport);
+        panel.classList.toggle("is-oppose", hasOppose);
+        panel.innerHTML = `
+          <p class="policy-engage__logged-message">
+            ${hasSupport ? "You supported this" : "You opposed this"}
+          </p>
+          <button type="button" class="policy-engage__change">Change</button>
+        `;
+        panel.querySelector(".policy-engage__change")?.addEventListener(
+          "click",
+          () => {
+            roots.changeMode = true;
+            applyLoggedStanceUI(roots, mine);
+          }
+        );
+      }
+      return;
+    }
+
+    // Choosing / changing: show Support / Oppose buttons again.
+    if (stances) stances.hidden = false;
+    if (panel) {
+      if (editing && hasVote) {
+        panel.hidden = false;
+        panel.classList.remove("is-support", "is-oppose");
+        panel.innerHTML = `
+          <p class="policy-engage__logged-hint">
+            Choose Support or Oppose to update your vote.
+          </p>
+        `;
+      } else {
+        panel.hidden = true;
+        panel.classList.remove("is-support", "is-oppose");
+        panel.innerHTML = "";
+      }
+    }
+  }
+
+  async function refreshMountedCard(item, roots, votePayload = null) {
     const communityBody = roots.communityBody;
     const alignmentEl = roots.alignmentEl;
     const mine = state.stances.get(item.id);
-    supportBtn.classList.toggle("is-active", mine === "support");
-    opposeBtn.classList.toggle("is-active", mine === "oppose");
-    supportBtn.setAttribute("aria-pressed", String(mine === "support"));
-    opposeBtn.setAttribute("aria-pressed", String(mine === "oppose"));
+    applyLoggedStanceUI(roots, mine);
     if (communityBody) {
       const stats = await fetchCommunity(item.id);
       communityBody.innerHTML = renderCommunityHtml(stats);
@@ -734,6 +899,7 @@ Sincerely,
             opposeLabel
           )}</button>
         </div>
+        <div class="policy-engage__logged-panel" hidden></div>
         ${
           showTakeAction
             ? `<button type="button" class="refresh-btn policy-engage__take-action">Take Action</button>`
@@ -766,32 +932,44 @@ Sincerely,
       root: wrap,
       supportBtn: wrap.querySelector('[data-stance="support"]'),
       opposeBtn: wrap.querySelector('[data-stance="oppose"]'),
+      stancesEl: wrap.querySelector(".policy-engage__stances"),
+      loggedPanel: wrap.querySelector(".policy-engage__logged-panel"),
       communityBody: wrap.querySelector(".policy-engage__community-body"),
       voteBody: wrap.querySelector(".policy-engage__vote-body"),
       alignmentEl: wrap.querySelector(".policy-engage__alignment"),
       onStanceChange: options.onStanceChange || null,
+      supportLabel,
+      opposeLabel,
+      changeMode: false,
     };
 
     const mine = state.stances.get(item.id);
-    roots.supportBtn.classList.toggle("is-active", mine === "support");
-    roots.opposeBtn.classList.toggle("is-active", mine === "oppose");
-    roots.supportBtn.setAttribute("aria-pressed", String(mine === "support"));
-    roots.opposeBtn.setAttribute("aria-pressed", String(mine === "oppose"));
+    applyLoggedStanceUI(roots, mine);
 
     roots.supportBtn.addEventListener("click", async () => {
       try {
+        roots.supportBtn.disabled = true;
+        roots.opposeBtn.disabled = true;
         await setStance(item, "support", roots);
       } catch (error) {
         console.error(error);
         alert(error.message || "Could not save stance.");
+      } finally {
+        roots.supportBtn.disabled = false;
+        roots.opposeBtn.disabled = false;
       }
     });
     roots.opposeBtn.addEventListener("click", async () => {
       try {
+        roots.supportBtn.disabled = true;
+        roots.opposeBtn.disabled = true;
         await setStance(item, "oppose", roots);
       } catch (error) {
         console.error(error);
         alert(error.message || "Could not save stance.");
+      } finally {
+        roots.supportBtn.disabled = false;
+        roots.opposeBtn.disabled = false;
       }
     });
     wrap
@@ -822,13 +1000,24 @@ Sincerely,
   }
 
   function mountVote(card, item, options = {}) {
+    const chamber = resolveItemChamber(item);
+    // Ensure compare bioguides travel with the item for fetchVoteMatch.
+    if (
+      Array.isArray(options.compareBioguides) &&
+      options.compareBioguides.length
+    ) {
+      item.compareBioguides = options.compareBioguides;
+    }
     return mount(card, item, {
       supportLabel: "Yea",
       opposeLabel: "Nay",
       prompt: "How would you vote?",
       showTakeAction: false,
       showCommunity: false,
-      whoVotedHint: "Tap Yea or Nay to compare with House members.",
+      whoVotedHint:
+        chamber === "senate"
+          ? "Tap Yea or Nay to compare with Senate roll-call votes."
+          : "Tap Yea or Nay to compare with House members.",
       ...options,
     });
   }
