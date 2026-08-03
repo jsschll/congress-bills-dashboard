@@ -3178,16 +3178,33 @@ function dedupeLookupPoliticians(politicians) {
 }
 
 function politiciansResultsUrl(address) {
-  return `politicians-results.html?address=${encodeURIComponent(address.trim())}`;
+  const value = String(address || "").trim();
+  if (!value) return "representatives.html";
+  // Match home ZIP lookup params so both entry points share one results page.
+  if (/^\d{5}(-\d{4})?$/.test(value)) {
+    return `representatives.html?zipCode=${encodeURIComponent(value.slice(0, 5))}`;
+  }
+  return `representatives.html?address=${encodeURIComponent(value)}`;
 }
 
 function politiciansBrowseUrl(address) {
   return `politicians.html?address=${encodeURIComponent(address.trim())}`;
 }
 
+function resolveAddressLookupQuery(search = window.location.search) {
+  const params = new URLSearchParams(search);
+  return (
+    params.get("address") ||
+    params.get("q") ||
+    params.get("zipCode") ||
+    params.get("zip") ||
+    ""
+  ).trim();
+}
+
 /**
- * Search forms navigate to results by default.
- * Pass destination: "politicians" to land on the Politicians page with the
+ * Search forms navigate to the unified Representative Scorecard + directory page.
+ * Pass destination: "politicians" to land on the Politicians browse page with the
  * address carried in the query string (auto-populated there).
  */
 function mountAddressLookup({ formId, inputId, destination = "results" } = {}) {
@@ -3210,18 +3227,22 @@ function mountAddressResultsPage({
   statusId = "address-status",
   resultsId = "address-results",
   queryLabelId = "results-query",
+  redirectIfMissing = "politicians.html",
+  queryOverride = null,
 } = {}) {
   const status = document.getElementById(statusId);
   const results = document.getElementById(resultsId);
   const queryLabel = document.getElementById(queryLabelId);
   if (!status || !results) return;
 
-  const address = new URLSearchParams(window.location.search)
-    .get("address")
-    ?.trim();
+  const address = String(
+    queryOverride || resolveAddressLookupQuery() || ""
+  ).trim();
 
   if (!address) {
-    window.location.replace("politicians.html");
+    if (redirectIfMissing) {
+      window.location.replace(redirectIfMissing);
+    }
     return;
   }
 

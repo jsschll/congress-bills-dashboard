@@ -1564,6 +1564,74 @@
     return payload;
   }
 
+  function bindViewToggle() {
+    const toggle = $("scorecard-view-toggle");
+    const main = document.querySelector(".page--scorecard");
+    const details = $("scorecard-directory-details");
+    if (!toggle || toggle.dataset.bound === "1") return;
+    toggle.dataset.bound = "1";
+
+    toggle.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-view]");
+      if (!button) return;
+      const view = button.dataset.view;
+      toggle.querySelectorAll("[data-view]").forEach((btn) => {
+        const selected = btn.dataset.view === view;
+        btn.classList.toggle("is-active", selected);
+        btn.setAttribute("aria-selected", selected ? "true" : "false");
+      });
+      if (main) main.dataset.activeView = view;
+
+      if (view === "directory") {
+        if (details) details.open = true;
+        $("scorecard-directory")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      } else {
+        $("scorecard-primary")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    });
+  }
+
+  function mountOfficialsDirectory(lookupQuery) {
+    const section = $("scorecard-directory");
+    const toggle = $("scorecard-view-toggle");
+    const query = String(lookupQuery || "").trim();
+
+    if (!query) {
+      if (section) section.hidden = true;
+      if (toggle) toggle.hidden = true;
+      return;
+    }
+
+    if (section) section.hidden = false;
+    if (toggle) toggle.hidden = false;
+    bindViewToggle();
+
+    if (typeof mountAddressResultsPage !== "function") {
+      const status = $("directory-status");
+      if (status) {
+        status.hidden = false;
+        status.dataset.type = "error";
+        status.textContent =
+          "Officials directory is unavailable on this page build.";
+      }
+      return;
+    }
+
+    mountAddressResultsPage({
+      statusId: "directory-status",
+      resultsId: "address-results",
+      queryLabelId: null,
+      redirectIfMissing: false,
+      queryOverride: query,
+    });
+  }
+
   function mountRepresentativesScorecard() {
     const query = readQuery();
     const session = readSession();
@@ -1676,6 +1744,13 @@
         const bioguideId = query.bioguideId || null;
         const politicianId = query.politicianId || null;
         const sessionActiveId = session?.activeId || null;
+        const directoryQuery =
+          address ||
+          zipCode ||
+          (typeof resolveAddressLookupQuery === "function"
+            ? resolveAddressLookupQuery()
+            : "") ||
+          null;
 
         if (
           !id &&
@@ -1748,7 +1823,7 @@
           if (payload.counts) {
             lede.textContent = `${payload.counts.total || 0} federal representative${
               payload.counts.total === 1 ? "" : "s"
-            } — switch tabs to compare donor alignment, attendance, and votes.`;
+            } — switch tabs for scorecards, or open Full Regional & State Representation below.`;
           } else if (payload.representatives?.length === 1) {
             lede.textContent =
               "Donor alignment, attendance, Action Match, and Truth in Voting for this member.";
@@ -1757,6 +1832,12 @@
 
         setStatus("", "loading");
         await paint();
+        mountOfficialsDirectory(
+          directoryQuery ||
+            payload.location?.formattedAddress ||
+            payload.location?.state ||
+            null
+        );
       } catch (error) {
         setStatus(error?.message || "Could not load scorecards.", "error");
       }

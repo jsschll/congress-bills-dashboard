@@ -4,68 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Your representatives · Article 1</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="styles.css?v=20260804a1" />
+    <script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var raw = (
+            params.get("address") ||
+            params.get("q") ||
+            params.get("zipCode") ||
+            params.get("zip") ||
+            ""
+          ).trim();
+          var next = "representatives.html";
+          if (raw) {
+            var key = /^\d{5}(-\d{4})?$/.test(raw) ? "zipCode" : "address";
+            var value = key === "zipCode" ? raw.slice(0, 5) : raw;
+            next =
+              "representatives.html?" +
+              key +
+              "=" +
+              encodeURIComponent(value);
+          }
+          window.location.replace(next);
+        } catch (e) {
+          window.location.replace("representatives.html");
+        }
+      })();
+    </script>
   </head>
-  <body class="page-app page-politicians">
-    <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
-
-    <section class="politicians-hero politicians-hero--compact" aria-label="Search representatives">
-      <div class="politicians-hero__media" aria-hidden="true"></div>
-      <div class="politicians-hero__shade" aria-hidden="true"></div>
-      <div class="politicians-hero__content">
-        <p class="politicians-hero__brand">
-          <a class="politicians-hero__back" href="politicians.html">← Politicians</a>
-        </p>
-        <h1 class="politicians-hero__title">Your representatives</h1>
-        <p class="politicians-hero__lede">
-          Results for <strong id="results-query">your address</strong>
-        </p>
-        <form
-          id="address-form"
-          class="politicians-hero__form"
-          aria-label="Search another address"
-        >
-          <label class="visually-hidden" for="address-input"
-            >Street address or ZIP code</label
-          >
-          <input
-            id="address-input"
-            class="politicians-hero__input"
-            type="search"
-            name="address"
-            placeholder="Street address or ZIP code"
-            autocomplete="street-address"
-            required
-          />
-          <button class="politicians-hero__submit" type="submit">
-            Look up
-          </button>
-        </form>
-      </div>
-    </section>
-
-    <main class="page page--politicians">
-      <section
-        class="lookup-results-panel politicians-results-panel"
-        aria-labelledby="results-heading"
-      >
-        <h2 id="results-heading" class="visually-hidden">Search results</h2>
-        <p id="address-status" class="status politicians-status" hidden></p>
-        <div id="address-results" class="politician-results"></div>
-      </section>
-    </main>
-
-    <script src="config.js"></script>
-    <script src="shared.js"></script>
-    <script src="nav.js?v=20260804a1"></script>
-    <script src="engagement.js?v=20260729t"></script>
-    <script src="politicians-shared.js?v=20260804sc3"></script>
-    <script src="politicians-results.js?v=20260729t" defer></script>
+  <body>
+    <p>
+      Redirecting to the unified Representative Scorecard…
+      <a href="representatives.html">Continue</a>
+    </p>
   </body>
 </html>
