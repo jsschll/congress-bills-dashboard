@@ -2240,6 +2240,16 @@ function renderPoliticianCard(
     }
 
     followBtn.disabled = true;
+    followBtn.classList.add("is-loading");
+    const wasFollowing = Boolean(politician.id && followedIds.has(politician.id));
+    // Optimistic UI
+    if (wasFollowing) {
+      followBtn.textContent = "Follow";
+      followBtn.classList.remove("is-following");
+    } else {
+      followBtn.textContent = "Following";
+      followBtn.classList.add("is-following");
+    }
     try {
       let record = politician;
       if (!record.id) {
@@ -2248,22 +2258,40 @@ function renderPoliticianCard(
         politician.id = record.id;
       }
 
-      if (followedIds.has(politician.id)) {
+      if (wasFollowing) {
         await unfollowPolitician(user.id, politician.id);
         followedIds.delete(politician.id);
         followBtn.textContent = "Follow";
         followBtn.classList.remove("is-following");
+        if (typeof showAppToast === "function") {
+          showAppToast(`Unfollowed ${politician.name || "official"}.`, "info");
+        }
       } else {
         await followPolitician(user.id, politician.id);
         followedIds.add(politician.id);
         followBtn.textContent = "Following";
         followBtn.classList.add("is-following");
+        if (typeof showAppToast === "function") {
+          showAppToast(`Following ${politician.name || "official"}.`, "success");
+        }
       }
       onFollowChange?.(politician);
     } catch (error) {
       console.error(error);
-      alert(error.message || "Could not update follow.");
+      if (wasFollowing) {
+        followBtn.textContent = "Following";
+        followBtn.classList.add("is-following");
+      } else {
+        followBtn.textContent = "Follow";
+        followBtn.classList.remove("is-following");
+      }
+      if (typeof showAppToast === "function") {
+        showAppToast(error.message || "Could not update follow.", "error");
+      } else {
+        alert(error.message || "Could not update follow.");
+      }
     } finally {
+      followBtn.classList.remove("is-loading");
       followBtn.disabled = false;
     }
   });
