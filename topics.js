@@ -79,16 +79,34 @@ function renderPolicyAreas() {
         ? "refresh-btn policy-card__btn is-following"
         : "refresh-btn policy-card__btn";
       button.textContent = following ? "Following" : "Follow";
-      button.addEventListener("click", () => {
-        if (following) {
-          const row = follows.find(
-            (item) =>
-              item.kind === "policy_area" &&
-              item.value.toLowerCase() === area.toLowerCase()
-          );
-          if (row) unfollow(row);
-        } else {
-          follow("policy_area", area);
+      button.setAttribute("aria-pressed", following ? "true" : "false");
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        button.classList.add("is-loading");
+        try {
+          if (following) {
+            const row = follows.find(
+              (item) =>
+                item.kind === "policy_area" &&
+                item.value.toLowerCase() === area.toLowerCase()
+            );
+            // Optimistic
+            button.textContent = "Follow";
+            button.classList.remove("is-following");
+            button.setAttribute("aria-pressed", "false");
+            if (row) await unfollow(row);
+            else renderPolicyAreas();
+          } else {
+            button.textContent = "Following";
+            button.classList.add("is-following");
+            button.setAttribute("aria-pressed", "true");
+            await follow("policy_area", area);
+          }
+        } finally {
+          button.classList.remove("is-loading");
+          button.disabled = false;
+          // follow/unfollow re-render on success; ensure failure reverts optimistic UI
+          renderPolicyAreas();
         }
       });
 
@@ -114,6 +132,9 @@ async function follow(kind, value) {
   if (error) {
     console.error(error);
     setTopicsStatus(error.message || "Could not follow topic.", "error");
+    if (typeof showAppToast === "function") {
+      showAppToast(error.message || "Could not follow topic.", "error");
+    }
     return;
   }
 
@@ -121,6 +142,9 @@ async function follow(kind, value) {
   renderFollowing();
   renderPolicyAreas();
   setTopicsStatus(`Now following “${cleaned}”.`, "success");
+  if (typeof showAppToast === "function") {
+    showAppToast(`Following “${cleaned}”.`, "success");
+  }
   setTimeout(() => setTopicsStatus(""), 1800);
 }
 
@@ -136,6 +160,9 @@ async function unfollow(item) {
   if (error) {
     console.error(error);
     setTopicsStatus(error.message || "Could not unfollow.", "error");
+    if (typeof showAppToast === "function") {
+      showAppToast(error.message || "Could not unfollow.", "error");
+    }
     return;
   }
 
@@ -143,6 +170,9 @@ async function unfollow(item) {
   renderFollowing();
   renderPolicyAreas();
   setTopicsStatus("", "success");
+  if (typeof showAppToast === "function") {
+    showAppToast(`Unfollowed “${item.value || "topic"}”.`, "info");
+  }
 }
 
 keywordForm.addEventListener("submit", async (event) => {

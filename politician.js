@@ -598,6 +598,17 @@ function bindFollowButton(person) {
       return;
     }
     button.disabled = true;
+    button.classList.add("is-loading");
+    const wasFollowing = Boolean(
+      activePerson?.id && followedPoliticianIds.has(String(activePerson.id))
+    );
+    // Optimistic toggle for instant feedback.
+    if (activePerson?.id) {
+      const id = String(activePerson.id);
+      if (wasFollowing) followedPoliticianIds.delete(id);
+      else followedPoliticianIds.add(id);
+      syncFollowButton();
+    }
     try {
       let record = activePerson || person;
       if (!record.id) {
@@ -615,6 +626,11 @@ function bindFollowButton(person) {
         }
         activePerson = record;
         if (person) person.id = record.id;
+        // Apply optimistic state now that we have an id.
+        if (record?.id && !wasFollowing) {
+          followedPoliticianIds.add(String(record.id));
+          syncFollowButton();
+        }
       }
       if (!record?.id) {
         throw new Error(
@@ -623,19 +639,36 @@ function bindFollowButton(person) {
       }
 
       const id = String(record.id);
-      if (followedPoliticianIds.has(id)) {
+      if (wasFollowing) {
         await unfollowPolitician(followUser.id, id);
         followedPoliticianIds.delete(id);
+        if (typeof showAppToast === "function") {
+          showAppToast(`Unfollowed ${record.name || "official"}.`, "info");
+        }
       } else {
         await followPolitician(followUser.id, id);
         followedPoliticianIds.add(id);
+        if (typeof showAppToast === "function") {
+          showAppToast(`Following ${record.name || "official"}.`, "success");
+        }
       }
       syncFollowButton();
       setStatus("", "loading");
     } catch (error) {
       console.error(error);
+      // Revert optimistic state.
+      if (activePerson?.id) {
+        const id = String(activePerson.id);
+        if (wasFollowing) followedPoliticianIds.add(id);
+        else followedPoliticianIds.delete(id);
+        syncFollowButton();
+      }
       setStatus(error.message || "Could not update follow.", "error");
+      if (typeof showAppToast === "function") {
+        showAppToast(error.message || "Could not update follow.", "error");
+      }
     } finally {
+      button.classList.remove("is-loading");
       button.disabled = false;
     }
   });
@@ -1727,24 +1760,49 @@ document.addEventListener("pointerdown", (event) => {
 noteSaveBtn?.addEventListener("click", async () => {
   if (!activePerson) return;
   setNotesStatus("Saving note…", "loading");
+  noteSaveBtn.disabled = true;
+  noteSaveBtn.classList.add("is-loading");
   try {
     const user = typeof getUser === "function" ? await getUser() : null;
     await savePoliticianNote(activePerson, user);
+    if (typeof showAppToast === "function") {
+      showAppToast("Private note saved.", "success");
+    }
+    if (typeof flashSuccessBadge === "function") {
+      flashSuccessBadge(noteSaveBtn, "Saved");
+    }
   } catch (error) {
     console.error(error);
     setNotesStatus(error.message || "Could not save note.", "error");
+    if (typeof showAppToast === "function") {
+      showAppToast(error.message || "Could not save note.", "error");
+    }
+  } finally {
+    noteSaveBtn.classList.remove("is-loading");
+    noteSaveBtn.disabled = false;
   }
 });
 
 noteClearBtn?.addEventListener("click", async () => {
   if (!activePerson || !politicianNote?.id) return;
   setNotesStatus("Clearing note…", "loading");
+  noteClearBtn.disabled = true;
+  noteClearBtn.classList.add("is-loading");
   try {
     const user = typeof getUser === "function" ? await getUser() : null;
     await clearPoliticianNote(activePerson, user);
+    if (typeof showAppToast === "function") {
+      showAppToast("Private note cleared.", "info");
+    }
   } catch (error) {
     console.error(error);
     setNotesStatus(error.message || "Could not clear note.", "error");
+    if (typeof showAppToast === "function") {
+      showAppToast(error.message || "Could not clear note.", "error");
+    }
+  } finally {
+    noteClearBtn.classList.remove("is-loading");
+    noteClearBtn.disabled = false;
   }
 });
 

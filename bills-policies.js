@@ -1155,11 +1155,40 @@ function renderBillCard(item) {
   card
     .querySelector(".policy-bill-card__follow")
     .addEventListener("click", async () => {
+      const btn = card.querySelector(".policy-bill-card__follow");
+      const wasFollowed = isFollowedBill(item);
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add("is-loading");
+        // Optimistic label swap
+        btn.textContent = wasFollowed ? "Follow bill" : "Following";
+        btn.classList.toggle("is-following", !wasFollowed);
+      }
       try {
         await toggleFollowBill(item);
+        if (typeof showAppToast === "function") {
+          showAppToast(
+            wasFollowed
+              ? `Unfollowed ${item.billNumber || "bill"}.`
+              : `Following ${item.billNumber || "bill"}.`,
+            wasFollowed ? "info" : "success"
+          );
+        }
       } catch (error) {
         console.error(error);
+        if (btn) {
+          btn.textContent = wasFollowed ? "Following" : "Follow bill";
+          btn.classList.toggle("is-following", wasFollowed);
+        }
         setPolicyFeedStatus("Could not update bill follow.", "error");
+        if (typeof showAppToast === "function") {
+          showAppToast("Could not update bill follow.", "error");
+        }
+      } finally {
+        if (btn) {
+          btn.classList.remove("is-loading");
+          btn.disabled = false;
+        }
       }
     });
 

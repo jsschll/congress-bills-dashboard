@@ -579,6 +579,7 @@ body {
 }
 
 .refresh-btn {
+  position: relative;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -587,7 +588,7 @@ body {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -8363,3 +8364,184 @@ body.scorecard-match-modal-open {
     background: rgba(71, 85, 105, 0.55);
   }
 }
+
+/* —— App toast + interactive button feedback —— */
+.app-toast-host {
+  position: fixed;
+  z-index: 120;
+  left: 50%;
+  bottom: 1.35rem;
+  transform: translateX(-50%);
+  width: min(22rem, calc(100vw - 1.5rem));
+  pointer-events: none;
+}
+
+.app-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(0.65rem) scale(0.98);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+}
+
+.app-toast.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.app-toast.is-leaving {
+  opacity: 0;
+  transform: translateY(0.4rem);
+}
+
+.app-toast__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+  background: rgba(52, 211, 153, 0.18);
+  color: #6ee7b7;
+}
+
+.app-toast--error {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.app-toast--error .app-toast__icon {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fca5a5;
+}
+
+.app-toast--info .app-toast__icon {
+  background: rgba(96, 165, 250, 0.18);
+  color: #93c5fd;
+}
+
+.app-toast__text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.refresh-btn,
+.politician-profile-follow-btn,
+.politician-card__follow,
+.policy-card__btn,
+.policy-bill-card__follow,
+.politician-note-clear-btn {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    filter 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.refresh-btn:hover:not(:disabled),
+.policy-card__btn:hover:not(:disabled),
+.policy-bill-card__follow:hover:not(:disabled),
+.politician-card__follow:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.refresh-btn:active:not(:disabled),
+.policy-card__btn:active:not(:disabled),
+.policy-bill-card__follow:active:not(:disabled),
+.politician-card__follow:active:not(:disabled),
+.politician-profile-follow-btn:active:not(:disabled),
+.politician-note-clear-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+  filter: brightness(0.96);
+}
+
+.refresh-btn.is-loading,
+.politician-profile-follow-btn.is-loading,
+.policy-card__btn.is-loading,
+.politician-card__follow.is-loading,
+.policy-bill-card__follow.is-loading {
+  position: relative;
+  opacity: 0.78;
+  cursor: wait;
+  pointer-events: none;
+}
+
+.refresh-btn.is-following,
+.policy-card__btn.is-following,
+.politician-card__follow.is-following,
+.policy-bill-card__follow.is-following {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.4);
+  color: #a7f3d0;
+}
+
+.page-app .refresh-btn.is-following:hover:not(:disabled),
+.page-app .policy-card__btn.is-following:hover:not(:disabled),
+.page-app .politician-card__follow.is-following:hover:not(:disabled),
+.page-app .policy-bill-card__follow.is-following:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(110, 231, 183, 0.55);
+  color: #d1fae5;
+}
+
+.refresh-btn.is-success-flash,
+.politician-note-save.is-success-flash {
+  position: relative;
+  border-color: rgba(52, 211, 153, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.btn-success-badge {
+  position: absolute;
+  top: -0.55rem;
+  right: -0.35rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: #10b981;
+  color: #042f2e;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.35);
+  animation: btn-badge-pop 0.25s ease;
+}
+
+@keyframes btn-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7) translateY(0.2rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast,
+  .refresh-btn,
+  .politician-profile-follow-btn,
+  .politician-card__follow,
+  .policy-card__btn,
+  .policy-bill-card__follow,
+  .btn-success-badge {
+    transition: none;
+    animation: none;
+  }
+}
+

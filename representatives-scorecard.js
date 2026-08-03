@@ -1009,6 +1009,9 @@
           `Unfollowed ${person.name || "this official"}.`,
           "success"
         );
+        if (typeof showAppToast === "function") {
+          showAppToast(`Unfollowed ${person.name || "this official"}.`, "info");
+        }
       }
     } else {
       await followPolitician(user.id, id);
@@ -1019,6 +1022,9 @@
           `Following ${person.name || "this official"} — their actions will show in My Feed.`,
           "success"
         );
+        if (typeof showAppToast === "function") {
+          showAppToast(`Following ${person.name || "this official"}.`, "success");
+        }
       }
     }
     syncFollowButton();

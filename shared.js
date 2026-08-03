@@ -1978,3 +1978,89 @@ function showSkeletonCards(container, { type = "bill", count = 4 } = {}) {
   container.replaceChildren(wrap);
 }
 
+/** Subtle app-wide toast confirmations for follow/note actions. */
+let appToastTimer = null;
+
+function ensureAppToastHost() {
+  let host = document.getElementById("app-toast-host");
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = "app-toast-host";
+  host.className = "app-toast-host";
+  host.setAttribute("aria-live", "polite");
+  host.setAttribute("aria-atomic", "true");
+  document.body.append(host);
+  return host;
+}
+
+function showAppToast(message, type = "success", { duration = 2600 } = {}) {
+  const text = String(message || "").trim();
+  if (!text || typeof document === "undefined") return null;
+  const host = ensureAppToastHost();
+  const toast = document.createElement("div");
+  toast.className = `app-toast app-toast--${type}`;
+  toast.setAttribute("role", "status");
+
+  const icon = document.createElement("span");
+  icon.className = "app-toast__icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent =
+    type === "error" ? "!" : type === "info" ? "i" : "✓";
+
+  const body = document.createElement("span");
+  body.className = "app-toast__text";
+  body.textContent = text;
+
+  toast.append(icon, body);
+  host.replaceChildren(toast);
+  requestAnimationFrame(() => toast.classList.add("is-visible"));
+
+  clearTimeout(appToastTimer);
+  appToastTimer = setTimeout(() => {
+    toast.classList.remove("is-visible");
+    toast.classList.add("is-leaving");
+    setTimeout(() => {
+      if (toast.parentElement === host) toast.remove();
+    }, 220);
+  }, Math.max(1200, Number(duration) || 2600));
+
+  return toast;
+}
+
+function setButtonLoading(button, isLoading, loadingLabel = "") {
+  if (!button) return;
+  if (isLoading) {
+    if (!button.dataset.prevLabel) {
+      button.dataset.prevLabel = button.textContent || "";
+    }
+    button.classList.add("is-loading");
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    if (loadingLabel) button.textContent = loadingLabel;
+  } else {
+    button.classList.remove("is-loading");
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    if (button.dataset.prevLabel != null) {
+      // Only restore if caller didn't already set a new label.
+      if (loadingLabel && button.textContent === loadingLabel) {
+        button.textContent = button.dataset.prevLabel;
+      }
+      delete button.dataset.prevLabel;
+    }
+  }
+}
+
+function flashSuccessBadge(button, label = "Saved") {
+  if (!button) return;
+  button.classList.add("is-success-flash");
+  const badge = document.createElement("span");
+  badge.className = "btn-success-badge";
+  badge.textContent = label;
+  button.append(badge);
+  setTimeout(() => {
+    badge.remove();
+    button.classList.remove("is-success-flash");
+  }, 1600);
+}
+
