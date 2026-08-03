@@ -761,95 +761,12 @@ function renderMatchScorecard({ user, rows }, person) {
     (a, b) => b.compared - a.compared
   );
 
-  const billLink = (row) => {
-    const bill = row.bill || {};
-    const impact =
-      row.impact ||
-      (typeof buildActionMatchImpact === "function"
-        ? buildActionMatchImpact(bill, row.voteCopy, row)
-        : null);
-    const shortTitle =
-      impact?.short_title ||
-      row.displayTitle ||
-      bill.title ||
-      bill.bill_number ||
-      row.bill_id;
-    const rawCode = impact?.raw_code || bill.bill_number || "";
-    const whatItDoes =
-      impact?.what_it_does || row.detailSummary || bill.short_pitch || "";
-    const detailHref =
-      row.detailHref ||
-      bill.official_url ||
-      `bills-policies.html?tab=votes&bill=${encodeURIComponent(
-        row.bill_id || bill.id || ""
-      )}`;
-    const detailPayload = encodeURIComponent(
-      JSON.stringify({
-        title: shortTitle,
-        number: rawCode,
-        summary: whatItDoes,
-        yea: impact?.yea_impact || row.voteMeans?.yea || "",
-        nay: impact?.nay_impact || row.voteMeans?.nay || "",
-        href: detailHref,
-        rawTitle: bill.title || "",
-        stance: row.user_stance || "",
-        memberVote: row.member_vote || "",
-        yourStanceLabel: impact?.your_stance_label || "",
-        yourStanceImpact: impact?.your_stance_impact || "",
-        repStanceLabel: impact?.rep_stance_label || "",
-        repStanceImpact: impact?.rep_stance_impact || "",
-      })
-    );
-
-    return `<li class="scorecard-match-item">
-      <div class="scorecard-match-item__top">
-        <button
-          type="button"
-          class="scorecard-match-item__title"
-          data-open-match-detail="${detailPayload}"
-        >
-          <span class="scorecard-match-item__name">${escapeHtml(
-            shortTitle
-          )}</span>
-          ${
-            rawCode
-              ? `<span class="scorecard-match-item__code">${escapeHtml(
-                  rawCode
-                )}</span>`
-              : ""
-          }
-        </button>
-        <button
-          type="button"
-          class="scorecard-match-item__info"
-          data-toggle-match-means="1"
-          aria-expanded="false"
-          aria-label="What this vote means"
-          title="What this vote means"
-        >ⓘ</button>
-      </div>
-      <p class="scorecard-match-item__stance">
-        You ${escapeHtml(row.user_stance)} · They voted ${escapeHtml(
-          row.member_vote || "—"
-        )}
-      </p>
-      <div class="scorecard-match-item__means" hidden>
-        <p><strong>What this vote means:</strong> ${escapeHtml(
-          whatItDoes || "—"
-        )}</p>
-        <p><strong>Your Stance (${escapeHtml(
-          impact?.your_stance_label || "Support"
-        )}):</strong> ${escapeHtml(
-          impact?.your_stance_impact || impact?.yea_impact || "—"
-        )}</p>
-        <p><strong>Representative Stance (${escapeHtml(
-          impact?.rep_stance_label || "—"
-        )}):</strong> ${escapeHtml(
-          impact?.rep_stance_impact || impact?.nay_impact || "—"
-        )}</p>
-      </div>
-    </li>`;
-  };
+  const billLink = (row) =>
+    typeof renderActionMatchScorecardItem === "function"
+      ? renderActionMatchScorecardItem(row, escapeHtml)
+      : `<li class="scorecard-match-item">${escapeHtml(
+          row.bill?.title || row.bill_id || "Roll call"
+        )}</li>`;
 
   // Empty scorecard: prompt the user to vote on bills in the Activity Feed.
   if (compared.length === 0) {

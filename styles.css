@@ -5104,12 +5104,20 @@ a.politician-badge--match {
   outline: none;
 }
 
+.scorecard-match-item__summary {
+  margin: 0.1rem 0 0;
+  color: #cbd5e1;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
 .scorecard-match-item__stance {
   margin: 0;
   color: #94a3b8;
   font-size: 0.82rem;
 }
 
+.scorecard-match-item__breakdown,
 .scorecard-match-item__means {
   display: grid;
   gap: 0.35rem;
@@ -5120,6 +5128,7 @@ a.politician-badge--match {
   background: rgba(15, 23, 42, 0.55);
 }
 
+.scorecard-match-item__breakdown p,
 .scorecard-match-item__means p {
   margin: 0;
   color: #cbd5e1;
@@ -5127,6 +5136,7 @@ a.politician-badge--match {
   line-height: 1.4;
 }
 
+.scorecard-match-item__breakdown strong,
 .scorecard-match-item__means strong {
   color: #e2e8f0;
 }
