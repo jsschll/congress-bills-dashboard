@@ -534,3 +534,255 @@ async function uploadProfileAvatar(userId, file) {
   }
 }
 
+/**
+ * Action Match helpers — humanize amendment titles + Yea/Nay context.
+ */
+
+function collapseMatchWs(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function firstMatchSentence(text, maxChars = 220) {
+  const cleaned = collapseMatchWs(text);
+  if (!cleaned) return "";
+  // Avoid splitting on common abbreviations (U.S., F.Y., No., Amdt.).
+  const protectedText = cleaned
+    .replace(/\bU\.S\./gi, "US")
+    .replace(/\bF\.Y\.?/gi, "FY")
+    .replace(/\bNo\./gi, "No")
+    .replace(/\bAmdt\./gi, "Amdt")
+    .replace(/\b[A-Z]\.(?=[A-Za-z])/g, (m) => m.replace(".", ""));
+  const match = protectedText.match(/[^.!?]+[.!?]+|[^.!?]+$/);
+  let sentence = collapseMatchWs(match ? match[0] : protectedText);
+  sentence = sentence.replace(/\bUS\b/g, "U.S.");
+  if (sentence.length > maxChars) {
+    sentence = `${sentence.slice(0, maxChars - 1).replace(/\s+\S*$/, "")}…`;
+  }
+  if (sentence && !/[.!?]$/.test(sentence)) sentence = `${sentence}.`;
+  return sentence;
+}
+
+function parseAmendmentAttribution(title = "") {
+  const raw = collapseMatchWs(title);
+  if (!raw) return null;
+  const match = raw.match(
+    /(?:Re:\s*)?([A-Z][A-Za-z.'\-]+(?:\s+[A-Z][A-Za-z.'\-]+){0,3})\s+Amdt\.?\s*(?:No\.?\s*)?(\d+)/i
+  );
+  if (!match) return null;
+  return {
+    sponsor: collapseMatchWs(match[1]),
+    number: match[2],
+    label: `${collapseMatchWs(match[1])} Amdt. ${match[2]}`,
+  };
+}
+
+function topicFromPitch(pitch = "") {
+  let text = firstMatchSentence(pitch, 280).replace(/\.$/, "");
+  if (!text) return "";
+  text = text.replace(
+    /^This (amendment|motion|bill|measure|vote|package)\s+/i,
+    ""
+  );
+  text = text.replace(
+    /^(allows the (Senate|House) to |allows Congress to |would |will )/i,
+    ""
+  );
+
+  const forMatch = text.match(
+    /\bfor\s+(.+?)(?:\s+through\b|\s+while\b|\s+and related\b|\.|$)/i
+  );
+  if (forMatch) {
+    let topic = collapseMatchWs(forMatch[1]).replace(/,$/, "");
+    topic = topic.replace(/,?\s+and related.*$/i, "").trim();
+    if (topic.length >= 12) {
+      topic = topic.charAt(0).toUpperCase() + topic.slice(1);
+      if (topic.length > 72) {
+        topic = `${topic.slice(0, 69).replace(/\s+\S*$/, "")}…`;
+      }
+      return topic;
+    }
+  }
+
+  const allocates = text.match(
+    /^(?:allocates|provides|authorizes|requires|establishes|expands|creates)\s+(.+)$/i
+  );
+  if (allocates) {
+    let topic = collapseMatchWs(allocates[1]);
+    const purpose = topic.match(/\bfor\s+(.+)$/i);
+    if (purpose) topic = purpose[1];
+    topic = topic.replace(/,?\s+and related.*$/i, "").trim();
+    if (topic.length > 72) {
+      topic = `${topic.slice(0, 69).replace(/\s+\S*$/, "")}…`;
+    }
+    return topic.charAt(0).toUpperCase() + topic.slice(1);
+  }
+
+  if (text.length > 72) {
+    text = `${text.slice(0, 69).replace(/\s+\S*$/, "")}…`;
+  }
+  return text;
+}
+
+function cleanRawMatchTitle(title = "", billNumber = "") {
+  let text = collapseMatchWs(title);
+  const number = collapseMatchWs(billNumber);
+  if (!text) return number || "Congressional roll call";
+  // Strip duplicated bill-number prefixes: "S. 2 S. 2: …" / "S. 2: S. 2: …"
+  if (number) {
+    const escaped = number.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`^(?:${escaped}\\s*:?\\s*)+`, "i");
+    text = text.replace(re, "").trim();
+  }
+  text = text.replace(/^(seed|placeholder)\s*:\s*/i, "");
+  return text || number || "Congressional roll call";
+}
+
+/**
+ * Build a plain-English Action Match card title.
+ * Example: "Border security and immigration enforcement (Cortez Masto Amdt. 5463)"
+ */
+function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
+  const number = collapseMatchWs(bill.bill_number || bill.billNumber || "");
+  const rawTitle = collapseMatchWs(bill.title || "");
+  const pitch =
+    collapseMatchWs(voteCopy?.summary || "") ||
+    collapseMatchWs(bill.short_pitch || bill.shortPitch || "");
+  const attribution = parseAmendmentAttribution(rawTitle);
+  const topic =
+    topicFromPitch(pitch) ||
+    cleanRawMatchTitle(rawTitle, number) ||
+    number ||
+    "Congressional roll call";
+
+  if (attribution) {
+    // Avoid "Cortez Masto Amdt. 5463 (Cortez Masto Amdt. 5463)"
+    const topicLooksLikeAmdt = /amdt\.?\s*(?:no\.?\s*)?\d+/i.test(topic);
+    if (topicLooksLikeAmdt) return attribution.label;
+    return `${topic} (${attribution.label})`;
+  }
+
+  if (number) {
+    const bareNumber = number.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
+    const bareTopic = topic.replace(/\./g, "").replace(/\s+/g, "").toLowerCase();
+    if (bareTopic.startsWith(bareNumber) || /^[^:]+:\s*/.test(topic)) {
+      return topic.includes(":")
+        ? topic.replace(/^[^:]+/, number)
+        : `${number}: ${topic}`;
+    }
+    return `${number}: ${topic}`;
+  }
+  return topic;
+}
+
+function buildActionMatchVoteMeans(bill = {}, voteCopy = null) {
+  const yeaFromCopy = collapseMatchWs(voteCopy?.yea_means || voteCopy?.yeaMeans || "");
+  const nayFromCopy = collapseMatchWs(voteCopy?.nay_means || voteCopy?.nayMeans || "");
+  let yea =
+    yeaFromCopy && !isGenericVoteMeans(yeaFromCopy) ? yeaFromCopy : "";
+  let nay =
+    nayFromCopy && !isGenericVoteMeans(nayFromCopy) ? nayFromCopy : "";
+
+  if (yea && !/^a yea\b/i.test(yea)) {
+    yea = `A Yea vote means ${yea.charAt(0).toLowerCase()}${yea
+      .slice(1)
+      .replace(/\.$/, "")}.`;
+  }
+  if (nay && !/^a nay\b/i.test(nay)) {
+    nay = `A Nay vote means ${nay.charAt(0).toLowerCase()}${nay
+      .slice(1)
+      .replace(/\.$/, "")}.`;
+  }
+  if (yea && nay) return { yea, nay };
+
+  const pitch = firstMatchSentence(
+    voteCopy?.summary || bill.short_pitch || bill.shortPitch || "",
+    180
+  );
+  if (pitch) {
+    const clause = pitch
+      .replace(/^This (amendment|motion|bill|measure|vote)\s+/i, "")
+      .replace(/\.$/, "");
+    return {
+      yea: `A Yea vote supports ${clause}.`,
+      nay: "A Nay vote rejects this change and leaves current law or procedure in place.",
+    };
+  }
+
+  const attribution = parseAmendmentAttribution(bill.title || "");
+  if (attribution) {
+    return {
+      yea: `A Yea vote supports the ${attribution.label}.`,
+      nay: `A Nay vote rejects the ${attribution.label}.`,
+    };
+  }
+
+  return {
+    yea: "A Yea vote supports advancing this measure as written.",
+    nay: "A Nay vote supports rejecting this measure.",
+  };
+}
+
+function actionMatchDetailHref(bill = {}, voteCopy = null) {
+  const official =
+    collapseMatchWs(voteCopy?.official_url || bill.official_url || bill.officialUrl || "");
+  if (official) return official;
+  const id = collapseMatchWs(bill.id || bill.bill_id || "");
+  if (id) {
+    return `bills-policies.html?tab=votes&bill=${encodeURIComponent(id)}`;
+  }
+  return "bills-policies.html?tab=votes";
+}
+
+/**
+ * Enrich stance_vote_matches rows with processed_votes plain-English copy.
+ * @param {import('@supabase/supabase-js').SupabaseClient} client
+ * @param {object[]} rows
+ */
+async function enrichActionMatchRows(client, rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!client || !list.length) return list;
+
+  const ids = [
+    ...new Set(
+      list
+        .map((row) => String(row.bill_id || row.bill?.id || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  if (!ids.length) return list;
+
+  const { data, error } = await client
+    .from("processed_votes")
+    .select(
+      "roll_call_id, title, summary, yea_means, nay_means, bill_number, official_url, vote_kind, vote_question"
+    )
+    .in("roll_call_id", ids);
+  if (error) {
+    console.warn("processed_votes enrich failed:", error.message || error);
+    return list;
+  }
+
+  const byId = new Map();
+  for (const row of data || []) {
+    if (row.roll_call_id) byId.set(String(row.roll_call_id), row);
+  }
+
+  return list.map((row) => {
+    const voteCopy = byId.get(String(row.bill_id || "")) || null;
+    const bill = row.bill || {};
+    return {
+      ...row,
+      voteCopy,
+      displayTitle: humanizeActionMatchTitle(bill, voteCopy),
+      voteMeans: buildActionMatchVoteMeans(bill, voteCopy),
+      detailHref: actionMatchDetailHref(bill, voteCopy),
+      detailSummary: firstMatchSentence(
+        voteCopy?.summary || bill.short_pitch || bill.shortPitch || bill.title || "",
+        280
+      ),
+    };
+  });
+}
+

@@ -248,7 +248,11 @@ async function loadMatchRows(bioguide) {
     console.warn(error);
     return { user, rows: [] };
   }
-  return { user, rows: data || [] };
+  const rows =
+    typeof enrichActionMatchRows === "function"
+      ? await enrichActionMatchRows(client, data || [])
+      : data || [];
+  return { user, rows };
 }
 
 function enrichExecutiveDefaults(person = {}) {
@@ -759,17 +763,75 @@ function renderMatchScorecard({ user, rows }, person) {
 
   const billLink = (row) => {
     const bill = row.bill || {};
-    const title = bill.title || bill.bill_number || row.bill_id;
     const number = bill.bill_number || "";
-    const href = bill.official_url || "#";
-    return `<li>
-      <a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">
-        <strong>${escapeHtml(number)}</strong>
-        ${escapeHtml(title)}
-      </a>
-      <span>You ${escapeHtml(row.user_stance)} · They voted ${escapeHtml(
-        row.member_vote || "—"
-      )}</span>
+    const displayTitle =
+      row.displayTitle ||
+      (typeof humanizeActionMatchTitle === "function"
+        ? humanizeActionMatchTitle(bill, row.voteCopy)
+        : bill.title || number || row.bill_id);
+    const means =
+      row.voteMeans ||
+      (typeof buildActionMatchVoteMeans === "function"
+        ? buildActionMatchVoteMeans(bill, row.voteCopy)
+        : { yea: "", nay: "" });
+    const summary =
+      row.detailSummary || bill.short_pitch || bill.title || "";
+    const detailHref =
+      row.detailHref ||
+      bill.official_url ||
+      `bills-policies.html?tab=votes&bill=${encodeURIComponent(
+        row.bill_id || bill.id || ""
+      )}`;
+    const detailPayload = encodeURIComponent(
+      JSON.stringify({
+        title: displayTitle,
+        number,
+        summary,
+        yea: means.yea || "",
+        nay: means.nay || "",
+        href: detailHref,
+        rawTitle: bill.title || "",
+        stance: row.user_stance || "",
+        memberVote: row.member_vote || "",
+      })
+    );
+
+    return `<li class="scorecard-match-item">
+      <div class="scorecard-match-item__top">
+        <button
+          type="button"
+          class="scorecard-match-item__title"
+          data-open-match-detail="${detailPayload}"
+        >
+          ${
+            number
+              ? `<span class="scorecard-match-item__bill">${escapeHtml(
+                  number
+                )}</span>`
+              : ""
+          }
+          <span class="scorecard-match-item__name">${escapeHtml(
+            displayTitle
+          )}</span>
+        </button>
+        <button
+          type="button"
+          class="scorecard-match-item__info"
+          data-toggle-match-means="1"
+          aria-expanded="false"
+          aria-label="What Yea and Nay mean"
+          title="What Yea and Nay mean"
+        >ⓘ</button>
+      </div>
+      <p class="scorecard-match-item__stance">
+        You ${escapeHtml(row.user_stance)} · They voted ${escapeHtml(
+          row.member_vote || "—"
+        )}
+      </p>
+      <div class="scorecard-match-item__means" hidden>
+        <p><strong>Yea:</strong> ${escapeHtml(means.yea || "—")}</p>
+        <p><strong>Nay:</strong> ${escapeHtml(means.nay || "—")}</p>
+      </div>
     </li>`;
   };
 
@@ -861,6 +923,91 @@ function renderMatchScorecard({ user, rows }, person) {
       </div>
     </div>
   `;
+  bindPoliticianMatchListInteractions(matchBody);
+}
+
+function openPoliticianMatchDetail(payload) {
+  const modal = document.getElementById("politician-match-detail-modal");
+  if (!modal || !payload) return;
+  const titleEl = document.getElementById("politician-match-detail-title");
+  const billEl = document.getElementById("politician-match-detail-bill");
+  const summaryEl = document.getElementById("politician-match-detail-summary");
+  const yeaEl = document.getElementById("politician-match-detail-yea");
+  const nayEl = document.getElementById("politician-match-detail-nay");
+  const linkEl = document.getElementById("politician-match-detail-link");
+  const stanceEl = document.getElementById("politician-match-detail-stance");
+
+  if (titleEl) titleEl.textContent = payload.title || "Roll-call detail";
+  if (billEl) {
+    billEl.textContent = payload.number || payload.rawTitle || "";
+    billEl.hidden = !billEl.textContent;
+  }
+  if (summaryEl) {
+    summaryEl.textContent =
+      payload.summary ||
+      "No plain-English summary is available for this roll call yet.";
+  }
+  if (yeaEl) yeaEl.textContent = payload.yea || "—";
+  if (nayEl) nayEl.textContent = payload.nay || "—";
+  if (stanceEl) {
+    const stance = payload.stance ? `You ${payload.stance}` : "";
+    const member = payload.memberVote ? `They voted ${payload.memberVote}` : "";
+    stanceEl.textContent = [stance, member].filter(Boolean).join(" · ");
+    stanceEl.hidden = !stanceEl.textContent;
+  }
+  if (linkEl) {
+    linkEl.href = payload.href || "bills-policies.html?tab=votes";
+  }
+  modal.hidden = false;
+  document.body.classList.add("scorecard-match-detail-open");
+}
+
+function closePoliticianMatchDetail() {
+  const modal = document.getElementById("politician-match-detail-modal");
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove("scorecard-match-detail-open");
+}
+
+function bindPoliticianMatchListInteractions(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-toggle-match-means]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = button.closest(".scorecard-match-item");
+      const panel = item?.querySelector(".scorecard-match-item__means");
+      if (!panel) return;
+      const open = panel.hasAttribute("hidden");
+      if (open) panel.removeAttribute("hidden");
+      else panel.setAttribute("hidden", "");
+      button.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  });
+  root.querySelectorAll("[data-open-match-detail]").forEach((button) => {
+    button.addEventListener("click", () => {
+      try {
+        const payload = JSON.parse(
+          decodeURIComponent(button.getAttribute("data-open-match-detail") || "")
+        );
+        openPoliticianMatchDetail(payload);
+      } catch (error) {
+        console.warn(error);
+      }
+    });
+  });
+}
+
+function bindPoliticianMatchDetailModal() {
+  const modal = document.getElementById("politician-match-detail-modal");
+  if (!modal || modal.dataset.bound === "1") return;
+  modal.dataset.bound = "1";
+  modal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-match-detail]")) {
+      closePoliticianMatchDetail();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.hidden) closePoliticianMatchDetail();
+  });
 }
 
 function voteCastClass(voteCast) {
@@ -1568,6 +1715,7 @@ async function boot() {
   if (typeof bootNav === "function") {
     await bootNav("politicians");
   }
+  bindPoliticianMatchDetailModal();
 
   if (window.PolicyEngagement?.init) {
     try {
