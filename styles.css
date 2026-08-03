@@ -6081,6 +6081,12 @@ body.politician-notes-modal-open {
   color: #a7f3d0;
 }
 
+.scorecard-page__status[data-type="success"] {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(16, 185, 129, 0.12);
+  color: #a7f3d0;
+}
+
 .scorecard-tabs {
   display: flex;
   flex-wrap: wrap;
