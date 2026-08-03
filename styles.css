@@ -6424,7 +6424,12 @@ body.politician-notes-modal-open {
 
 @media (max-width: 640px) {
   .scorecard-hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .scorecard-hero__match {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 
   .scorecard-hero__media,
