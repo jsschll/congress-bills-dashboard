@@ -9,6 +9,7 @@
     "import:mapping": "node scripts/import-county-mapping.js",
     "import:officials": "node scripts/import-state-officials.js",
     "import:all": "node scripts/import-all-judges.js",
-    "coverage:judges": "node scripts/coverage-report.js"
+    "coverage:judges": "node scripts/coverage-report.js",
+    "seed:scorecard": "node scripts/seed-scorecard-profiles.js"
   }
 }
