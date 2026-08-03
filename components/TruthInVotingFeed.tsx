@@ -7,6 +7,9 @@ export type TruthInVotingFeedProps = {
   /** Optional topic list; defaults are derived from vote categories + common topics. */
   topics?: string[];
   className?: string;
+  /** Opens Action Match quiz / alignment flow. Keeps Support/Oppose out of audit cards. */
+  onMatchVotesClick?: () => void;
+  matchVotesLabel?: string;
 };
 
 const DEFAULT_TOPICS = [
@@ -327,6 +330,8 @@ export function TruthInVotingFeed({
   votes,
   topics,
   className = "",
+  onMatchVotesClick,
+  matchVotesLabel = "Match My Votes",
 }: TruthInVotingFeedProps) {
   const filterId = useId();
   const [topic, setTopic] = useState("all");
@@ -366,7 +371,7 @@ export function TruthInVotingFeed({
       className={`truth-in-voting-feed rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900 sm:p-5 ${className}`.trim()}
       aria-label="Truth in Voting feed"
     >
-      <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
             Truth in Voting
@@ -376,26 +381,38 @@ export function TruthInVotingFeed({
           </h3>
         </div>
 
-        <div className="w-full sm:w-auto">
-          <label
-            htmlFor={filterId}
-            className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"
-          >
-            Filter by topic
-          </label>
-          <select
-            id={filterId}
-            value={topic}
-            onChange={(event) => setTopic(event.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 sm:min-w-[12rem]"
-          >
-            <option value="all">All topics</option>
-            {topicOptions.map((option) => (
-              <option key={topicKey(option)} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end lg:w-auto">
+          {onMatchVotesClick ? (
+            <button
+              type="button"
+              onClick={onMatchVotesClick}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3.5 py-2 text-sm font-bold text-emerald-800 transition hover:border-emerald-500/70 hover:bg-emerald-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 dark:text-emerald-200"
+            >
+              <span aria-hidden="true">🎯</span>
+              {matchVotesLabel}
+            </button>
+          ) : null}
+          <div className="w-full sm:min-w-[12rem] sm:flex-1 lg:flex-none">
+            <label
+              htmlFor={filterId}
+              className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+            >
+              Filter by topic
+            </label>
+            <select
+              id={filterId}
+              value={topic}
+              onChange={(event) => setTopic(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            >
+              <option value="all">All topics</option>
+              {topicOptions.map((option) => (
+                <option key={topicKey(option)} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </header>
 

@@ -299,7 +299,23 @@ export function RepresentativesScorecardView({
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
-                  <TruthInVotingFeed votes={filteredVotes} />
+                  <TruthInVotingFeed
+                    votes={filteredVotes}
+                    onMatchVotesClick={() => {
+                      const target = document.getElementById("scorecard-match");
+                      if (target) {
+                        target.scrollIntoView({ behavior: "smooth", block: "start" });
+                        target.classList.add("is-match-focus");
+                        window.setTimeout(
+                          () => target.classList.remove("is-match-focus"),
+                          1800
+                        );
+                        return;
+                      }
+                      window.location.href =
+                        "bills-policies.html?tab=votes&quiz=1";
+                    }}
+                  />
                 </div>
               </div>
             </div>

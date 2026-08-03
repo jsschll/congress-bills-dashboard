@@ -1243,7 +1243,8 @@
           )}.
         </p>
         <p class="politician-quick-match">
-          <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
+          <button type="button" class="refresh-btn" data-open-match-quiz="1">🎯 Match My Votes</button>
+          <a class="scorecard-match__quiz-link" href="bills-policies.html?tab=votes&amp;quiz=1">Or take the full 2-minute quiz</a>
         </p>`;
       return summary;
     }
@@ -1290,15 +1291,13 @@
     if (compared.length === 0) {
       bodyEl.innerHTML = `
         <p class="politician-match-hero__meta">
-          Support or Oppose votes in Truth in Voting (or take the quiz) to calculate your Action Match Score with ${escapeHtml(
+          Support or Oppose recent roll calls to calculate your Action Match Score with ${escapeHtml(
             personName
           )}. Your score appears in the profile card above.
         </p>
         <p class="politician-quick-match">
-          <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
-          <span class="politician-quick-match__hint">Or Support / Oppose recent ${escapeHtml(
-            chamberLabel
-          )} votes in the Truth in Voting feed.</span>
+          <button type="button" class="refresh-btn" data-open-match-quiz="1">🎯 Match My Votes</button>
+          <a class="scorecard-match__quiz-link" href="bills-policies.html?tab=votes&amp;quiz=1">Or take the full 2-minute quiz</a>
         </p>`;
       return summary;
     }
@@ -1527,6 +1526,437 @@
     `;
   }
 
+  function positionToMemberVote(position) {
+    const raw = String(position || "").toUpperCase();
+    if (raw === "YES" || raw === "YEA" || raw === "AYE") return "Yea";
+    if (raw === "NO" || raw === "NAY") return "Nay";
+    if (raw === "ABSTAIN" || raw === "PRESENT") return "Present";
+    if (raw === "NOT_VOTING" || raw === "NOT VOTING" || raw === "NV") {
+      return "Not Voting";
+    }
+    return null;
+  }
+
+  function stanceMatchesPosition(stance, votePosition) {
+    const memberVote = positionToMemberVote(votePosition);
+    if (!memberVote || memberVote === "Present" || memberVote === "Not Voting") {
+      return null;
+    }
+    if (stance === "support") return memberVote === "Yea";
+    if (stance === "oppose") return memberVote === "Nay";
+    return null;
+  }
+
+  function parseRollMetaFromBillId(billId) {
+    const id = String(billId || "").toLowerCase();
+    let match = id.match(/^(?:house|senate)-vote-(\d+)-(\d+)-(\d+)$/);
+    if (match) {
+      return {
+        congress: Number(match[1]),
+        sessionNumber: Number(match[2]),
+        rollCallNumber: Number(match[3]),
+      };
+    }
+    match = id.match(/^federal-(?:bill-)?(\d+)-([a-z]+)-(\d+)$/);
+    if (match) {
+      return {
+        congress: Number(match[1]),
+        legislationType: match[2],
+        legislationNumber: match[3],
+      };
+    }
+    return {};
+  }
+
+  function quizBillItemFromVote(vote, profile) {
+    const billId = String(vote.billId || "").trim();
+    if (!billId) return null;
+    const meta = parseRollMetaFromBillId(billId);
+    const billNumber =
+      normalizeBillNumber(vote.billNumber) || vote.billNumber || "Roll call";
+    return {
+      id: billId,
+      billNumber,
+      title: formatVoteTitle(vote),
+      level: "Federal",
+      jurisdiction:
+        profile?.chamber === "Senate" ? "U.S. Senate" : "U.S. House",
+      shortPitch: buildPlainEnglishSummary(vote) || vote.plainEnglishSummary || "",
+      category: vote.category || null,
+      votePosition: vote.votePosition,
+      officialUrl: null,
+      tags: vote.category ? [vote.category] : [],
+      congress: meta.congress || null,
+      sessionNumber: meta.sessionNumber || null,
+      rollCallNumber: meta.rollCallNumber || null,
+      legislationType: meta.legislationType || null,
+      legislationNumber: meta.legislationNumber || null,
+    };
+  }
+
+  async function upsertQuizBillItem(client, item) {
+    const payload = {
+      id: item.id,
+      bill_number: item.billNumber || "Bill",
+      title: item.title || "Untitled",
+      level: "Federal",
+      jurisdiction: item.jurisdiction || "U.S. Congress",
+      primary_sponsor_name: null,
+      primary_sponsor_title: null,
+      last_updated: new Date().toISOString(),
+      status_step_number: 4,
+      status_total_steps: 4,
+      status_step_name: "Voted",
+      short_pitch: item.shortPitch || null,
+      delta_summary: { added: [], changed: [], removed: [] },
+      official_url: item.officialUrl || null,
+      tags: item.tags || [],
+      all_steps: [],
+      metadata: {
+        source: "scorecard-match-quiz",
+        congress: item.congress || null,
+        sessionNumber: item.sessionNumber || null,
+        rollCallNumber: item.rollCallNumber || null,
+      },
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await client.from("bill_items").upsert(payload, {
+      onConflict: "id",
+    });
+    if (error) throw error;
+  }
+
+  function setMatchQuizStatus(message, tone) {
+    const el = $("scorecard-match-quiz-status");
+    if (!el) return;
+    if (!message) {
+      el.hidden = true;
+      el.textContent = "";
+      el.className = "status";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+    el.className = `status${tone ? ` is-${tone}` : ""}`;
+  }
+
+  function focusActionMatchSection() {
+    const section = $("scorecard-match");
+    if (!section) return;
+    section.hidden = false;
+    section.classList.remove("is-match-focus");
+    // Retrigger animation.
+    void section.offsetWidth;
+    section.classList.add("is-match-focus");
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    global.setTimeout(() => section.classList.remove("is-match-focus"), 1800);
+  }
+
+  function closeMatchQuizModal() {
+    const modal = $("scorecard-match-modal");
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.classList.remove("scorecard-match-modal-open");
+    setMatchQuizStatus("");
+  }
+
+  function renderMatchQuizBody(bodyEl, votes, profile, stancesMap) {
+    if (!bodyEl) return;
+    const items = (votes || [])
+      .map((vote) => quizBillItemFromVote(vote, profile))
+      .filter(Boolean)
+      .slice(0, 8);
+
+    if (!items.length) {
+      bodyEl.innerHTML = `
+        <div class="scorecard-empty scorecard-empty--card" role="status">
+          <p>No recent roll-call votes recorded for this representative.</p>
+        </div>`;
+      return;
+    }
+
+    bodyEl.innerHTML = `
+      <ol class="scorecard-match-quiz__list">
+        ${items
+          .map((item, index) => {
+            const mine = stancesMap.get(item.id) || null;
+            const summary = String(item.shortPitch || "").trim();
+            return `<li class="scorecard-match-quiz__card" data-bill-id="${escapeHtml(
+              item.id
+            )}">
+              <div class="scorecard-match-quiz__card-top">
+                <span class="scorecard-match-quiz__index">${index + 1}</span>
+                ${
+                  item.billNumber
+                    ? `<span class="scorecard-bill">${escapeHtml(
+                        item.billNumber
+                      )}</span>`
+                    : ""
+                }
+                ${
+                  item.category
+                    ? `<span class="scorecard-vote__category">${escapeHtml(
+                        item.category
+                      )}</span>`
+                    : ""
+                }
+              </div>
+              <h3>${escapeHtml(item.title)}</h3>
+              ${
+                summary
+                  ? `<p class="scorecard-match-quiz__summary">${escapeHtml(
+                      summary
+                    )}</p>`
+                  : ""
+              }
+              <div class="scorecard-match-quiz__actions" role="group" aria-label="Your stance">
+                <button
+                  type="button"
+                  class="scorecard-match-quiz__btn is-support${
+                    mine === "support" ? " is-active" : ""
+                  }"
+                  data-match-stance="support"
+                  data-bill-id="${escapeHtml(item.id)}"
+                  aria-pressed="${mine === "support"}"
+                >Support</button>
+                <button
+                  type="button"
+                  class="scorecard-match-quiz__btn is-oppose${
+                    mine === "oppose" ? " is-active" : ""
+                  }"
+                  data-match-stance="oppose"
+                  data-bill-id="${escapeHtml(item.id)}"
+                  aria-pressed="${mine === "oppose"}"
+                >Oppose</button>
+              </div>
+              <p class="scorecard-match-quiz__result" data-match-result="${escapeHtml(
+                item.id
+              )}" ${mine ? "" : "hidden"}>
+                ${
+                  mine
+                    ? mine === "support"
+                      ? "You supported this"
+                      : "You opposed this"
+                    : ""
+                }
+              </p>
+            </li>`;
+          })
+          .join("")}
+      </ol>`;
+  }
+
+  async function loadStanceMapForBills(billIds) {
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    const user = typeof getUser === "function" ? await getUser() : null;
+    const map = new Map();
+    if (!client || !user || !billIds.length) return { user, client, map };
+    const { data, error } = await client
+      .from("bill_stances")
+      .select("bill_id, stance")
+      .eq("user_id", user.id)
+      .in("bill_id", billIds);
+    if (error) console.warn(error);
+    for (const row of data || []) {
+      map.set(row.bill_id, row.stance);
+    }
+    return { user, client, map };
+  }
+
+  async function saveMatchQuizStance({
+    item,
+    stance,
+    profile,
+    onScoreRefresh,
+  }) {
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    const user = typeof getUser === "function" ? await getUser() : null;
+    if (!client || !user) {
+      global.location.href = authNextHref();
+      return null;
+    }
+    await upsertQuizBillItem(client, item);
+
+    const bioguide = String(profile.bioguideId || "").toUpperCase();
+    const memberVote = positionToMemberVote(item.votePosition);
+    const matched = stanceMatchesPosition(stance, item.votePosition);
+
+    const { error } = await client.from("bill_stances").upsert(
+      {
+        user_id: user.id,
+        bill_id: item.id,
+        stance,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,bill_id" }
+    );
+    if (error) throw error;
+
+    if (bioguide && memberVote) {
+      const { error: matchError } = await client
+        .from("stance_vote_matches")
+        .upsert(
+          {
+            user_id: user.id,
+            bill_id: item.id,
+            bioguide_id: bioguide,
+            politician_name: profile.name || bioguide,
+            politician_level: "federal",
+            user_stance: stance,
+            member_vote: memberVote,
+            matched,
+            roll_call_number: item.rollCallNumber || null,
+            congress: item.congress || null,
+            session_number: item.sessionNumber || null,
+            vote_result: null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,bill_id,bioguide_id" }
+        );
+      if (matchError) console.warn(matchError);
+    }
+
+    if (typeof onScoreRefresh === "function") {
+      await onScoreRefresh();
+    }
+    return { stance, matched, memberVote };
+  }
+
+  let matchQuizContext = {
+    votes: [],
+    profile: null,
+    onScoreRefresh: null,
+  };
+
+  function bindMatchQuizActions(bodyEl) {
+    if (!bodyEl || bodyEl.dataset.boundMatchQuiz === "1") return;
+    bodyEl.dataset.boundMatchQuiz = "1";
+    bodyEl.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-match-stance]");
+      if (!button) return;
+      const stance = button.dataset.matchStance;
+      const billId = button.dataset.billId;
+      const { votes, profile, onScoreRefresh } = matchQuizContext;
+      const vote = (votes || []).find(
+        (row) => String(row.billId || "") === String(billId || "")
+      );
+      const item = quizBillItemFromVote(vote, profile);
+      if (!item || !stance || !profile) return;
+
+      button.disabled = true;
+      setMatchQuizStatus("Saving your stance…", "loading");
+      try {
+        const result = await saveMatchQuizStance({
+          item,
+          stance,
+          profile,
+          onScoreRefresh,
+        });
+        if (!result) return;
+        const card = button.closest(".scorecard-match-quiz__card");
+        card
+          ?.querySelectorAll("[data-match-stance]")
+          .forEach((btn) => {
+            const active = btn.dataset.matchStance === stance;
+            btn.classList.toggle("is-active", active);
+            btn.setAttribute("aria-pressed", String(active));
+          });
+        const resultEl = card?.querySelector("[data-match-result]");
+        if (resultEl) {
+          resultEl.hidden = false;
+          const align =
+            result.matched === true
+              ? " · matches their roll call"
+              : result.matched === false
+                ? " · differs from their roll call"
+                : "";
+          resultEl.textContent = `${
+            stance === "support" ? "You supported this" : "You opposed this"
+          }${align}`;
+        }
+        setMatchQuizStatus("Action Match updated.", "success");
+      } catch (error) {
+        console.warn(error);
+        setMatchQuizStatus(
+          error?.message || "Could not save that stance.",
+          "error"
+        );
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  async function openMatchQuizModal({
+    votes,
+    profile,
+    onScoreRefresh,
+  }) {
+    const modal = $("scorecard-match-modal");
+    const bodyEl = $("scorecard-match-quiz-body");
+    const ledeEl = $("scorecard-match-quiz-lede");
+    if (!modal || !bodyEl) {
+      focusActionMatchSection();
+      return;
+    }
+
+    matchQuizContext = {
+      votes: votes || [],
+      profile: profile || null,
+      onScoreRefresh: onScoreRefresh || null,
+    };
+
+    focusActionMatchSection();
+    modal.hidden = false;
+    document.body.classList.add("scorecard-match-modal-open");
+    if (ledeEl) {
+      ledeEl.textContent = `Support or Oppose recent ${
+        profile?.chamber === "Senate" ? "Senate" : "House"
+      } roll calls to recalculate your Action Match with ${
+        profile?.name || "this representative"
+      }.`;
+    }
+
+    const items = (votes || [])
+      .map((vote) => quizBillItemFromVote(vote, profile))
+      .filter(Boolean)
+      .slice(0, 8);
+    const { map } = await loadStanceMapForBills(items.map((item) => item.id));
+    renderMatchQuizBody(bodyEl, votes, profile, map);
+    bindMatchQuizActions(bodyEl);
+    setMatchQuizStatus(
+      items.length
+        ? ""
+        : "No recent roll-call votes recorded for this representative.",
+      items.length ? "" : "error"
+    );
+    modal.querySelector(".scorecard-match-modal__close")?.focus();
+  }
+
+  function bindMatchQuizModalChrome(getContext) {
+    const modal = $("scorecard-match-modal");
+    if (!modal || modal.dataset.bound === "1") return;
+    modal.dataset.bound = "1";
+    modal.addEventListener("click", (event) => {
+      if (event.target.closest("[data-close-match-quiz]")) {
+        closeMatchQuizModal();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !modal.hidden) closeMatchQuizModal();
+    });
+    document.addEventListener("click", (event) => {
+      const trigger = event.target.closest(
+        "[data-open-match-quiz], #scorecard-match-cta"
+      );
+      if (!trigger) return;
+      event.preventDefault();
+      const ctx = typeof getContext === "function" ? getContext() : null;
+      if (!ctx) return;
+      openMatchQuizModal(ctx);
+    });
+  }
+
   function renderVotes(el, votes, query) {
     if (!el) return;
     const q = String(query || "").trim().toLowerCase();
@@ -1576,24 +2006,35 @@
 
     el.innerHTML = `
       <div class="scorecard-votes__header">
-        <div>
+        <div class="scorecard-votes__heading">
           <p class="scorecard-card__eyebrow">Truth in Voting</p>
           <h3 class="scorecard-card__title">Recent roll calls</h3>
         </div>
-        <label class="scorecard-topic">
-          <span>Topic</span>
-          <select id="scorecard-topic-filter">
-            <option value="all">All topics</option>
-            ${topics
-              .map(
-                (topic) =>
-                  `<option value="${escapeHtml(topic)}">${escapeHtml(
-                    topic
-                  )}</option>`
-              )
-              .join("")}
-          </select>
-        </label>
+        <div class="scorecard-votes__tools">
+          <button
+            type="button"
+            id="scorecard-match-cta"
+            class="scorecard-match-cta"
+            data-open-match-quiz="1"
+          >
+            <span aria-hidden="true">🎯</span>
+            Match My Votes
+          </button>
+          <label class="scorecard-topic">
+            <span>Topic</span>
+            <select id="scorecard-topic-filter">
+              <option value="all">All topics</option>
+              ${topics
+                .map(
+                  (topic) =>
+                    `<option value="${escapeHtml(topic)}">${escapeHtml(
+                      topic
+                    )}</option>`
+                )
+                .join("")}
+            </select>
+          </label>
+        </div>
       </div>
       ${
         filtered.length
@@ -1826,7 +2267,42 @@
       activeId: query.id || session?.activeId || null,
       voteQuery: "",
       paintToken: 0,
+      lastEnrich: null,
     };
+
+    async function refreshActionMatchScore() {
+      const reps = state.data?.representatives || [];
+      const active =
+        reps.find((rep) => rep.profile.id === state.activeId) || reps[0] || null;
+      if (!active?.profile) return;
+      const matchPayload = await loadMatchRows(active.profile.bioguideId);
+      const matchSummary = summarizeMatch(matchPayload);
+      renderMatch(
+        $("scorecard-match"),
+        $("scorecard-match-body"),
+        $("scorecard-match-lede"),
+        active.profile,
+        matchPayload
+      );
+      renderHero(
+        $("scorecard-hero"),
+        active.profile,
+        state.lastEnrich,
+        matchSummary
+      );
+    }
+
+    bindMatchQuizModalChrome(() => {
+      const reps = state.data?.representatives || [];
+      const active =
+        reps.find((rep) => rep.profile.id === state.activeId) || reps[0] || null;
+      if (!active) return null;
+      return {
+        votes: active.recentVotes || [],
+        profile: active.profile,
+        onScoreRefresh: refreshActionMatchScore,
+      };
+    });
 
     async function paint() {
       const token = ++state.paintToken;
@@ -1867,9 +2343,20 @@
         if (votesEl) {
           votesEl.innerHTML = `
             <div class="scorecard-votes__header">
-              <div>
+              <div class="scorecard-votes__heading">
                 <p class="scorecard-card__eyebrow">Truth in Voting</p>
                 <h3 class="scorecard-card__title">Recent roll calls</h3>
+              </div>
+              <div class="scorecard-votes__tools">
+                <button
+                  type="button"
+                  id="scorecard-match-cta"
+                  class="scorecard-match-cta"
+                  data-open-match-quiz="1"
+                >
+                  <span aria-hidden="true">🎯</span>
+                  Match My Votes
+                </button>
               </div>
             </div>
             <div class="scorecard-empty scorecard-empty--card" role="status">
@@ -1900,6 +2387,7 @@
       }
 
       activeRosterPerson = toRosterPerson(active.profile, enrich);
+      state.lastEnrich = enrich;
       const matchSummary = summarizeMatch(matchPayload);
       renderHero($("scorecard-hero"), active.profile, enrich, matchSummary);
       renderMatch(
