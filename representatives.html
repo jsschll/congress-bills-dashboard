@@ -6,7 +6,7 @@
     <title>Representative Scorecard · Article 1</title>
     <meta
       name="description"
-      content="Audit your senators and House representative — donor alignment, attendance, and Truth in Voting."
+      content="Audit your senators and House representative — donor alignment, attendance, and Truth in Voting — plus your full regional & state officials directory."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,12 +14,12 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260804fg2" />
+    <link rel="stylesheet" href="styles.css?v=20260804un1" />
   </head>
-  <body class="page-app page-scorecard">
+  <body class="page-app page-scorecard page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
-    <main class="page page--scorecard">
+    <main class="page page--scorecard" data-active-view="scorecards">
       <header class="scorecard-page__header">
         <p class="scorecard-page__back">
           <a href="politicians.html">← Back to Politicians</a>
@@ -30,76 +30,141 @@
         </h1>
         <p id="scorecard-lede" class="scorecard-page__lede">
           Switch between your senators and House member to audit money,
-          attendance, and recent votes.
+          attendance, and recent votes — then browse full regional &amp; state
+          representation below.
         </p>
+
+        <div
+          id="scorecard-view-toggle"
+          class="scorecard-view-toggle"
+          role="tablist"
+          aria-label="Results view"
+          hidden
+        >
+          <button
+            type="button"
+            class="scorecard-view-toggle__btn is-active"
+            role="tab"
+            aria-selected="true"
+            data-view="scorecards"
+          >
+            <span aria-hidden="true">📊</span> Scorecards
+          </button>
+          <button
+            type="button"
+            class="scorecard-view-toggle__btn"
+            role="tab"
+            aria-selected="false"
+            data-view="directory"
+          >
+            <span aria-hidden="true">🗂️</span> All Officials Directory
+          </button>
+        </div>
       </header>
 
       <p id="scorecard-status" class="scorecard-page__status" hidden></p>
 
-      <nav
-        id="scorecard-tabs"
-        class="scorecard-tabs"
-        role="tablist"
-        aria-label="Representatives"
-        hidden
-      ></nav>
-
-      <div id="scorecard-panel" class="scorecard-panel" hidden>
-        <section
-          id="scorecard-hero"
-          class="scorecard-hero"
-          aria-label="Representative overview"
-        ></section>
-
-        <section
-          id="scorecard-match"
-          class="scorecard-match"
-          aria-labelledby="scorecard-match-title"
+      <section
+        id="scorecard-primary"
+        class="scorecard-primary"
+        aria-label="Federal representative scorecards"
+      >
+        <nav
+          id="scorecard-tabs"
+          class="scorecard-tabs"
+          role="tablist"
+          aria-label="Representatives"
           hidden
-        >
-          <div class="scorecard-match__header">
-            <h2 id="scorecard-match-title">Action Match Scorecard</h2>
-            <p id="scorecard-match-lede" class="scorecard-match__lede">
-              Your Support / Oppose stances compared to this official’s roll-call
-              votes.
-            </p>
-          </div>
-          <div id="scorecard-match-body"></div>
-        </section>
+        ></nav>
 
-        <div class="scorecard-grid">
-          <div class="scorecard-grid__left">
-            <section
-              id="scorecard-donor"
-              class="scorecard-card"
-              aria-label="Donor alignment"
-            ></section>
-            <section
-              id="scorecard-attendance"
-              class="scorecard-card"
-              aria-label="Attendance and activity"
-            ></section>
-          </div>
-          <div class="scorecard-grid__right">
-            <div class="scorecard-card scorecard-card--search">
-              <label class="scorecard-search__label" for="scorecard-vote-search"
-                >Search bills in feed</label
-              >
-              <input
-                id="scorecard-vote-search"
-                class="scorecard-search__input"
-                type="search"
-                placeholder="Filter by bill number, title, or keyword…"
-              />
+        <div id="scorecard-panel" class="scorecard-panel" hidden>
+          <section
+            id="scorecard-hero"
+            class="scorecard-hero"
+            aria-label="Representative overview"
+          ></section>
+
+          <section
+            id="scorecard-match"
+            class="scorecard-match"
+            aria-labelledby="scorecard-match-title"
+            hidden
+          >
+            <div class="scorecard-match__header">
+              <h2 id="scorecard-match-title">Action Match Scorecard</h2>
+              <p id="scorecard-match-lede" class="scorecard-match__lede">
+                Your Support / Oppose stances compared to this official’s
+                roll-call votes.
+              </p>
             </div>
-            <section
-              id="scorecard-votes"
-              class="scorecard-card"
-              aria-label="Truth in Voting feed"
-            ></section>
+            <div id="scorecard-match-body"></div>
+          </section>
+
+          <div class="scorecard-grid">
+            <div class="scorecard-grid__left">
+              <section
+                id="scorecard-donor"
+                class="scorecard-card"
+                aria-label="Donor alignment"
+              ></section>
+              <section
+                id="scorecard-attendance"
+                class="scorecard-card"
+                aria-label="Attendance and activity"
+              ></section>
+            </div>
+            <div class="scorecard-grid__right">
+              <div class="scorecard-card scorecard-card--search">
+                <label
+                  class="scorecard-search__label"
+                  for="scorecard-vote-search"
+                  >Search bills in feed</label
+                >
+                <input
+                  id="scorecard-vote-search"
+                  class="scorecard-search__input"
+                  type="search"
+                  placeholder="Filter by bill number, title, or keyword…"
+                />
+              </div>
+              <section
+                id="scorecard-votes"
+                class="scorecard-card"
+                aria-label="Truth in Voting feed"
+              ></section>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <section
+        id="scorecard-directory"
+        class="scorecard-directory"
+        aria-labelledby="scorecard-directory-title"
+        hidden
+      >
+        <details
+          id="scorecard-directory-details"
+          class="scorecard-directory__details"
+        >
+          <summary class="scorecard-directory__summary">
+            <span>
+              <span class="scorecard-directory__eyebrow">Also representing you</span>
+              <span id="scorecard-directory-title" class="scorecard-directory__title"
+                >Full Regional &amp; State Representation</span
+              >
+            </span>
+            <span class="scorecard-directory__hint">Expand for governor, state legislature, courts, and local offices</span>
+          </summary>
+          <div class="scorecard-directory__body">
+            <p id="directory-status" class="scorecard-page__status" hidden></p>
+            <div
+              id="address-results"
+              class="politician-results scorecard-directory__results"
+            ></div>
+          </div>
+        </details>
+      </section>
     </main>
 
     <div id="scorecard-notes-modal" class="politician-notes-modal" hidden>
@@ -162,8 +227,8 @@
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260804a1"></script>
-    <script src="politicians-shared.js?v=20260804sc3"></script>
-    <script src="representatives-scorecard.js?v=20260804fg2"></script>
+    <script src="politicians-shared.js?v=20260804un1"></script>
+    <script src="representatives-scorecard.js?v=20260804un1"></script>
     <script>
       (async () => {
         await bootNav("politicians");
