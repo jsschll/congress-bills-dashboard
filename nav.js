@@ -84,7 +84,7 @@ function createNavShell(activePage = "home") {
       </a>
       <div class="app-nav__links">
         ${link("home", "index.html", "Home")}
-        ${link("search", "search.html", "Search")}
+        ${link("search", "search.html", "Bills &amp; Laws")}
         <a class="app-nav__link ${feedActive}" href="bills-policies.html"${
           feedActive ? ' aria-current="page"' : ""
         }>Feed</a>
