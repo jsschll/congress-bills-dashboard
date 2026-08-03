@@ -24,3 +24,12 @@ export type {
   DonorAlignmentCardProps,
   MoneyVsVoteHighlight,
 } from "./DonorAlignmentCard";
+
+export { AttendanceStatsCard } from "./AttendanceStatsCard";
+export type {
+  AttendanceStatsCardProps,
+  CongressionalAverages,
+} from "./AttendanceStatsCard";
+
+export { TruthInVotingFeed } from "./TruthInVotingFeed";
+export type { TruthInVotingFeedProps } from "./TruthInVotingFeed";
