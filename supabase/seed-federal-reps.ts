@@ -257,72 +257,6 @@ async function ensureAttendance(supabase, profileId, chamber) {
   if (error) throw error;
 }
 
-async function ensurePlaceholderVotes(supabase, profileId, party) {
-  const existing = await supabase
-    .from("representative_vote_records")
-    .select("id")
-    .eq("politician_id", profileId)
-    .limit(1);
-  if ((existing.data || []).length) return;
-
-  const lean = String(party || "").toLowerCase().startsWith("rep") ? "R" : "D";
-  const bills = [
-    {
-      bill_number: `H.R. 1-SEED-${profileId.slice(0, 8)}`,
-      title: "Seed: Household cost-of-living package",
-      plain_english_summary:
-        "Seeded placeholder vote until live roll calls are synced. Yea advances the package; Nay blocks it on this roll call.",
-      category: "Economy",
-      vote_date: "2026-06-01",
-      wallet_impact: "Could change near-term household costs.",
-      community_impact: "Affects local budgets and services.",
-      rights_impact: "Limited direct civil-rights impact.",
-      vote: lean === "R" ? "NO" : "YES",
-    },
-    {
-      bill_number: `S. 100-SEED-${profileId.slice(0, 8)}`,
-      title: "Seed: Community health access measure",
-      plain_english_summary:
-        "Seeded placeholder health-access roll call for scorecard demos.",
-      category: "Healthcare",
-      vote_date: "2026-05-12",
-      wallet_impact: "May affect insurance and clinic costs.",
-      community_impact: "Changes access to local care options.",
-      rights_impact: "Touches patient privacy and coverage rules.",
-      vote: "YES",
-    },
-  ];
-
-  for (const bill of bills) {
-    const inserted = await supabase
-      .from("scorecard_bills")
-      .insert({
-        bill_number: bill.bill_number,
-        title: bill.title,
-        plain_english_summary: bill.plain_english_summary,
-        category: bill.category,
-        vote_date: bill.vote_date,
-        wallet_impact: bill.wallet_impact,
-        community_impact: bill.community_impact,
-        rights_impact: bill.rights_impact,
-      })
-      .select("id")
-      .maybeSingle();
-    if (inserted.error || !inserted.data) {
-      console.warn("bill insert failed", inserted.error?.message);
-      continue;
-    }
-    const voteInsert = await supabase.from("representative_vote_records").insert({
-      politician_id: profileId,
-      bill_id: inserted.data.id,
-      vote_position: bill.vote,
-    });
-    if (voteInsert.error) {
-      console.warn("vote insert failed", voteInsert.error.message);
-    }
-  }
-}
-
 async function seedFederalReps(options = {}) {
   loadEnvLocal();
   const supabase = getSupabase();
@@ -337,7 +271,6 @@ async function seedFederalReps(options = {}) {
     if (!profile?.id) continue;
     await ensureFinance(supabase, profile.id, rep.party);
     await ensureAttendance(supabase, profile.id, rep.chamber);
-    await ensurePlaceholderVotes(supabase, profile.id, rep.party);
     results.push(profile);
     console.log(
       `✓ ${rep.chamber} ${rep.state}${rep.district ? `-${rep.district}` : ""} · ${rep.name}`

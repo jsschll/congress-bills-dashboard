@@ -6727,7 +6727,12 @@ body.politician-notes-modal-open {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
-  align-items: start;
+  align-items: flex-start;
+}
+
+.scorecard-vote__meta {
+  min-width: 0;
+  flex: 1;
 }
 
 .scorecard-bill {
@@ -6757,11 +6762,14 @@ body.politician-notes-modal-open {
 
 .scorecard-vote-pill {
   flex-shrink: 0;
+  margin-left: auto;
+  align-self: flex-start;
   border-radius: 999px;
-  padding: 0.25rem 0.6rem;
+  padding: 0.28rem 0.7rem;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .scorecard-vote-pill.is-yes {
@@ -6782,26 +6790,73 @@ body.politician-notes-modal-open {
 .scorecard-impacts {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.7rem;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
 }
 
-.scorecard-impacts span {
+.scorecard-impact-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   max-width: 100%;
   border-radius: 999px;
-  padding: 0.25rem 0.6rem;
-  font-size: 0.75rem;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
   background: rgba(148, 163, 184, 0.12);
-  color: #cbd5e1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #e2e8f0;
+}
+
+.scorecard-impact-pill__icon {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.scorecard-impact-pill__label {
+  font-weight: 700;
+}
+
+.scorecard-impact-pill.is-wallet {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.28);
+  color: #fcd34d;
+}
+
+.scorecard-impact-pill.is-community {
+  background: rgba(14, 165, 233, 0.14);
+  border-color: rgba(56, 189, 248, 0.28);
+  color: #7dd3fc;
+}
+
+.scorecard-impact-pill.is-rights {
+  background: rgba(139, 92, 246, 0.14);
+  border-color: rgba(167, 139, 250, 0.28);
+  color: #c4b5fd;
 }
 
 .scorecard-empty {
   margin: 0.75rem 0 0;
   color: var(--score-muted);
   font-size: 0.92rem;
+}
+
+.scorecard-empty--card {
+  margin-top: 0.85rem;
+  padding: 1.15rem 1rem;
+  border-radius: 0.85rem;
+  border: 1px dashed var(--score-border);
+  background: rgba(15, 23, 42, 0.45);
+  text-align: center;
+}
+
+.scorecard-empty--card p {
+  margin: 0;
+  color: var(--score-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 /* —— Unified results: view toggle + officials directory —— */
