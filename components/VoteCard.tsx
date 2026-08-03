@@ -203,23 +203,37 @@ export function VoteCard({
         <button
           type="button"
           className={`bill-summary-card__btn is-yea ${
-            userStance === "yea" ? "is-active" : ""
-          }`}
+            userStance === "yea" ? "is-active is-logged" : ""
+          } ${userStance === "nay" ? "is-dimmed" : ""}`}
           disabled={!onVote || pending !== null}
           onClick={() => handleVote("yea")}
         >
-          {pending === "yea" ? "Saving…" : yeaLabel}
+          {pending === "yea"
+            ? "Saving…"
+            : userStance === "yea"
+              ? `✓ Logged: ${yeaLabel}`
+              : yeaLabel}
         </button>
         <button
           type="button"
           className={`bill-summary-card__btn is-nay ${
-            userStance === "nay" ? "is-active" : ""
-          }`}
+            userStance === "nay" ? "is-active is-logged" : ""
+          } ${userStance === "yea" ? "is-dimmed" : ""}`}
           disabled={!onVote || pending !== null}
           onClick={() => handleVote("nay")}
         >
-          {pending === "nay" ? "Saving…" : nayLabel}
+          {pending === "nay"
+            ? "Saving…"
+            : userStance === "nay"
+              ? `✓ Logged: ${nayLabel}`
+              : nayLabel}
         </button>
+        {userStance ? (
+          <p className="bill-summary-card__logged">
+            Your vote is logged as “
+            {userStance === "yea" ? yeaLabel : nayLabel}”.
+          </p>
+        ) : null}
       </div>
     </article>
   );

@@ -722,6 +722,9 @@ Sincerely,
       activeStance = nextStance;
     }
 
+    // Show logged vote immediately — don't wait for roll-call comparison.
+    applyLoggedStanceUI(roots, activeStance);
+
     await loadAlignment(client);
     let votePayload = null;
     if (activeStance && String(item.level || "").toLowerCase() === "federal") {
@@ -750,16 +753,55 @@ Sincerely,
     }
   }
 
-  async function refreshMountedCard(item, roots, votePayload = null) {
+  function applyLoggedStanceUI(roots, mine) {
     const supportBtn = roots.supportBtn;
     const opposeBtn = roots.opposeBtn;
+    if (!supportBtn || !opposeBtn) return;
+
+    const supportLabel = roots.supportLabel || "Support Measure";
+    const opposeLabel = roots.opposeLabel || "Oppose Measure";
+    const hasSupport = mine === "support";
+    const hasOppose = mine === "oppose";
+
+    supportBtn.classList.toggle("is-active", hasSupport);
+    opposeBtn.classList.toggle("is-active", hasOppose);
+    supportBtn.classList.toggle("is-logged", hasSupport);
+    opposeBtn.classList.toggle("is-logged", hasOppose);
+    supportBtn.classList.toggle("is-dimmed", hasOppose);
+    opposeBtn.classList.toggle("is-dimmed", hasSupport);
+    supportBtn.setAttribute("aria-pressed", String(hasSupport));
+    opposeBtn.setAttribute("aria-pressed", String(hasOppose));
+
+    // Show a clear "logged" label instead of leaving the idle button text.
+    supportBtn.textContent = hasSupport ? `✓ Logged: ${supportLabel}` : supportLabel;
+    opposeBtn.textContent = hasOppose ? `✓ Logged: ${opposeLabel}` : opposeLabel;
+
+    let status = roots.root?.querySelector(".policy-engage__logged");
+    if (!status && roots.root) {
+      status = document.createElement("p");
+      status.className = "policy-engage__logged";
+      const actions = roots.root.querySelector(".policy-engage__actions");
+      if (actions) actions.insertAdjacentElement("afterend", status);
+      else roots.root.prepend(status);
+      roots.loggedStatus = status;
+    }
+    if (status) {
+      if (hasSupport || hasOppose) {
+        const label = hasSupport ? supportLabel : opposeLabel;
+        status.hidden = false;
+        status.textContent = `Your vote is logged as “${label}”. Tap again to clear, or choose the other side to switch.`;
+      } else {
+        status.hidden = true;
+        status.textContent = "";
+      }
+    }
+  }
+
+  async function refreshMountedCard(item, roots, votePayload = null) {
     const communityBody = roots.communityBody;
     const alignmentEl = roots.alignmentEl;
     const mine = state.stances.get(item.id);
-    supportBtn.classList.toggle("is-active", mine === "support");
-    opposeBtn.classList.toggle("is-active", mine === "oppose");
-    supportBtn.setAttribute("aria-pressed", String(mine === "support"));
-    opposeBtn.setAttribute("aria-pressed", String(mine === "oppose"));
+    applyLoggedStanceUI(roots, mine);
     if (communityBody) {
       const stats = await fetchCommunity(item.id);
       communityBody.innerHTML = renderCommunityHtml(stats);
@@ -852,28 +894,37 @@ Sincerely,
       voteBody: wrap.querySelector(".policy-engage__vote-body"),
       alignmentEl: wrap.querySelector(".policy-engage__alignment"),
       onStanceChange: options.onStanceChange || null,
+      supportLabel,
+      opposeLabel,
     };
 
     const mine = state.stances.get(item.id);
-    roots.supportBtn.classList.toggle("is-active", mine === "support");
-    roots.opposeBtn.classList.toggle("is-active", mine === "oppose");
-    roots.supportBtn.setAttribute("aria-pressed", String(mine === "support"));
-    roots.opposeBtn.setAttribute("aria-pressed", String(mine === "oppose"));
+    applyLoggedStanceUI(roots, mine);
 
     roots.supportBtn.addEventListener("click", async () => {
       try {
+        roots.supportBtn.disabled = true;
+        roots.opposeBtn.disabled = true;
         await setStance(item, "support", roots);
       } catch (error) {
         console.error(error);
         alert(error.message || "Could not save stance.");
+      } finally {
+        roots.supportBtn.disabled = false;
+        roots.opposeBtn.disabled = false;
       }
     });
     roots.opposeBtn.addEventListener("click", async () => {
       try {
+        roots.supportBtn.disabled = true;
+        roots.opposeBtn.disabled = true;
         await setStance(item, "oppose", roots);
       } catch (error) {
         console.error(error);
         alert(error.message || "Could not save stance.");
+      } finally {
+        roots.supportBtn.disabled = false;
+        roots.opposeBtn.disabled = false;
       }
     });
     wrap
