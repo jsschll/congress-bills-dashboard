@@ -685,7 +685,7 @@ function buildActionMatchVoteMeans(bill = {}, voteCopy = null) {
     nayFromCopy && !isGenericVoteMeans(nayFromCopy) ? nayFromCopy : "";
 
   if (yea && !/^a yea\b/i.test(yea)) {
-    yea = `A Yea vote supports ${yea.charAt(0).toLowerCase()}${yea
+    yea = `A Yea vote means ${yea.charAt(0).toLowerCase()}${yea
       .slice(1)
       .replace(/\.$/, "")}.`;
   }
