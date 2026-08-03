@@ -341,6 +341,7 @@
       overview: null,
       contact: null,
       roster: null,
+      recentVotes: [],
     };
 
     const client = typeof getSupabase === "function" ? getSupabase() : null;
@@ -376,6 +377,9 @@
         if (response.ok) {
           result.overview = data.overview || null;
           result.contact = data.contact || null;
+          result.recentVotes = Array.isArray(data.recentVotes)
+            ? data.recentVotes
+            : [];
         }
       } catch (error) {
         console.warn("Scorecard profile enrich failed:", error);
@@ -384,6 +388,56 @@
 
     if (cacheKey) enrichCache.set(cacheKey, result);
     return result;
+  }
+
+  function mapProfileVotesToScorecard(votes) {
+    return (votes || [])
+      .map((vote) => {
+        const cast = String(vote.voteCast || vote.vote_cast || "").toLowerCase();
+        let votePosition = "NOT_VOTING";
+        if (cast === "yea" || cast === "aye" || cast === "yes") votePosition = "YES";
+        else if (cast === "nay" || cast === "no") votePosition = "NO";
+        else if (cast.includes("present")) votePosition = "ABSTAIN";
+        const billNumber = vote.billNumber || vote.bill_number || null;
+        const rawTitle = vote.title || vote.voteQuestion || "Congressional roll call";
+        const title =
+          billNumber &&
+          !String(rawTitle).toLowerCase().startsWith(String(billNumber).toLowerCase())
+            ? `${billNumber}: ${rawTitle}`
+            : rawTitle;
+        return {
+          votePosition,
+          billId: String(vote.billId || vote.id || title),
+          billNumber,
+          title,
+          plainEnglishSummary:
+            vote.shortPitch ||
+            vote.officialSummary ||
+            vote.voteQuestion ||
+            null,
+          category: vote.subjectCategory || vote.policyArea || categorizeBill(vote),
+          voteDate: vote.date || (vote.lastUpdated || "").slice(0, 10) || null,
+          impacts: {
+            wallet: null,
+            community: null,
+            rights: null,
+          },
+        };
+      })
+      .filter((vote) => {
+        const title = String(vote.title || "");
+        return !/^seed\s*:/i.test(title) && !/^placeholder\s*:/i.test(title);
+      });
+  }
+
+  function hasUsableVotes(votes) {
+    return (votes || []).some((vote) => {
+      const title = String(vote?.title || "");
+      const number = String(vote?.billNumber || "");
+      if (/^seed\s*:/i.test(title) || /^placeholder\s*:/i.test(title)) return false;
+      if (/-seed-/i.test(number) || /-ph-/i.test(number)) return false;
+      return Boolean(title || number);
+    });
   }
 
   async function loadMatchRows(bioguide) {
@@ -1398,7 +1452,16 @@
   function renderVotes(el, votes, query) {
     if (!el) return;
     const q = String(query || "").trim().toLowerCase();
-    const filtered = (votes || []).filter((vote) => {
+    const sourceVotes = (votes || []).filter((vote) => {
+      const title = String(vote.title || "");
+      const number = String(vote.billNumber || "");
+      const summary = String(vote.plainEnglishSummary || "");
+      if (/^seed\s*:/i.test(title) || /^placeholder\s*:/i.test(title)) return false;
+      if (/-seed-/i.test(number) || /-ph-/i.test(number)) return false;
+      if (/seeded placeholder|placeholder vote data/i.test(summary)) return false;
+      return true;
+    });
+    const filtered = sourceVotes.filter((vote) => {
       if (!q) return true;
       const haystack = [
         vote.billNumber,
@@ -1417,11 +1480,17 @@
 
     const topics = [
       ...new Set(
-        (votes || [])
+        sourceVotes
           .map((vote) => String(vote.category || "").trim())
           .filter(Boolean)
       ),
     ];
+
+    const impactMeta = {
+      Wallet: { icon: "💳", className: "is-wallet" },
+      Community: { icon: "🏙️", className: "is-community" },
+      Rights: { icon: "⚖️", className: "is-rights" },
+    };
 
     el.innerHTML = `
       <div class="scorecard-votes__header">
@@ -1450,6 +1519,9 @@
               ${filtered
                 .map((vote) => {
                   const tone = voteTone(vote.votePosition);
+                  const positionLabel = String(vote.votePosition || "—")
+                    .toUpperCase()
+                    .replace(/_/g, " ");
                   const impacts = [
                     ["Wallet", vote.impacts?.wallet],
                     ["Community", vote.impacts?.community],
@@ -1457,7 +1529,7 @@
                   ].filter(([, text]) => text);
                   return `<li class="scorecard-vote">
                     <div class="scorecard-vote__top">
-                      <div>
+                      <div class="scorecard-vote__meta">
                         ${
                           vote.billNumber
                             ? `<span class="scorecard-bill">${escapeHtml(
@@ -1470,7 +1542,7 @@
                         )}</h4>
                       </div>
                       <span class="scorecard-vote-pill is-${tone}">${escapeHtml(
-                        vote.votePosition || "—"
+                        positionLabel
                       )}</span>
                     </div>
                     ${
@@ -1482,14 +1554,22 @@
                       impacts.length
                         ? `<div class="scorecard-impacts">
                             ${impacts
-                              .map(
-                                ([label, text]) =>
-                                  `<span title="${escapeHtml(
-                                    text
-                                  )}"><strong>${escapeHtml(
+                              .map(([label, text]) => {
+                                const meta = impactMeta[label] || {
+                                  icon: "",
+                                  className: "",
+                                };
+                                return `<span class="scorecard-impact-pill ${
+                                  meta.className
+                                }" title="${escapeHtml(text)}">
+                                  <span class="scorecard-impact-pill__icon" aria-hidden="true">${
+                                    meta.icon
+                                  }</span>
+                                  <span class="scorecard-impact-pill__label">${escapeHtml(
                                     label
-                                  )}</strong> ${escapeHtml(text)}</span>`
-                              )
+                                  )}</span>
+                                </span>`;
+                              })
                               .join("")}
                           </div>`
                         : ""
@@ -1498,7 +1578,13 @@
                 })
                 .join("")}
             </ul>`
-          : `<p class="scorecard-empty">No roll calls match this filter.</p>`
+          : `<div class="scorecard-empty scorecard-empty--card" role="status">
+              <p>${
+                sourceVotes.length
+                  ? "No roll calls match this filter."
+                  : "No recent recorded roll-call votes for this representative."
+              }</p>
+            </div>`
       }
     `;
 
@@ -1508,8 +1594,8 @@
         const topic = topicSelect.value;
         const next =
           topic === "all"
-            ? votes
-            : (votes || []).filter(
+            ? sourceVotes
+            : sourceVotes.filter(
                 (vote) =>
                   String(vote.category || "").toLowerCase() ===
                   topic.toLowerCase()
@@ -1682,7 +1768,23 @@
       );
       renderDonor($("scorecard-donor"), active.campaignFinance);
       renderAttendance($("scorecard-attendance"), active.attendance);
-      renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery);
+      if (!hasUsableVotes(active.recentVotes)) {
+        const votesEl = $("scorecard-votes");
+        if (votesEl) {
+          votesEl.innerHTML = `
+            <div class="scorecard-votes__header">
+              <div>
+                <p class="scorecard-card__eyebrow">Truth in Voting</p>
+                <h3 class="scorecard-card__title">Recent roll calls</h3>
+              </div>
+            </div>
+            <div class="scorecard-empty scorecard-empty--card" role="status">
+              <p>Loading recent roll-call votes…</p>
+            </div>`;
+        }
+      } else {
+        renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery);
+      }
       renderMatch(
         $("scorecard-match"),
         $("scorecard-match-body"),
@@ -1696,6 +1798,12 @@
         loadMatchRows(active.profile.bioguideId),
       ]);
       if (token !== state.paintToken) return;
+
+      if (!hasUsableVotes(active.recentVotes)) {
+        const liveVotes = mapProfileVotesToScorecard(enrich?.recentVotes);
+        active.recentVotes = liveVotes;
+        renderVotes($("scorecard-votes"), liveVotes, state.voteQuery);
+      }
 
       activeRosterPerson = toRosterPerson(active.profile, enrich);
       const matchSummary = summarizeMatch(matchPayload);

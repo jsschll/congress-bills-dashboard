@@ -125,24 +125,37 @@ type ImpactKind = "wallet" | "community" | "rights";
 
 const IMPACT_META: Record<
   ImpactKind,
-  { label: string; className: string }
+  { label: string; icon: string; className: string }
 > = {
   wallet: {
     label: "Wallet",
+    icon: "💳",
     className:
       "bg-amber-500/15 text-amber-800 ring-amber-500/25 dark:bg-amber-400/15 dark:text-amber-100 dark:ring-amber-300/25",
   },
   community: {
     label: "Community",
+    icon: "🏙️",
     className:
       "bg-sky-500/15 text-sky-800 ring-sky-500/25 dark:bg-sky-400/15 dark:text-sky-100 dark:ring-sky-300/25",
   },
   rights: {
     label: "Rights",
+    icon: "⚖️",
     className:
       "bg-violet-500/15 text-violet-800 ring-violet-500/25 dark:bg-violet-400/15 dark:text-violet-100 dark:ring-violet-300/25",
   },
 };
+
+function isPlaceholderVote(vote: ScorecardRecentVote): boolean {
+  const title = String(vote.title || "");
+  const number = String(vote.billNumber || "");
+  const summary = String(vote.plainEnglishSummary || "");
+  if (/^seed\s*:/i.test(title) || /^placeholder\s*:/i.test(title)) return true;
+  if (/-seed-/i.test(number) || /-ph-/i.test(number)) return true;
+  if (/seeded placeholder|placeholder vote data/i.test(summary)) return true;
+  return false;
+}
 
 /**
  * Recent roll-call feed with vote position, plain-English summary, and impact tags.
@@ -157,6 +170,7 @@ export function TruthInVotingFeed({
 
   const topicOptions = useMemo(() => {
     const fromVotes = (votes || [])
+      .filter((vote) => !isPlaceholderVote(vote))
       .map((vote) => String(vote.category || "").trim())
       .filter(Boolean);
     const merged = [
@@ -175,10 +189,14 @@ export function TruthInVotingFeed({
     return unique;
   }, [votes, topics]);
 
+  const cleanedVotes = useMemo(
+    () => (Array.isArray(votes) ? votes.filter((vote) => !isPlaceholderVote(vote)) : []),
+    [votes]
+  );
+
   const filtered = useMemo(() => {
-    const list = Array.isArray(votes) ? votes : [];
-    return list.filter((vote) => voteMatchesTopic(vote, topic));
-  }, [votes, topic]);
+    return cleanedVotes.filter((vote) => voteMatchesTopic(vote, topic));
+  }, [cleanedVotes, topic]);
 
   return (
     <section
@@ -219,11 +237,13 @@ export function TruthInVotingFeed({
       </header>
 
       {filtered.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-600 dark:text-slate-400">
-          {votes?.length
-            ? "No roll calls match that topic yet."
-            : "No recent roll-call votes are available for this representative."}
-        </p>
+        <div className="rounded-xl border border-dashed border-slate-300 px-3 py-6 text-center dark:border-slate-600">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {cleanedVotes.length
+              ? "No roll calls match that topic yet."
+              : "No recent recorded roll-call votes for this representative."}
+          </p>
+        </div>
       ) : (
         <ul className="space-y-3">
           {filtered.map((vote) => {
@@ -247,7 +267,7 @@ export function TruthInVotingFeed({
                 key={`${vote.billId}-${vote.votePosition}-${vote.voteDate || ""}`}
                 className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/50 sm:p-4"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex flex-wrap items-center gap-2">
                       {vote.billNumber ? (
@@ -272,7 +292,7 @@ export function TruthInVotingFeed({
                   </div>
 
                   <span
-                    className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ring-1 ring-inset ${style.className}`}
+                    className={`ml-auto inline-flex shrink-0 items-center self-start rounded-full px-2.5 py-1 text-xs font-bold tracking-wide ring-1 ring-inset ${style.className}`}
                   >
                     {style.label}
                   </span>
@@ -290,12 +310,12 @@ export function TruthInVotingFeed({
                       <span
                         key={kind}
                         title={String(text)}
-                        className={`inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${IMPACT_META[kind].className}`}
+                        className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${IMPACT_META[kind].className}`}
                       >
-                        <span className="shrink-0">{IMPACT_META[kind].label}</span>
-                        <span className="truncate font-medium opacity-80">
-                          {String(text)}
+                        <span className="shrink-0" aria-hidden="true">
+                          {IMPACT_META[kind].icon}
                         </span>
+                        <span className="shrink-0">{IMPACT_META[kind].label}</span>
                       </span>
                     ))}
                   </div>
