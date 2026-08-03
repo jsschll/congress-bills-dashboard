@@ -605,6 +605,10 @@ function officialRoleKind(person = {}) {
 
   if (chamber === "senate") return "senate";
   if (chamber === "house") return "house";
+  if (/\bsenator\b|\bu\.?s\.?\s*senate\b/.test(title)) return "senate";
+  if (/\brepresentative\b|\bu\.?s\.?\s*house\b|\bcongressman\b|\bcongresswoman\b/.test(title)) {
+    return "house";
+  }
   if (hasBioguide) return "house";
 
   if (
@@ -692,10 +696,13 @@ function renderMatchScorecard({ user, rows }, person) {
     return;
   }
 
+  const chamberLabel = roleKind === "senate" ? "Senate" : "House";
+  const personName = person?.name || "this official";
+
   if (matchLede) {
     matchLede.textContent =
       roleKind === "senate"
-        ? "Your Support / Oppose stances compared to this senator’s recorded votes when available."
+        ? "Your Support / Oppose stances compared to this senator’s Senate roll-call votes."
         : "Your Support / Oppose stances compared to this official’s House roll-call votes.";
   }
 
@@ -705,8 +712,8 @@ function renderMatchScorecard({ user, rows }, person) {
         <a href="auth.html?next=${encodeURIComponent(
           window.location.pathname + window.location.search
         )}">Sign in</a>
-        and Support or Oppose bills on Feed/Search to build your Action Match Score with ${escapeHtml(
-          person.name || "this official"
+        and Support or Oppose bills below to build your Action Match Score with ${escapeHtml(
+          personName
         )}.
       </p>
       <p class="politician-quick-match">
@@ -758,44 +765,49 @@ function renderMatchScorecard({ user, rows }, person) {
     </li>`;
   };
 
+  // Empty scorecard: prompt the user to vote on bills in the Activity Feed.
+  if (compared.length === 0) {
+    matchBody.innerHTML = `
+      <div class="politician-match-hero politician-match-hero--empty">
+        <div class="politician-match-hero__score">
+          <span class="politician-match-hero__value">—</span>
+          <span class="politician-match-hero__label">Action Match Score</span>
+        </div>
+        <p class="politician-match-hero__meta">
+          Vote on 3 bills below to calculate your Action Match Score with ${escapeHtml(
+            personName
+          )}!
+        </p>
+      </div>
+      <p class="politician-quick-match">
+        <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
+        <span class="politician-quick-match__hint">Or Support / Oppose recent ${chamberLabel} votes in the Activity Feed.</span>
+      </p>`;
+    return;
+  }
+
   const needsQuickMatch = compared.length < 5;
   const quickMatchCta = needsQuickMatch
     ? `<p class="politician-quick-match">
         <a class="refresh-btn" href="bills-policies.html?tab=votes&amp;quiz=1">Take a 2-Minute Match Quiz</a>
-        <span class="politician-quick-match__hint">${
-          compared.length === 0
-            ? "Answer 5–10 recent key votes to populate your Action Match Score."
-            : `You’ve compared ${compared.length} vote${
-                compared.length === 1 ? "" : "s"
-              }. A few more key votes will firm up this score.`
-        }</span>
+        <span class="politician-quick-match__hint">You’ve compared ${
+          compared.length
+        } vote${
+          compared.length === 1 ? "" : "s"
+        }. A few more key votes will firm up this score.</span>
       </p>`
     : "";
 
   matchBody.innerHTML = `
     <div class="politician-match-hero">
       <div class="politician-match-hero__score ${
-        score == null
-          ? ""
-          : score >= 70
-            ? "is-high"
-            : score >= 40
-              ? "is-mid"
-              : "is-low"
+        score >= 70 ? "is-high" : score >= 40 ? "is-mid" : "is-low"
       }">
-        <span class="politician-match-hero__value">${
-          score == null ? "—" : `${score}%`
-        }</span>
+        <span class="politician-match-hero__value">${score}%</span>
         <span class="politician-match-hero__label">Action Match Score</span>
       </div>
       <p class="politician-match-hero__meta">
-        ${
-          compared.length
-            ? `${matched.length} of ${compared.length} comparable House roll calls match your stance.`
-            : roleKind === "senate"
-              ? "No comparable House roll calls for this senator yet. Action Match currently uses House floor votes linked to bills you Support or Oppose."
-              : "No comparable roll calls yet. Support or Oppose federal bills that have House votes — or take the Quick Match quiz."
-        }
+        ${matched.length} of ${compared.length} comparable ${chamberLabel} roll calls match your stance.
       </p>
     </div>
 
@@ -998,8 +1010,16 @@ function renderVotesList(target, votes, emptyMessage, person) {
         whoVotedHint: `Tap ${copy.yeaLabel} or ${copy.nayLabel} to compare with ${personName}.`,
         onStanceChange: async () => {
           if (!bioguide) return;
+          // Live refresh — no full page reload. Persist finishes before this callback.
           const payload = await loadMatchRows(bioguide);
           renderMatchScorecard(payload, person);
+          // Keep the match section in view so the updated score is obvious.
+          if (matchSection && typeof matchSection.scrollIntoView === "function") {
+            const rect = matchSection.getBoundingClientRect();
+            if (rect.bottom < 0 || rect.top > window.innerHeight) {
+              matchSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+          }
         },
       });
     }

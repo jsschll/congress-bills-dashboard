@@ -224,9 +224,93 @@
       .map((id) => String(id).toUpperCase());
   }
 
+  function resolveItemChamber(item = {}) {
+    const id = String(item.id || item.billId || "").toLowerCase();
+    if (id.startsWith("senate-vote-")) return "senate";
+    if (id.startsWith("house-vote-")) return "house";
+    const chamber = String(item.chamber || item.jurisdiction || "").toLowerCase();
+    if (chamber.includes("senate")) return "senate";
+    if (chamber.includes("house")) return "house";
+    return "house";
+  }
+
+  function normalizeMatchVoteCast(voteCast = "") {
+    const value = String(voteCast || "").toLowerCase();
+    if (value === "yea" || value === "aye" || value === "yes") return "Yea";
+    if (value === "nay" || value === "no") return "Nay";
+    if (value.includes("present")) return "Present";
+    if (value.includes("not voting") || value === "nv") return "Not Voting";
+    return voteCast || null;
+  }
+
+  function stanceMatchesMemberVote(stance, voteCast) {
+    const vote = String(voteCast || "").toLowerCase();
+    if (!vote || vote.includes("present") || vote.includes("not voting") || vote === "nv") {
+      return null;
+    }
+    if (stance === "support") {
+      return vote === "yea" || vote === "aye" || vote === "yes";
+    }
+    if (stance === "oppose") {
+      return vote === "nay" || vote === "no";
+    }
+    return null;
+  }
+
+  /**
+   * Profile Activity cards already include this politician’s recorded vote.
+   * Use that for instant Action Match without waiting on the wrong chamber API.
+   */
+  function matchFromItemVoteCast(item, stance, bioguides) {
+    const cast = normalizeMatchVoteCast(item?.voteCast || item?.memberVote);
+    if (!cast || !bioguides.length) return null;
+    const chamber = resolveItemChamber(item);
+    return {
+      billId: item.id,
+      chamber,
+      hasRollCall: true,
+      congress: item.congress || null,
+      sessionNumber: item.sessionNumber || null,
+      rollCallNumber: item.rollCallNumber || null,
+      result: item.result || "",
+      members: bioguides.map((bioguide) => ({
+        bioguideId: bioguide,
+        name: null,
+        party: null,
+        state: null,
+        voteCast: cast,
+        matched: stance ? stanceMatchesMemberVote(stance, cast) : null,
+      })),
+      sourceUrl: item.clerkUrl || item.officialUrl || item.senateUrl || null,
+      source: "item-vote-cast",
+    };
+  }
+
   async function fetchVoteMatch(item, stance) {
+    const chamber = resolveItemChamber(item);
+    const fromItem = Array.isArray(item.compareBioguides)
+      ? item.compareBioguides
+      : [];
+    const bios = [
+      ...new Set(
+        [
+          ...(chamber === "senate" ? [] : houseRepBioguides()),
+          ...fromItem,
+        ]
+          .map((id) => String(id || "").toUpperCase())
+          .filter(Boolean)
+      ),
+    ];
+
+    // Instant path for politician Activity Feed cards (voteCast already known).
+    if (fromItem.length && (item.voteCast || item.memberVote)) {
+      const local = matchFromItemVoteCast(item, stance, fromItem.map((id) => String(id).toUpperCase()));
+      if (local?.hasRollCall) return local;
+    }
+
     const params = new URLSearchParams();
     params.set("billId", item.id);
+    params.set("chamber", chamber);
     if (stance) params.set("stance", stance);
     if (item.rollCallNumber) {
       params.set("rollCallNumber", String(item.rollCallNumber));
@@ -237,16 +321,12 @@
     if (item.congress) {
       params.set("congress", String(item.congress));
     }
-    const fromItem = Array.isArray(item.compareBioguides)
-      ? item.compareBioguides
-      : [];
-    const bios = [
-      ...new Set(
-        [...houseRepBioguides(), ...fromItem]
-          .map((id) => String(id || "").toUpperCase())
-          .filter(Boolean)
-      ),
-    ];
+    if (item.legislationType) {
+      params.set("type", String(item.legislationType).toLowerCase());
+    }
+    if (item.legislationNumber) {
+      params.set("number", String(item.legislationNumber));
+    }
     if (bios.length) params.set("bioguides", bios.join(","));
     if (typeof API_KEY === "string" && API_KEY.trim()) {
       params.set("api_key", API_KEY.trim());
@@ -645,9 +725,11 @@ Sincerely,
     await loadAlignment(client);
     let votePayload = null;
     if (activeStance && String(item.level || "").toLowerCase() === "federal") {
+      const chamber = resolveItemChamber(item);
       if (roots.voteBody) {
-        roots.voteBody.innerHTML =
-          `<p class="policy-engage__vote-empty">Checking House roll call…</p>`;
+        roots.voteBody.innerHTML = `<p class="policy-engage__vote-empty">Checking ${
+          chamber === "senate" ? "Senate" : "House"
+        } roll call…</p>`;
       }
       votePayload = await fetchVoteMatch(item, activeStance);
       await persistVoteMatches(client, user, item, activeStance, votePayload);
@@ -822,13 +904,24 @@ Sincerely,
   }
 
   function mountVote(card, item, options = {}) {
+    const chamber = resolveItemChamber(item);
+    // Ensure compare bioguides travel with the item for fetchVoteMatch.
+    if (
+      Array.isArray(options.compareBioguides) &&
+      options.compareBioguides.length
+    ) {
+      item.compareBioguides = options.compareBioguides;
+    }
     return mount(card, item, {
       supportLabel: "Yea",
       opposeLabel: "Nay",
       prompt: "How would you vote?",
       showTakeAction: false,
       showCommunity: false,
-      whoVotedHint: "Tap Yea or Nay to compare with House members.",
+      whoVotedHint:
+        chamber === "senate"
+          ? "Tap Yea or Nay to compare with Senate roll-call votes."
+          : "Tap Yea or Nay to compare with House members.",
       ...options,
     });
   }
