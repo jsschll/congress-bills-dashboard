@@ -5,6 +5,7 @@
 
 (function (global) {
   const SESSION_KEY = "article1.scorecardSession";
+  const PENDING_FOLLOW_KEY = "article1.pendingFollow";
   const ENDPOINT = "/api/representatives/lookup";
 
   const CATEGORY_RULES = [
@@ -153,6 +154,56 @@
     el.hidden = !message;
     el.textContent = message || "";
     el.dataset.type = type;
+    if (message && (type === "success" || type === "error")) {
+      global.clearTimeout(setStatus._hideTimer);
+      setStatus._hideTimer = global.setTimeout(() => {
+        if (el.dataset.type === type && el.textContent === message) {
+          el.hidden = true;
+          el.textContent = "";
+        }
+      }, type === "success" ? 4200 : 7000);
+    }
+  }
+
+  function readPendingFollow() {
+    try {
+      const raw = sessionStorage.getItem(PENDING_FOLLOW_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writePendingFollow(payload) {
+    try {
+      if (!payload) sessionStorage.removeItem(PENDING_FOLLOW_KEY);
+      else sessionStorage.setItem(PENDING_FOLLOW_KEY, JSON.stringify(payload));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function pendingFollowMatches(person) {
+    const pending = readPendingFollow();
+    if (!pending || !person) return null;
+    const pendingBio = String(pending.bioguideId || "")
+      .trim()
+      .toUpperCase();
+    const personBio = String(person.bioguide_id || person.bioguideId || "")
+      .trim()
+      .toUpperCase();
+    if (pendingBio && personBio && pendingBio === personBio) return pending;
+    if (pending.id && person.id && String(pending.id) === String(person.id)) {
+      return pending;
+    }
+    if (
+      pending.name &&
+      person.name &&
+      String(pending.name).toLowerCase() === String(person.name).toLowerCase()
+    ) {
+      return pending;
+    }
+    return null;
   }
 
   function districtLabel(profile) {
@@ -406,6 +457,100 @@
     }
   }
 
+  async function resolveFollowTargetId(person) {
+    if (!person) return null;
+    let id = person.id || null;
+    if (!id && typeof resolveRosterId === "function") {
+      id = await resolveRosterId(person);
+    }
+    if (!id && typeof upsertPoliticianRecord === "function") {
+      const record = await upsertPoliticianRecord(person);
+      id = record?.id || null;
+      if (id) person.id = id;
+    }
+    return id ? String(id) : null;
+  }
+
+  async function toggleFollowForPerson(person, { announce = true } = {}) {
+    if (!person) throw new Error("No official selected.");
+    const user = typeof getUser === "function" ? await getUser() : null;
+    followUser = user;
+    if (!user) {
+      writePendingFollow({
+        id: person.id || null,
+        bioguideId: person.bioguide_id || person.bioguideId || null,
+        name: person.name || null,
+        createdAt: Date.now(),
+      });
+      global.location.href = authNextHref();
+      return { redirected: true };
+    }
+
+    const id = await resolveFollowTargetId(person);
+    if (!id) {
+      throw new Error("Could not resolve this official to follow.");
+    }
+    person.id = id;
+
+    if (!followedPoliticianIds.size && typeof loadFollowedPoliticianIds === "function") {
+      followedPoliticianIds = await loadFollowedPoliticianIds(user.id);
+    }
+
+    let following = false;
+    if (followedPoliticianIds.has(id)) {
+      await unfollowPolitician(user.id, id);
+      followedPoliticianIds.delete(id);
+      following = false;
+      if (announce) {
+        setStatus(
+          `Unfollowed ${person.name || "this official"}.`,
+          "success"
+        );
+      }
+    } else {
+      await followPolitician(user.id, id);
+      followedPoliticianIds.add(id);
+      following = true;
+      if (announce) {
+        setStatus(
+          `Following ${person.name || "this official"} — their actions will show in My Feed.`,
+          "success"
+        );
+      }
+    }
+    syncFollowButton();
+    return { following, id };
+  }
+
+  async function completePendingFollowIfNeeded(person) {
+    const pending = pendingFollowMatches(person);
+    if (!pending || !followUser || !person) return;
+    writePendingFollow(null);
+    try {
+      const id = await resolveFollowTargetId(person);
+      if (!id) return;
+      person.id = id;
+      if (followedPoliticianIds.has(id)) {
+        syncFollowButton();
+        setStatus(
+          `You’re already following ${person.name || "this official"}.`,
+          "success"
+        );
+        return;
+      }
+      await followPolitician(followUser.id, id);
+      followedPoliticianIds.add(id);
+      syncFollowButton();
+      setStatus(
+        `Following ${person.name || "this official"} — their actions will show in My Feed.`,
+        "success"
+      );
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || "Could not complete follow after sign-in.", "error");
+    }
+  }
+
   function syncFollowButton() {
     const button = $("scorecard-follow-btn");
     if (!button) return;
@@ -431,29 +576,11 @@
     syncFollowButton();
 
     button.addEventListener("click", async () => {
-      if (!followUser) {
-        global.location.href = authNextHref();
-        return;
-      }
       if (!activeRosterPerson) return;
       button.disabled = true;
       try {
-        let id = activeRosterPerson.id;
-        if (!id && typeof upsertPoliticianRecord === "function") {
-          const record = await upsertPoliticianRecord(activeRosterPerson);
-          id = record?.id || null;
-          if (id) activeRosterPerson.id = id;
-        }
-        if (!id) throw new Error("Could not resolve this official to follow.");
-        id = String(id);
-        if (followedPoliticianIds.has(id)) {
-          await unfollowPolitician(followUser.id, id);
-          followedPoliticianIds.delete(id);
-        } else {
-          await followPolitician(followUser.id, id);
-          followedPoliticianIds.add(id);
-        }
-        syncFollowButton();
+        const result = await toggleFollowForPerson(activeRosterPerson);
+        if (result?.redirected) return;
       } catch (error) {
         console.error(error);
         setStatus(error.message || "Could not update follow.", "error");
@@ -1503,10 +1630,14 @@
         active.profile,
         matchPayload
       );
+      await resolveFollowTargetId(activeRosterPerson);
       await loadNoteForPerson(activeRosterPerson, followUser);
       if (token !== state.paintToken) return;
-      syncFollowButton();
       refreshNoteUi();
+      syncFollowButton();
+      await completePendingFollowIfNeeded(activeRosterPerson);
+      if (token !== state.paintToken) return;
+      syncFollowButton();
     }
 
     if (search) {
