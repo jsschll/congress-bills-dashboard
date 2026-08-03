@@ -1,0 +1,19 @@
+/**
+ * Tailwind-oriented companion styles for ZipLookupHero when used in a
+ * Tailwind-enabled React app. The production landing page uses the
+ * `.zip-lookup-hero*` rules in styles.css instead.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .zip-lookup-hero__spinner {
+    @apply inline-block h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600;
+  }
+
+  .zip-lookup-hero__spinner--on-dark {
+    @apply border-white/30 border-t-white;
+  }
+}
