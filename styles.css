@@ -6704,8 +6704,306 @@ body.politician-notes-modal-open {
   margin-bottom: 0.85rem;
 }
 
+.scorecard-votes__heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.scorecard-votes__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.scorecard-match-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.22),
+    rgba(14, 165, 233, 0.16)
+  );
+  color: #a7f3d0;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.scorecard-match-cta:hover,
+.scorecard-match-cta:focus-visible {
+  border-color: rgba(110, 231, 183, 0.7);
+  color: #ecfdf5;
+  outline: none;
+  transform: translateY(-1px);
+}
+
 .scorecard-topic {
   min-width: 11rem;
+}
+
+.scorecard-match__quiz-link {
+  display: inline-flex;
+  margin-left: 0.65rem;
+  color: #94a3b8;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.scorecard-match__quiz-link:hover,
+.scorecard-match__quiz-link:focus-visible {
+  color: #a7f3d0;
+}
+
+.scorecard-match.is-match-focus {
+  animation: scorecard-match-pulse 1.4s ease;
+}
+
+@keyframes scorecard-match-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+  35% {
+    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+
+body.scorecard-match-modal-open {
+  overflow: hidden;
+}
+
+.scorecard-match-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.scorecard-match-modal[hidden] {
+  display: none;
+}
+
+.scorecard-match-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.scorecard-match-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(40rem, 100%);
+  max-height: min(90vh, 52rem);
+  overflow: auto;
+  border-radius: 1rem;
+  border: 1px solid #334155;
+  background: #0f172a;
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+  padding: 1.1rem 1.15rem 1rem;
+}
+
+.scorecard-match-modal__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.scorecard-match-modal__eyebrow {
+  margin: 0;
+  color: #6ee7b7;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.scorecard-match-modal__header h2 {
+  margin: 0.25rem 0 0;
+  font-family: "Fraunces", "Times New Roman", serif;
+  color: #f8fafc;
+  font-size: 1.45rem;
+}
+
+.scorecard-match-modal__lede {
+  margin: 0.4rem 0 0;
+  color: #94a3b8;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.scorecard-match-modal__close {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.9);
+  color: #cbd5e1;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.scorecard-match-modal__close:hover,
+.scorecard-match-modal__close:focus-visible {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #a7f3d0;
+  outline: none;
+}
+
+.scorecard-match-modal .status {
+  margin: 0.75rem 0 0;
+}
+
+.scorecard-match-quiz {
+  margin-top: 0.85rem;
+}
+
+.scorecard-match-quiz__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.scorecard-match-quiz__card {
+  border: 1px solid #334155;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 0.85rem;
+}
+
+.scorecard-match-quiz__card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.scorecard-match-quiz__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.scorecard-match-quiz__card h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.scorecard-match-quiz__summary {
+  margin: 0.45rem 0 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.scorecard-match-quiz__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.scorecard-match-quiz__btn {
+  min-height: 2.2rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid #475569;
+  background: rgba(30, 41, 59, 0.9);
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scorecard-match-quiz__btn.is-support.is-active,
+.scorecard-match-quiz__btn.is-support:hover,
+.scorecard-match-quiz__btn.is-support:focus-visible {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(16, 185, 129, 0.18);
+  color: #6ee7b7;
+  outline: none;
+}
+
+.scorecard-match-quiz__btn.is-oppose.is-active,
+.scorecard-match-quiz__btn.is-oppose:hover,
+.scorecard-match-quiz__btn.is-oppose:focus-visible {
+  border-color: rgba(251, 113, 133, 0.55);
+  background: rgba(244, 63, 94, 0.16);
+  color: #fda4af;
+  outline: none;
+}
+
+.scorecard-match-quiz__result {
+  margin: 0.55rem 0 0;
+  color: #a7f3d0;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.scorecard-match-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #334155;
+}
+
+.scorecard-match-modal__secondary {
+  color: #94a3b8;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.scorecard-match-modal__secondary:hover,
+.scorecard-match-modal__secondary:focus-visible {
+  color: #a7f3d0;
+}
+
+@media (max-width: 640px) {
+  .scorecard-votes__tools {
+    width: 100%;
+  }
+
+  .scorecard-match-cta,
+  .scorecard-topic {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .scorecard-vote-list {

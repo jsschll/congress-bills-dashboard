@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260804tiv2" />
+    <link rel="stylesheet" href="styles.css?v=20260804match1" />
   </head>
   <body class="page-app page-scorecard page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -224,11 +224,57 @@
       </div>
     </div>
 
+    <div id="scorecard-match-modal" class="scorecard-match-modal" hidden>
+      <div class="scorecard-match-modal__backdrop" data-close-match-quiz="1"></div>
+      <div
+        class="scorecard-match-modal__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scorecard-match-quiz-title"
+      >
+        <header class="scorecard-match-modal__header">
+          <div>
+            <p class="scorecard-match-modal__eyebrow">Action Match</p>
+            <h2 id="scorecard-match-quiz-title">Match My Votes</h2>
+            <p id="scorecard-match-quiz-lede" class="scorecard-match-modal__lede">
+              Support or Oppose recent roll calls to recalculate your Action Match
+              with this representative.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="scorecard-match-modal__close"
+            data-close-match-quiz="1"
+            aria-label="Close match quiz"
+          >
+            ✕
+          </button>
+        </header>
+        <p id="scorecard-match-quiz-status" class="status" hidden></p>
+        <div id="scorecard-match-quiz-body" class="scorecard-match-quiz"></div>
+        <footer class="scorecard-match-modal__footer">
+          <a
+            class="scorecard-match-modal__secondary"
+            href="bills-policies.html?tab=votes&amp;quiz=1"
+            >Open full 2-minute quiz</a
+          >
+          <button
+            type="button"
+            id="scorecard-match-quiz-done"
+            class="refresh-btn"
+            data-close-match-quiz="1"
+          >
+            Done
+          </button>
+        </footer>
+      </div>
+    </div>
+
     <script src="config.js"></script>
     <script src="shared.js"></script>
     <script src="nav.js?v=20260804a1"></script>
     <script src="politicians-shared.js?v=20260804un1"></script>
-    <script src="representatives-scorecard.js?v=20260804tiv2"></script>
+    <script src="representatives-scorecard.js?v=20260804match1"></script>
     <script>
       (async () => {
         await bootNav("politicians");
