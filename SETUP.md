@@ -22,6 +22,7 @@
    - For offline-processed vote cards (`processed_votes`), run [`supabase/migration-processed-votes.sql`](supabase/migration-processed-votes.sql)
    - For impact estimator roles (teacher, veteran, etc.), run [`supabase/migration-impact-roles.sql`](supabase/migration-impact-roles.sql)
    - For profile avatars + display name (nav account menu), run [`supabase/migration-profile-avatar.sql`](supabase/migration-profile-avatar.sql)
+   - For Representative Scorecard tables + types, run [`supabase/migration-representative-scorecard.sql`](supabase/migration-representative-scorecard.sql) (see `types/scorecard.ts`)
 6. Project Settings → API: copy Project URL and the **anon / publishable** key
 
 ## 2. Local config
