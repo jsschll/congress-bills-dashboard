@@ -34,6 +34,7 @@ alter table public.processed_votes
   add column if not exists what_it_does text,
   add column if not exists yea_impact text,
   add column if not exists nay_impact text,
+  add column if not exists is_key_vote boolean,
   add column if not exists summary_source text default 'llm',
   add column if not exists raw_payload jsonb not null default '{}'::jsonb,
   add column if not exists created_at timestamptz not null default now(),

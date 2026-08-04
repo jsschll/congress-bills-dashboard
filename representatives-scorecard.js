@@ -539,6 +539,18 @@
           plainEnglishSummary: plainSummary || null,
           yea_impact: vote.yea_impact || vote.yeaImpact || null,
           nay_impact: vote.nay_impact || vote.nayImpact || null,
+          is_key_vote:
+            typeof vote.is_key_vote === "boolean"
+              ? vote.is_key_vote
+              : typeof vote.isKeyVote === "boolean"
+                ? vote.isKeyVote
+                : null,
+          isKeyVote:
+            typeof vote.is_key_vote === "boolean"
+              ? vote.is_key_vote
+              : typeof vote.isKeyVote === "boolean"
+                ? vote.isKeyVote
+                : null,
           category: vote.subjectCategory || vote.policyArea || categorizeBill(vote),
           voteDate: vote.date || (vote.lastUpdated || "").slice(0, 10) || null,
           impacts: {
@@ -2381,9 +2393,27 @@
     });
   }
 
-  function renderVotes(el, votes, query) {
+  function isDisplayedKeyVote(vote = {}) {
+    if (vote.is_key_vote === true || vote.isKeyVote === true) return true;
+    if (vote.is_key_vote === false || vote.isKeyVote === false) return false;
+    // Fallback for rows not yet re-synced with Claude's gatekeeper.
+    const billNumber = String(vote.billNumber || "");
+    if (/j\.?\s*res/i.test(billNumber)) return true;
+    const kind = String(vote.voteKind || "").toLowerCase();
+    if (kind === "final_passage" || kind === "amendment") return true;
+    const title = String(vote.title || vote.rawTitle || "");
+    if (/war powers|military|authorization/i.test(title)) return true;
+    return false;
+  }
+
+  function renderVotes(el, votes, query, options = {}) {
     if (!el) return;
     const q = String(query || "").trim().toLowerCase();
+    const scope =
+      options.scope ||
+      el.dataset.voteScope ||
+      "key";
+    el.dataset.voteScope = scope;
     const sourceVotes = (votes || []).filter((vote) => {
       const title = String(vote.title || "");
       const number = String(vote.billNumber || "");
@@ -2393,12 +2423,17 @@
       if (/seeded placeholder|placeholder vote data/i.test(summary)) return false;
       return true;
     });
-    const filtered = sourceVotes.filter((vote) => {
+    const scopedVotes =
+      scope === "all"
+        ? sourceVotes
+        : sourceVotes.filter((vote) => isDisplayedKeyVote(vote));
+    const filtered = scopedVotes.filter((vote) => {
       if (!q) return true;
       const haystack = [
         vote.billNumber,
         vote.title,
         vote.plainEnglishSummary,
+        vote.plain_summary,
         vote.category,
         vote.impacts?.wallet,
         vote.impacts?.community,
@@ -2444,6 +2479,17 @@
             <span aria-hidden="true">🎯</span>
             Match My Votes
           </button>
+          <label class="scorecard-topic">
+            <span>Votes</span>
+            <select id="scorecard-vote-scope" aria-label="Vote significance filter">
+              <option value="key"${
+                scope === "key" ? " selected" : ""
+              }>Key Votes</option>
+              <option value="all"${
+                scope === "all" ? " selected" : ""
+              }>All Votes</option>
+            </select>
+          </label>
           <label class="scorecard-topic">
             <span>Topic</span>
             <select id="scorecard-topic-filter">
@@ -2547,12 +2593,21 @@
           : `<div class="scorecard-empty scorecard-empty--card" role="status">
               <p>${
                 sourceVotes.length
-                  ? "No roll calls match this filter."
+                  ? scope === "key"
+                    ? "No key votes in this list yet. Switch to All Votes to see every roll call."
+                    : "No roll calls match this filter."
                   : "No recent roll-call votes recorded for this representative."
               }</p>
             </div>`
       }
     `;
+
+    const scopeSelect = $("scorecard-vote-scope");
+    if (scopeSelect) {
+      scopeSelect.addEventListener("change", () => {
+        renderVotes(el, sourceVotes, query, { scope: scopeSelect.value });
+      });
+    }
 
     const topicSelect = $("scorecard-topic-filter");
     if (topicSelect) {
@@ -2566,7 +2621,7 @@
                   String(vote.category || "").toLowerCase() ===
                   topic.toLowerCase()
               );
-        renderVotes(el, next, query);
+        renderVotes(el, next, query, { scope: el.dataset.voteScope || "key" });
       });
     }
   }
