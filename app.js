@@ -345,6 +345,17 @@ function truncateToSentences(text) {
   return sentences.slice(0, Math.min(3, sentences.length)).join(" ");
 }
 
+function truncateCardSummaryForDisplay(text, maxChars = 250) {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleaned || cleaned.length <= maxChars) {
+    return { preview: cleaned, truncated: false, full: cleaned };
+  }
+  let preview = cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim();
+  if (!preview) preview = cleaned.slice(0, maxChars).trim();
+  if (!/[.…!?]$/.test(preview)) preview = `${preview}…`;
+  return { preview, truncated: true, full: cleaned };
+}
+
 function fallbackCardSummary(bill) {
   return `${bill.title} was introduced in the ${chamberLabel(bill.originChamber)} on ${formatDate(bill.introducedDate)}. A detailed CRS summary is not yet available.`;
 }
@@ -440,11 +451,31 @@ function renderBillCard(bill, highlightTerms = []) {
     )
   );
 
-  const excerpt = document.createElement("p");
-  excerpt.className = "bill-card__excerpt";
-  excerpt.append(
-    highlightText(bill.cardSummary || fallbackCardSummary(bill), highlightTerms)
-  );
+  const excerpt = document.createElement("div");
+  excerpt.className = "bill-card__excerpt summary-collapse";
+  const rawSummary = bill.cardSummary || fallbackCardSummary(bill);
+  const plain =
+    String(bill.plain_summary || bill.plainSummary || "").trim();
+  const clipped = plain
+    ? { preview: plain, truncated: false, full: plain }
+    : typeof truncateSummaryAtWord === "function"
+      ? truncateSummaryAtWord(rawSummary, 250)
+      : truncateCardSummaryForDisplay(rawSummary, 250);
+  const textEl = document.createElement("p");
+  textEl.className = "summary-collapse__text";
+  textEl.append(highlightText(clipped.preview || rawSummary, highlightTerms));
+  excerpt.append(textEl);
+  if (clipped.truncated) {
+    textEl.dataset.summaryPreview = clipped.preview;
+    textEl.dataset.summaryFull = clipped.full;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "summary-collapse__toggle";
+    toggle.dataset.summaryToggle = "";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "Read More";
+    excerpt.append(toggle);
+  }
 
   const link = document.createElement("a");
   link.className = "bill-card__link";

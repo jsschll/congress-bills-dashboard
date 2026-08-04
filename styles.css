@@ -252,6 +252,43 @@
   overflow: hidden;
 }
 
+.summary-collapse {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.summary-collapse__text,
+.summary-collapse .vote-card__summary-text,
+.summary-collapse .policy-bill-card__pitch,
+.summary-collapse .search-result-card__pitch,
+.summary-collapse .scorecard-vote__plain {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: visible;
+  margin: 0;
+}
+
+.summary-collapse__toggle {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6ee7b7;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.summary-collapse__toggle:hover,
+.summary-collapse__toggle:focus-visible {
+  color: #a7f3d0;
+  outline: none;
+}
+
 .policy-bill-card__status {
   margin: 0;
   color: #94a3b8;
@@ -5540,6 +5577,13 @@ body.scorecard-match-detail-open {
   -webkit-line-clamp: 3;
   line-clamp: 3;
   overflow: hidden;
+}
+
+.politician-vote-card__summary .summary-collapse .vote-card__summary-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: visible;
 }
 
 .politician-vote-card__meanings {

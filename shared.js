@@ -166,6 +166,192 @@ function isShortVoteLabel(text = "") {
 }
 
 /**
+ * Prefer Claude plain_summary over raw CRS / chamber text.
+ */
+function preferPlainSummaryText(item = {}) {
+  return String(
+    item.plain_summary ||
+      item.plainSummary ||
+      item.plainEnglishSummary ||
+      item.what_it_does ||
+      item.whatItDoes ||
+      ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Resolve display summary: plain_summary first, else raw CRS fields.
+ * @returns {{ text: string, isPlain: boolean }}
+ */
+function resolveBillOrVoteSummaryText(item = {}) {
+  const plain = preferPlainSummaryText(item);
+  if (plain) return { text: plain, isPlain: true };
+  const raw = String(
+    item.officialSummary ||
+      item.shortPitch ||
+      item.summary ||
+      item.cardSummary ||
+      item.title ||
+      item.voteQuestion ||
+      ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  return { text: raw, isPlain: false };
+}
+
+const DISPLAY_SUMMARY_MAX_CHARS = 250;
+
+function truncateSummaryAtWord(text = "", maxChars = DISPLAY_SUMMARY_MAX_CHARS) {
+  const cleaned = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned || cleaned.length <= maxChars) {
+    return { preview: cleaned, truncated: false, full: cleaned };
+  }
+  let preview = cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim();
+  if (!preview) preview = cleaned.slice(0, maxChars).trim();
+  if (!/[.…!?]$/.test(preview)) preview = `${preview}…`;
+  return { preview, truncated: true, full: cleaned };
+}
+
+/**
+ * Build display copy for bill/vote cards.
+ * Plain summaries stay short; raw CRS falls back to ≤250 chars + Read More.
+ */
+function resolveDisplaySummary(item = {}, options = {}) {
+  const maxChars = Number(options.maxChars) || DISPLAY_SUMMARY_MAX_CHARS;
+  const maxWords = Number(options.maxWords) || 35;
+  const resolved = resolveBillOrVoteSummaryText(item);
+  let text = resolved.text;
+  if (resolved.isPlain && typeof clampPunchySummary === "function") {
+    text =
+      clampPunchySummary(text, { maxSentences: 2, maxWords }) || text;
+  } else if (resolved.isPlain) {
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length > maxWords) {
+      text = `${words.slice(0, maxWords).join(" ").replace(/[,:;–—-]+$/, "")}.`;
+    }
+  }
+  if (!text) {
+    return {
+      text: "No plain-English summary is available yet.",
+      preview: "No plain-English summary is available yet.",
+      full: "No plain-English summary is available yet.",
+      truncated: false,
+      isPlain: false,
+    };
+  }
+  if (resolved.isPlain) {
+    return {
+      text,
+      preview: text,
+      full: text,
+      truncated: false,
+      isPlain: true,
+    };
+  }
+  const clipped = truncateSummaryAtWord(text, maxChars);
+  return {
+    text: clipped.preview,
+    preview: clipped.preview,
+    full: clipped.full,
+    truncated: clipped.truncated,
+    isPlain: false,
+  };
+}
+
+/**
+ * HTML for a summary block with optional Read More collapse.
+ */
+function renderCollapsibleSummaryHtml(
+  itemOrText,
+  {
+    escapeHtmlFn,
+    className = "",
+    maxChars = DISPLAY_SUMMARY_MAX_CHARS,
+    paragraphClass = "",
+  } = {}
+) {
+  const esc =
+    typeof escapeHtmlFn === "function"
+      ? escapeHtmlFn
+      : (value) => String(value ?? "");
+  const display =
+    itemOrText && typeof itemOrText === "object" && !Array.isArray(itemOrText)
+      ? resolveDisplaySummary(itemOrText, { maxChars })
+      : (() => {
+          const full = String(itemOrText || "")
+            .replace(/\s+/g, " ")
+            .trim();
+          const clipped = truncateSummaryAtWord(full, maxChars);
+          return {
+            preview: clipped.preview || "Summary unavailable.",
+            full: clipped.full || "Summary unavailable.",
+            truncated: clipped.truncated,
+            isPlain: false,
+          };
+        })();
+
+  const classes = ["summary-collapse", className].filter(Boolean).join(" ");
+  const pClass = ["summary-collapse__text", paragraphClass]
+    .filter(Boolean)
+    .join(" ");
+
+  if (!display.truncated) {
+    return `<p class="${esc(pClass)}">${esc(display.preview)}</p>`;
+  }
+
+  return `<div class="${esc(classes)}">
+    <p
+      class="${esc(pClass)}"
+      data-summary-preview="${esc(display.preview)}"
+      data-summary-full="${esc(display.full)}"
+    >${esc(display.preview)}</p>
+    <button
+      type="button"
+      class="summary-collapse__toggle"
+      data-summary-toggle
+      aria-expanded="false"
+    >Read More</button>
+  </div>`;
+}
+
+function bindSummaryCollapseToggles(root = document) {
+  if (!root || root.__summaryCollapseBound) return;
+  root.__summaryCollapseBound = true;
+  root.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("[data-summary-toggle]");
+    if (!button || !root.contains(button)) return;
+    const wrap = button.closest(".summary-collapse");
+    const textEl = wrap?.querySelector("[data-summary-full]");
+    if (!textEl) return;
+    const expanded = button.getAttribute("aria-expanded") === "true";
+    if (expanded) {
+      textEl.textContent = textEl.getAttribute("data-summary-preview") || "";
+      button.setAttribute("aria-expanded", "false");
+      button.textContent = "Read More";
+    } else {
+      textEl.textContent = textEl.getAttribute("data-summary-full") || "";
+      button.setAttribute("aria-expanded", "true");
+      button.textContent = "Show Less";
+    }
+  });
+}
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () =>
+      bindSummaryCollapseToggles(document)
+    );
+  } else {
+    bindSummaryCollapseToggles(document);
+  }
+}
+
+/**
  * Normalize vote-card props for Feed / politician Recent Votes / Truth in Voting.
  * Prefer Claude fields from processed_votes when present.
  */
@@ -190,21 +376,8 @@ function resolveVoteCardCopy(item = {}) {
   const nayMeans = punchyImpactClause(nayClean) || nayClean;
   const showMeans = Boolean(yeaMeans && nayMeans);
 
-  const summary =
-    clampPunchySummary(
-      item.plain_summary ||
-        item.plainSummary ||
-        item.plainEnglishSummary ||
-        item.what_it_does ||
-        item.whatItDoes ||
-        item.officialSummary ||
-        item.shortPitch ||
-        item.summary ||
-        item.title ||
-        item.voteQuestion ||
-        "",
-      { maxSentences: 2, maxWords: 30 }
-    ) || "No plain-English summary is available for this vote yet.";
+  const display = resolveDisplaySummary(item, { maxWords: 35 });
+  const summary = display.preview;
 
   const shortTitle = String(
     item.short_title || item.shortTitle || item.displayTitle || ""
@@ -221,6 +394,7 @@ function resolveVoteCardCopy(item = {}) {
 
   return {
     summary,
+    displaySummary: display,
     shortTitle,
     yeaMeans,
     nayMeans,
@@ -405,12 +579,23 @@ function indexProcessedVotesByBill(rows = []) {
 
 function applyProcessedSummaryToBillItem(item, row) {
   if (!item || !row) return item;
-  const summary = String(row.summary || "").trim();
+  const plain = String(
+    row.plain_summary || row.what_it_does || ""
+  ).trim();
+  const summary = plain || String(row.summary || "").trim();
   if (!summary) return item;
+  item.plain_summary = plain || summary;
+  item.plainSummary = plain || summary;
+  item.plainEnglishSummary = plain || summary;
+  item.what_it_does = plain || summary;
   item.shortPitch = summary;
   item.summary = summary;
   item.officialSummary = summary;
   item.summarySource = String(row.summary_source || "processed_votes");
+  if (row.short_title) {
+    item.short_title = String(row.short_title).trim();
+    item.shortTitle = item.short_title;
+  }
   return item;
 }
 
@@ -605,8 +790,8 @@ function splitMatchSentences(text = "") {
   );
 }
 
-/** Enforce ≤2 sentences / ~30 words for Action Match card summaries. */
-function clampPunchySummary(text = "", { maxSentences = 2, maxWords = 30 } = {}) {
+/** Enforce ≤2 sentences / ~35 words for Action Match card summaries. */
+function clampPunchySummary(text = "", { maxSentences = 2, maxWords = 35 } = {}) {
   const sentences = splitMatchSentences(text).slice(0, maxSentences);
   if (!sentences.length) return "";
   let out = sentences.join(" ");
@@ -856,7 +1041,7 @@ function resolveActionMatchCardCopy(row = {}) {
         bill.short_pitch ||
         bill.shortPitch ||
         "",
-      { maxSentences: 2, maxWords: 30 }
+      { maxSentences: 2, maxWords: 35 }
     ) || "No plain-English summary is available for this roll call yet.";
   const detailHref =
     row.detailHref || actionMatchDetailHref(bill, voteCopy);
@@ -1004,7 +1189,7 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
         bill.short_pitch ||
         bill.shortPitch ||
         "",
-      { maxSentences: 2, maxWords: 30 }
+      { maxSentences: 2, maxWords: 35 }
     ) || "No plain-English summary is available for this roll call yet.";
   const what_it_does = plain_summary;
   const yea_impact =

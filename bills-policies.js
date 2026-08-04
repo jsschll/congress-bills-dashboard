@@ -1054,12 +1054,23 @@ function renderBillCard(item) {
     (delta.added && delta.added.length) ||
     (delta.changed && delta.changed.length) ||
     (delta.removed && delta.removed.length);
-  const pitch = String(item.shortPitch || "").trim();
+  const pitch = String(
+    preferPlainSummaryText(item) || item.shortPitch || ""
+  ).trim();
   const statusLabel = String(item.statusLabel || "").trim();
   const showStatus =
     statusLabel &&
     statusLabel.toLowerCase() !== pitch.toLowerCase() &&
     !/calendar no\.?\s*$/i.test(statusLabel);
+  const summaryHtml =
+    typeof renderCollapsibleSummaryHtml === "function"
+      ? renderCollapsibleSummaryHtml(item, {
+          escapeHtmlFn: escapePolicyHtml,
+          paragraphClass: "policy-bill-card__pitch",
+        })
+      : `<p class="policy-bill-card__pitch">${escapePolicyHtml(
+          pitch || "Summary unavailable."
+        )}</p>`;
 
   card.innerHTML = `
     <div class="policy-bill-card__header">
@@ -1092,9 +1103,7 @@ function renderBillCard(item) {
     </div>
     <section class="policy-bill-card__summary" aria-label="Summary">
       <h3 class="policy-bill-card__summary-label">Summary</h3>
-      <p class="policy-bill-card__pitch">${escapePolicyHtml(
-        pitch || "Summary unavailable."
-      )}</p>
+      ${summaryHtml}
       ${
         showStatus
           ? `<p class="policy-bill-card__status">${escapePolicyHtml(statusLabel)}</p>`
@@ -1208,12 +1217,6 @@ function renderVoteCard(item) {
     String(item.voteQuestion || "").trim() ||
     "Congressional vote";
   const dateLabel = voteCardDateLabel(item);
-  const summary =
-    String(
-      item.summary || item.officialSummary || item.shortPitch || ""
-    ).trim() || "No summary available for this vote.";
-  const yeaMeans = String(item.yeaMeans || item.yea_means || "").trim();
-  const nayMeans = String(item.nayMeans || item.nay_means || "").trim();
   const copy =
     typeof resolveVoteCardCopy === "function"
       ? resolveVoteCardCopy(item)
@@ -1227,6 +1230,24 @@ function renderVoteCard(item) {
         };
   const yeaLabel = copy.yeaLabel || "Support Measure";
   const nayLabel = copy.nayLabel || "Oppose Measure";
+  const yeaMeans = String(
+    copy.yeaMeans || item.yeaMeans || item.yea_means || ""
+  ).trim();
+  const nayMeans = String(
+    copy.nayMeans || item.nayMeans || item.nay_means || ""
+  ).trim();
+  const summaryHtml =
+    typeof renderCollapsibleSummaryHtml === "function"
+      ? renderCollapsibleSummaryHtml(item, {
+          escapeHtmlFn: escapePolicyHtml,
+          paragraphClass: "policy-bill-card__pitch vote-card__summary-text",
+        })
+      : `<p class="policy-bill-card__pitch vote-card__summary-text">${escapePolicyHtml(
+          copy.summary ||
+            item.plain_summary ||
+            item.summary ||
+            "No summary available for this vote."
+        )}</p>`;
   const billNumber =
     item.billNumber ||
     (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "");
@@ -1264,9 +1285,7 @@ function renderVoteCard(item) {
     </div>
     <section class="policy-bill-card__summary" aria-label="Summary">
       <h3 class="policy-bill-card__summary-label">Summary</h3>
-      <p class="policy-bill-card__pitch vote-card__summary-text">${escapePolicyHtml(
-        summary
-      )}</p>
+      ${summaryHtml}
     </section>
     ${
       yeaMeans || nayMeans

@@ -1109,9 +1109,14 @@ function renderVotesList(target, votes, emptyMessage, person) {
       </header>
       <section class="politician-vote-card__summary" aria-label="What was proposed">
         <h4>What’s proposed</h4>
-        <p class="vote-card__summary-text line-clamp-3">${escapeHtml(
-          copy.summary
-        )}</p>
+        ${
+          typeof renderCollapsibleSummaryHtml === "function"
+            ? renderCollapsibleSummaryHtml(item, {
+                escapeHtmlFn: escapeHtml,
+                paragraphClass: "vote-card__summary-text",
+              })
+            : `<p class="vote-card__summary-text">${escapeHtml(copy.summary)}</p>`
+        }
       </section>
       ${
         copy.showMeans
