@@ -591,6 +591,272 @@
     return { user, rows };
   }
 
+  function normalizeLegislationTypeLocal(type) {
+    return String(type || "")
+      .toLowerCase()
+      .replace(/\./g, "")
+      .replace(/\s+/g, "")
+      .trim();
+  }
+
+  function legislationKeyFromParts(congress, billType, legislationNumber) {
+    const c = Number(congress || 0);
+    const t = normalizeLegislationTypeLocal(billType);
+    const n = String(legislationNumber || "").replace(/\D/g, "");
+    if (!c || !t || !n) return "";
+    return `${c}:${t}:${n}`;
+  }
+
+  function parseBillNumberPartsLocal(billNumber) {
+    const match = String(billNumber || "")
+      .trim()
+      .match(
+        /^(h\.?\s*r\.?|s\.?|s\.?\s*j\.?\s*res\.?|h\.?\s*j\.?\s*res\.?|s\.?\s*con\.?\s*res\.?|h\.?\s*con\.?\s*res\.?|[a-z.]+)\s*(\d+)/i
+      );
+    if (!match) return null;
+    return {
+      billType: normalizeLegislationTypeLocal(match[1]),
+      legislationNumber: match[2],
+    };
+  }
+
+  function legislationKeyFromVote(vote = {}) {
+    const id = String(vote.billId || vote.id || "").toLowerCase();
+    const fromId = id.match(/federal-(?:bill-)?(\d{2,3})-([a-z]+)-(\d+)/);
+    if (fromId) {
+      return legislationKeyFromParts(fromId[1], fromId[2], fromId[3]);
+    }
+    const meta = parseRollMetaFromBillId(id);
+    if (meta.legislationType && meta.legislationNumber) {
+      return legislationKeyFromParts(
+        meta.congress || 119,
+        meta.legislationType,
+        meta.legislationNumber
+      );
+    }
+    const parts = parseBillNumberPartsLocal(vote.billNumber || vote.bill_number);
+    if (parts) {
+      return legislationKeyFromParts(
+        vote.congress || meta.congress || 119,
+        parts.billType,
+        parts.legislationNumber
+      );
+    }
+    return "";
+  }
+
+  function legislationKeyFromBillRow(row = {}) {
+    const id = String(row.bill_id || row.id || row.roll_call_id || "").toLowerCase();
+    const fromId = id.match(/federal-(?:bill-)?(\d{2,3})-([a-z]+)-(\d+)/);
+    if (fromId) {
+      return legislationKeyFromParts(fromId[1], fromId[2], fromId[3]);
+    }
+    const parts = parseBillNumberPartsLocal(
+      row.bill_number || row.legislation_number
+        ? `${row.bill_type || ""} ${row.legislation_number || row.bill_number || ""}`
+        : row.bill_number
+    );
+    if (parts) {
+      return legislationKeyFromParts(
+        row.congress || row.metadata?.congress || 119,
+        row.bill_type || parts.billType,
+        row.legislation_number || parts.legislationNumber
+      );
+    }
+    if (row.bill_type && (row.legislation_number || row.bill_number)) {
+      return legislationKeyFromParts(
+        row.congress || 119,
+        row.bill_type,
+        row.legislation_number || row.bill_number
+      );
+    }
+    return "";
+  }
+
+  /**
+   * Load the signed-in user's stances once, keyed by exact bill_id and by
+   * legislation (congress:type:number) so Senate quiz answers apply to House.
+   */
+  async function loadUserStanceIndex() {
+    const client = typeof getSupabase === "function" ? getSupabase() : null;
+    const user = typeof getUser === "function" ? await getUser() : null;
+    const byBillId = new Map();
+    const byLegislationKey = new Map();
+    if (!client || !user) {
+      return { user: null, client: null, byBillId, byLegislationKey };
+    }
+
+    const { data: stances, error } = await client
+      .from("bill_stances")
+      .select("bill_id, stance, updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      console.warn(error);
+      return { user, client, byBillId, byLegislationKey };
+    }
+
+    const ids = [];
+    for (const row of stances || []) {
+      const billId = String(row.bill_id || "").trim();
+      const stance = String(row.stance || "").toLowerCase();
+      if (!billId || !stance) continue;
+      if (!byBillId.has(billId)) byBillId.set(billId, stance);
+      ids.push(billId);
+      const federalKey = legislationKeyFromBillRow({ bill_id: billId });
+      if (federalKey && !byLegislationKey.has(federalKey)) {
+        byLegislationKey.set(federalKey, stance);
+      }
+    }
+
+    if (ids.length) {
+      const [billItemsRes, processedRes] = await Promise.all([
+        client
+          .from("bill_items")
+          .select("id, bill_number, metadata")
+          .in("id", ids),
+        client
+          .from("processed_votes")
+          .select(
+            "roll_call_id, bill_number, bill_type, legislation_number, congress"
+          )
+          .in("roll_call_id", ids),
+      ]);
+      if (billItemsRes.error) console.warn(billItemsRes.error);
+      if (processedRes.error) console.warn(processedRes.error);
+
+      for (const item of billItemsRes.data || []) {
+        const stance = byBillId.get(String(item.id));
+        if (!stance) continue;
+        const meta = item.metadata || {};
+        const key =
+          legislationKeyFromBillRow({
+            bill_id: item.id,
+            bill_number: item.bill_number,
+            congress: meta.congress,
+            bill_type: meta.legislationType || meta.bill_type,
+            legislation_number:
+              meta.legislationNumber || meta.legislation_number,
+          }) ||
+          legislationKeyFromParts(
+            meta.congress || 119,
+            meta.legislationType,
+            meta.legislationNumber
+          );
+        if (key && !byLegislationKey.has(key)) {
+          byLegislationKey.set(key, stance);
+        }
+      }
+
+      for (const row of processedRes.data || []) {
+        const stance = byBillId.get(String(row.roll_call_id));
+        if (!stance) continue;
+        const key = legislationKeyFromBillRow(row);
+        if (key && !byLegislationKey.has(key)) {
+          byLegislationKey.set(key, stance);
+        }
+      }
+    }
+
+    return { user, client, byBillId, byLegislationKey };
+  }
+
+  function resolveStanceForVote(vote, stanceIndex) {
+    if (!vote || !stanceIndex) return "";
+    const billId = String(vote.billId || vote.id || "").trim();
+    if (billId && stanceIndex.byBillId.has(billId)) {
+      return stanceIndex.byBillId.get(billId);
+    }
+    const key = legislationKeyFromVote(vote);
+    if (key && stanceIndex.byLegislationKey.has(key)) {
+      return stanceIndex.byLegislationKey.get(key);
+    }
+    return "";
+  }
+
+  /**
+   * Project the user's existing (often Senate) stances onto this member's
+   * recent votes so House Action Match scores fill in without re-quizzing.
+   */
+  async function projectStancesOntoMember(profile, votes = []) {
+    const bioguide = String(profile?.bioguideId || "").toUpperCase();
+    if (!bioguide || !votes.length) {
+      return { projected: 0, stanceIndex: null };
+    }
+
+    const stanceIndex = await loadUserStanceIndex();
+    const { user, client } = stanceIndex;
+    if (!user || !client) {
+      return { projected: 0, stanceIndex };
+    }
+
+    const rows = [];
+    for (const vote of votes) {
+      const stance = resolveStanceForVote(vote, stanceIndex);
+      const memberVote = positionToMemberVote(vote.votePosition);
+      if (!stance || !memberVote) continue;
+      if (memberVote === "Present" || memberVote === "Not Voting") continue;
+
+      const item = quizBillItemFromVote(vote, profile);
+      if (!item?.id) continue;
+      const matched = stanceMatchesPosition(stance, vote.votePosition);
+      if (matched == null) continue;
+
+      try {
+        await upsertQuizBillItem(client, item);
+      } catch (error) {
+        console.warn(error);
+      }
+
+      rows.push({
+        user_id: user.id,
+        bill_id: item.id,
+        bioguide_id: bioguide,
+        politician_name: profile.name || bioguide,
+        politician_level: "federal",
+        user_stance: stance,
+        member_vote: memberVote,
+        matched,
+        roll_call_number: item.rollCallNumber || null,
+        congress: item.congress || null,
+        session_number: item.sessionNumber || null,
+        vote_result: null,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    if (!rows.length) {
+      return { projected: 0, stanceIndex };
+    }
+
+    const { error } = await client.from("stance_vote_matches").upsert(rows, {
+      onConflict: "user_id,bill_id,bioguide_id",
+    });
+    if (error) {
+      console.warn("projectStancesOntoMember failed:", error.message || error);
+      return { projected: 0, stanceIndex };
+    }
+    return { projected: rows.length, stanceIndex };
+  }
+
+  async function loadStanceMapForVotes(votes = []) {
+    const stanceIndex = await loadUserStanceIndex();
+    const map = new Map();
+    for (const vote of votes || []) {
+      const billId = String(vote.billId || vote.id || "").trim();
+      if (!billId) continue;
+      const stance = resolveStanceForVote(vote, stanceIndex);
+      if (stance) map.set(billId, stance);
+    }
+    return {
+      user: stanceIndex.user,
+      client: stanceIndex.client,
+      map,
+      stanceIndex,
+    };
+  }
+
   function toRosterPerson(profile, enrich) {
     const roster = enrich?.roster || {};
     const overview = enrich?.overview || {};
@@ -1727,6 +1993,15 @@
     const meta = parseRollMetaFromBillId(billId);
     const billNumber =
       normalizeBillNumber(vote.billNumber) || vote.billNumber || "Roll call";
+    const parts = parseBillNumberPartsLocal(billNumber);
+    const congress = meta.congress || vote.congress || 119;
+    const legislationType =
+      meta.legislationType || parts?.billType || vote.legislationType || null;
+    const legislationNumber =
+      meta.legislationNumber ||
+      parts?.legislationNumber ||
+      vote.legislationNumber ||
+      null;
     return {
       id: billId,
       billNumber,
@@ -1739,11 +2014,11 @@
       votePosition: vote.votePosition,
       officialUrl: null,
       tags: vote.category ? [vote.category] : [],
-      congress: meta.congress || null,
-      sessionNumber: meta.sessionNumber || null,
-      rollCallNumber: meta.rollCallNumber || null,
-      legislationType: meta.legislationType || null,
-      legislationNumber: meta.legislationNumber || null,
+      congress,
+      sessionNumber: meta.sessionNumber || vote.sessionNumber || null,
+      rollCallNumber: meta.rollCallNumber || vote.rollCallNumber || null,
+      legislationType,
+      legislationNumber,
     };
   }
 
@@ -1770,6 +2045,8 @@
         congress: item.congress || null,
         sessionNumber: item.sessionNumber || null,
         rollCallNumber: item.rollCallNumber || null,
+        legislationType: item.legislationType || null,
+        legislationNumber: item.legislationNumber || null,
       },
       updated_at: new Date().toISOString(),
     };
@@ -1900,18 +2177,12 @@
   }
 
   async function loadStanceMapForBills(billIds) {
-    const client = typeof getSupabase === "function" ? getSupabase() : null;
-    const user = typeof getUser === "function" ? await getUser() : null;
+    // Back-compat wrapper: exact bill_id matches only.
+    const { user, client, byBillId } = await loadUserStanceIndex();
     const map = new Map();
-    if (!client || !user || !billIds.length) return { user, client, map };
-    const { data, error } = await client
-      .from("bill_stances")
-      .select("bill_id, stance")
-      .eq("user_id", user.id)
-      .in("bill_id", billIds);
-    if (error) console.warn(error);
-    for (const row of data || []) {
-      map.set(row.bill_id, row.stance);
+    for (const id of billIds || []) {
+      const key = String(id || "").trim();
+      if (key && byBillId.has(key)) map.set(key, byBillId.get(key));
     }
     return { user, client, map };
   }
@@ -2074,7 +2345,7 @@
       .map((vote) => quizBillItemFromVote(vote, profile))
       .filter(Boolean)
       .slice(0, 8);
-    const { map } = await loadStanceMapForBills(items.map((item) => item.id));
+    const { map } = await loadStanceMapForVotes(votes || []);
     renderMatchQuizBody(bodyEl, votes, profile, map);
     bindMatchQuizActions(bodyEl);
     setMatchQuizStatus(
@@ -2535,10 +2806,7 @@
         pendingMatch
       );
 
-      const [enrich, matchPayload] = await Promise.all([
-        loadEnrichment(active.profile),
-        loadMatchRows(active.profile.bioguideId),
-      ]);
+      const [enrich] = await Promise.all([loadEnrichment(active.profile)]);
       if (token !== state.paintToken) return;
 
       if (!hasUsableVotes(active.recentVotes)) {
@@ -2546,6 +2814,23 @@
         active.recentVotes = liveVotes;
         renderVotes($("scorecard-votes"), liveVotes, state.voteQuery);
       }
+
+      // Project existing user stances (often from Senate quiz) onto this
+      // member so House Action Match badges fill without re-taking the quiz.
+      if (followUser && hasUsableVotes(active.recentVotes)) {
+        try {
+          await projectStancesOntoMember(
+            active.profile,
+            active.recentVotes || []
+          );
+        } catch (error) {
+          console.warn(error);
+        }
+      }
+      if (token !== state.paintToken) return;
+
+      const matchPayload = await loadMatchRows(active.profile.bioguideId);
+      if (token !== state.paintToken) return;
 
       activeRosterPerson = toRosterPerson(active.profile, enrich);
       state.lastEnrich = enrich;
