@@ -40,19 +40,24 @@ export interface FormatBillSummaryOptions {
 export const DEFAULT_YEA_LABEL = "Support Measure";
 export const DEFAULT_NAY_LABEL = "Oppose Measure";
 
-export const BILL_SUMMARY_SYSTEM_PROMPT = `You write plain-English vote cards for a civic app.
+export const BILL_SUMMARY_SYSTEM_PROMPT = `You are an expert civic journalist translating complex federal legislation for everyday voters.
 
-Rules (strict):
-1. Analyze ONLY the provided bill title + congressional/CRS text. Do not invent programs, repeals, bans, or funding cuts that are not clearly in the text.
-2. If the text is thin, unclear, or mostly procedural, say what you can neutrally and set yea_label to "Support Measure" and nay_label to "Oppose Measure".
-3. summary must be 1–2 COMPLETE sentences in plain English (never cut off mid-sentence, never paste truncated legalese).
-4. yea_means / nay_means must describe real-world outcomes of Yea vs Nay on THIS measure — not a stock “You support ending…” template.
-5. Labels are 2–4 words, parallel, concrete. Only use vivid verbs like End/Keep/Pass/Reject when the text clearly supports them; otherwise use Support Measure / Oppose Measure.
-6. No slogans, no fear-mongering, no bill jargon.
+RULES:
+- BAN JARGON: Eliminate references to tax codes, administrative databases (e.g. WEAMS), statutory sub-clauses, and legalisms.
+- MAXIMUM LENGTH: 2 short sentences (~35 words max).
+- FOCUS ON REAL-WORLD IMPACT: Explain what changes for an ordinary citizen's wallet, rights, or community.
+- Analyze ONLY the provided bill title + congressional/CRS text. Do not invent programs, repeals, bans, or funding cuts that are not clearly in the text.
+- yea_means / nay_means must describe real-world outcomes of Yea vs Nay on THIS measure — not a stock template.
+- If the text is thin or procedural, set yea_label to "Support Measure" and nay_label to "Oppose Measure".
+- Labels are 2–4 words, parallel, concrete.
+- No slogans and no fear-mongering.
+
+Format your response in plain, direct English.
 
 Return ONLY valid JSON with exactly these keys:
 {
   "summary": string,
+  "plain_summary": string,
   "yea_means": string,
   "nay_means": string,
   "yea_label": string,
@@ -69,13 +74,14 @@ export function buildBillSummaryUserPrompt(
     String(rawSummary || "").trim() || "(No CRS summary available.)";
   return `Bill title: ${title}
 
-Raw congressional / CRS text:
+Raw congressional / CRS text (translate — do not paste jargon):
 """
 ${summary.slice(0, 6000)}
 """
 
 If unsure, set confident=false and use Support Measure / Oppose Measure labels.
 Do NOT reuse rebate/end-program framing unless the source text clearly says so.
+Keep summary and plain_summary to ≤2 short sentences (~35 words).
 
 Produce the JSON card for the bill above.`;
 }

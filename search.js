@@ -126,7 +126,19 @@ function renderCard(item) {
     </div>
     <h2 class="search-result-card__title">${escapeHtml(item.title)}</h2>
     <p class="search-result-card__meta">${escapeHtml(metaBits.join(" · "))}</p>
-    <p class="search-result-card__pitch">${escapeHtml(item.shortPitch || "")}</p>
+    ${
+      typeof renderCollapsibleSummaryHtml === "function"
+        ? renderCollapsibleSummaryHtml(item, {
+            escapeHtmlFn: escapeHtml,
+            paragraphClass: "search-result-card__pitch",
+          })
+        : `<p class="search-result-card__pitch">${escapeHtml(
+            item.plain_summary ||
+              item.plainSummary ||
+              item.shortPitch ||
+              ""
+          )}</p>`
+    }
     ${
       item.statusLabel
         ? `<p class="search-result-card__status">${escapeHtml(

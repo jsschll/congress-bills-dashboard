@@ -2581,9 +2581,20 @@
                     }
                     ${
                       summary
-                        ? `<p class="scorecard-vote__plain">${escapeHtml(
-                            summary
-                          )}</p>`
+                        ? typeof renderCollapsibleSummaryHtml === "function"
+                          ? renderCollapsibleSummaryHtml(
+                              {
+                                plain_summary: summary,
+                                summary: vote.officialSummary || vote.summary || "",
+                              },
+                              {
+                                escapeHtmlFn: escapeHtml,
+                                paragraphClass: "scorecard-vote__plain",
+                              }
+                            )
+                          : `<p class="scorecard-vote__plain">${escapeHtml(
+                              summary
+                            )}</p>`
                         : ""
                     }
                   </li>`;

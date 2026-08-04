@@ -4,7 +4,9 @@ import { DEFAULT_NAY_LABEL, DEFAULT_YEA_LABEL } from "../types/bill-summary";
 export type VoteCardProps = {
   /** Official bill / vote title. */
   title: string;
-  /** Official CRS or chamber summary text (raw). */
+  /** Prefer Claude plain_summary when available. */
+  plainSummary?: string | null;
+  /** Official CRS or chamber summary text (raw fallback). */
   summary?: string | null;
   billNumber?: string;
   memberVote?: string | null;
@@ -26,6 +28,8 @@ export type ProcessedVoteRow = {
   roll_call_id?: string;
   title?: string | null;
   summary?: string | null;
+  plain_summary?: string | null;
+  what_it_does?: string | null;
   yea_means?: string | null;
   nay_means?: string | null;
   yea_label?: string | null;
@@ -35,6 +39,26 @@ export type ProcessedVoteRow = {
   vote_date?: string | null;
 };
 
+const DISPLAY_SUMMARY_MAX_CHARS = 250;
+
+function preferPlainSummary(props: {
+  plainSummary?: string | null;
+  summary?: string | null;
+}) {
+  return String(props.plainSummary || "").trim();
+}
+
+function truncateAtWord(text: string, maxChars = DISPLAY_SUMMARY_MAX_CHARS) {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  if (!cleaned || cleaned.length <= maxChars) {
+    return { preview: cleaned, truncated: false, full: cleaned };
+  }
+  let preview = cleaned.slice(0, maxChars).replace(/\s+\S*$/, "").trim();
+  if (!preview) preview = cleaned.slice(0, maxChars).trim();
+  if (!/[.…!?]$/.test(preview)) preview = `${preview}…`;
+  return { preview, truncated: true, full: cleaned };
+}
+
 /** Map a `processed_votes` row into VoteCard props. */
 export function voteCardPropsFromProcessed(
   row: ProcessedVoteRow
@@ -42,6 +66,7 @@ export function voteCardPropsFromProcessed(
   VoteCardProps,
   | "title"
   | "summary"
+  | "plainSummary"
   | "yeaMeans"
   | "nayMeans"
   | "yeaLabel"
@@ -50,9 +75,11 @@ export function voteCardPropsFromProcessed(
   | "result"
   | "dateLabel"
 > {
+  const plain = String(row.plain_summary || row.what_it_does || "").trim();
   return {
     title: String(row.title || "").trim() || "Congressional vote",
-    summary: String(row.summary || "").trim(),
+    plainSummary: plain || null,
+    summary: plain || String(row.summary || "").trim(),
     yeaMeans: String(row.yea_means || "").trim(),
     nayMeans: String(row.nay_means || "").trim(),
     yeaLabel: String(row.yea_label || "").trim() || DEFAULT_YEA_LABEL,
@@ -105,11 +132,11 @@ function voteTone(vote?: string | null) {
 
 /**
  * Runtime VoteCard — no AI generation.
- * Uses the official title/summary and only shows Yea/Nay means when
- * concrete, non-generic copy is supplied on the data object.
+ * Prefers Claude plain_summary; raw CRS falls back to ≤250 chars + Read More.
  */
 export function VoteCard({
   title,
+  plainSummary,
   summary,
   billNumber,
   memberVote,
@@ -124,8 +151,16 @@ export function VoteCard({
   className = "",
 }: VoteCardProps) {
   const [pending, setPending] = React.useState<"yea" | "nay" | null>(null);
+  const [expanded, setExpanded] = React.useState(false);
 
-  const officialSummary = String(summary || "").trim() || String(title || "").trim();
+  const plain = preferPlainSummary({ plainSummary, summary });
+  const raw = String(summary || "").trim() || String(title || "").trim();
+  const officialSummary = plain || raw;
+  const clipped = plain
+    ? { preview: officialSummary, truncated: false, full: officialSummary }
+    : truncateAtWord(officialSummary, DISPLAY_SUMMARY_MAX_CHARS);
+  const visibleSummary = expanded ? clipped.full : clipped.preview;
+
   const yeaMeansClean = String(yeaMeans || "").trim();
   const nayMeansClean = String(nayMeans || "").trim();
   // Always show action-impact text when processed_votes supplies it.
@@ -175,7 +210,21 @@ export function VoteCard({
 
       <section className="bill-summary-card__summary" aria-label="Summary">
         <h4>Summary</h4>
-        <p className="vote-card__summary-text">{officialSummary}</p>
+        <div className="summary-collapse">
+          <p className="vote-card__summary-text summary-collapse__text">
+            {visibleSummary}
+          </p>
+          {clipped.truncated ? (
+            <button
+              type="button"
+              className="summary-collapse__toggle"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? "Show Less" : "Read More"}
+            </button>
+          ) : null}
+        </div>
       </section>
 
       {showMeans ? (
