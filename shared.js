@@ -184,12 +184,14 @@ function resolveVoteCardCopy(item = {}) {
       item.nay_means ||
       ""
   ).trim();
-  const yeaMeans = isGenericVoteMeans(yeaMeansRaw) ? "" : yeaMeansRaw;
-  const nayMeans = isGenericVoteMeans(nayMeansRaw) ? "" : nayMeansRaw;
+  const yeaClean = isGenericVoteMeans(yeaMeansRaw) ? "" : yeaMeansRaw;
+  const nayClean = isGenericVoteMeans(nayMeansRaw) ? "" : nayMeansRaw;
+  const yeaMeans = punchyImpactClause(yeaClean) || yeaClean;
+  const nayMeans = punchyImpactClause(nayClean) || nayClean;
   const showMeans = Boolean(yeaMeans && nayMeans);
 
   const summary =
-    String(
+    clampPunchySummary(
       item.plain_summary ||
         item.plainSummary ||
         item.plainEnglishSummary ||
@@ -200,8 +202,9 @@ function resolveVoteCardCopy(item = {}) {
         item.summary ||
         item.title ||
         item.voteQuestion ||
-        ""
-    ).trim() || "No plain-English summary is available for this vote yet.";
+        "",
+      { maxSentences: 2, maxWords: 30 }
+    ) || "No plain-English summary is available for this vote yet.";
 
   const shortTitle = String(
     item.short_title || item.shortTitle || item.displayTitle || ""
@@ -586,6 +589,102 @@ function firstMatchSentence(text, maxChars = 220) {
   return sentence;
 }
 
+function splitMatchSentences(text = "") {
+  const cleaned = collapseMatchWs(text);
+  if (!cleaned) return [];
+  const protectedText = cleaned
+    .replace(/\bU\.S\./gi, "US")
+    .replace(/\bF\.Y\.?/gi, "FY")
+    .replace(/\bNo\./gi, "No")
+    .replace(/\bAmdt\./gi, "Amdt");
+  return (
+    protectedText
+      .match(/[^.!?]+[.!?]+|[^.!?]+$/g)
+      ?.map((part) => collapseMatchWs(part).replace(/\bUS\b/g, "U.S."))
+      .filter(Boolean) || []
+  );
+}
+
+/** Enforce ≤2 sentences / ~30 words for Action Match card summaries. */
+function clampPunchySummary(text = "", { maxSentences = 2, maxWords = 30 } = {}) {
+  const sentences = splitMatchSentences(text).slice(0, maxSentences);
+  if (!sentences.length) return "";
+  let out = sentences.join(" ");
+  const words = out.split(/\s+/).filter(Boolean);
+  if (words.length > maxWords) {
+    out = words.slice(0, maxWords).join(" ").replace(/[,:;–—-]+$/, "");
+    if (!/[.!?]$/.test(out)) out = `${out}.`;
+  } else if (!/[.!?]$/.test(out)) {
+    out = `${out}.`;
+  }
+  return out;
+}
+
+/**
+ * Turn a raw yea/nay impact into a one-line clause (≤14 words).
+ * Strips "Votes to…", "A Yea vote means…", etc.
+ */
+function punchyImpactClause(text = "", { maxWords = 14 } = {}) {
+  let out = collapseMatchWs(text);
+  if (!out) return "";
+  out = out
+    .replace(/^a (yea|nay) vote means\s+/i, "")
+    .replace(/^votes?\s+(yes|no|yea|nay)?\s*(to|for|against)?\s*/i, "")
+    .replace(/^(supports?|opposes?|supported|opposed)\s+/i, "")
+    .replace(/^to\s+/i, "");
+  const first = splitMatchSentences(out)[0] || out;
+  let words = collapseMatchWs(first.replace(/[.!?]+$/, ""))
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length > maxWords) words = words.slice(0, maxWords);
+  return words.join(" ");
+}
+
+/** Best-effort infinitive → gerund for punchy stance lines. */
+function toGerundPhrase(clause = "") {
+  const text = collapseMatchWs(clause);
+  if (!text) return "";
+  if (/^\w+ing\b/i.test(text)) return text;
+  const match = text.match(/^([A-Za-z]+)(.*)$/);
+  if (!match) return text;
+  let verb = match[1];
+  const rest = match[2] || "";
+  const lower = verb.toLowerCase();
+  if (lower.endsWith("ie")) verb = `${verb.slice(0, -2)}ying`;
+  else if (lower.endsWith("e") && !lower.endsWith("ee")) {
+    verb = `${verb.slice(0, -1)}ing`;
+  } else {
+    verb = `${verb}ing`;
+  }
+  if (/^[A-Z]/.test(match[1])) {
+    verb = verb.charAt(0).toUpperCase() + verb.slice(1);
+  }
+  return `${verb}${rest}`;
+}
+
+/**
+ * One-line stance statement for Agree/Differ footers.
+ * e.g. "Supported adding $70B to border security"
+ */
+function formatStanceImpactLine(rawImpact, polarity) {
+  const clause = toGerundPhrase(punchyImpactClause(rawImpact));
+  if (!clause) return "—";
+  const isOppose =
+    polarity === "oppose" ||
+    polarity === "nay" ||
+    polarity === "no";
+  const verb = isOppose ? "Opposed" : "Supported";
+  const body = clause.charAt(0).toLowerCase() + clause.slice(1);
+  return `${verb} ${body}`;
+}
+
+function stanceBadgeTone(label = "") {
+  const value = String(label || "").toLowerCase();
+  if (/^(yea|aye|yes|support)/.test(value)) return "yea";
+  if (/^(nay|no|oppose)/.test(value)) return "nay";
+  return "neutral";
+}
+
 function parseAmendmentAttribution(title = "") {
   const raw = collapseMatchWs(title);
   if (!raw) return null;
@@ -745,7 +844,7 @@ function resolveActionMatchCardCopy(row = {}) {
   );
   // vote.plain_summary is the primary card-body explanation.
   const plainSummary =
-    firstMatchSentence(
+    clampPunchySummary(
       voteCopy?.plain_summary ||
         voteCopy?.plainSummary ||
         row.plain_summary ||
@@ -757,10 +856,30 @@ function resolveActionMatchCardCopy(row = {}) {
         bill.short_pitch ||
         bill.shortPitch ||
         "",
-      280
+      { maxSentences: 2, maxWords: 30 }
     ) || "No plain-English summary is available for this roll call yet.";
   const detailHref =
     row.detailHref || actionMatchDetailHref(bill, voteCopy);
+  const yourStanceImpactLine =
+    impact.your_stance_line ||
+    formatStanceImpactLine(
+      impact.your_stance_impact || impact.yea_impact,
+      String(row.user_stance || impact.your_stance_label || "").toLowerCase()
+    );
+  const repVoteLabel = impact.rep_stance_label || "—";
+  const repImpactCore =
+    impact.rep_stance_line_core ||
+    formatStanceImpactLine(
+      impact.rep_stance_impact || impact.nay_impact,
+      /^(nay|no)$/i.test(String(row.member_vote || repVoteLabel))
+        ? "oppose"
+        : "support"
+    );
+  const repStanceImpactLine =
+    impact.rep_stance_line ||
+    (/^(yea|aye|yes|nay|no)$/i.test(String(repVoteLabel))
+      ? `Voted ${repVoteLabel} — ${repImpactCore}`
+      : repImpactCore);
   return {
     bill,
     voteCopy,
@@ -773,10 +892,11 @@ function resolveActionMatchCardCopy(row = {}) {
     plainSummary,
     detailHref,
     yourStanceLabel: impact.your_stance_label || "Your stance",
-    yourStanceImpact:
-      impact.your_stance_impact || impact.yea_impact || "—",
-    repStanceLabel: impact.rep_stance_label || "—",
-    repStanceImpact: impact.rep_stance_impact || impact.nay_impact || "—",
+    yourStanceImpact: yourStanceImpactLine,
+    yourStanceTone: stanceBadgeTone(impact.your_stance_label || row.user_stance),
+    repStanceLabel: repVoteLabel,
+    repStanceImpact: repStanceImpactLine,
+    repStanceTone: stanceBadgeTone(repVoteLabel),
     yeaImpact: impact.yea_impact || "",
     nayImpact: impact.nay_impact || "",
   };
@@ -810,6 +930,12 @@ function renderActionMatchScorecardItem(row, escapeHtmlFn) {
       repStanceImpact: copy.repStanceImpact,
     })
   );
+  const yourBadgeClass = `scorecard-match-badge scorecard-match-badge--${
+    copy.yourStanceTone || "neutral"
+  }`;
+  const repBadgeClass = `scorecard-match-badge scorecard-match-badge--${
+    copy.repStanceTone || "neutral"
+  }`;
 
   return `<li class="scorecard-match-item">
       <div class="scorecard-match-item__top">
@@ -838,19 +964,26 @@ function renderActionMatchScorecardItem(row, escapeHtmlFn) {
         >ⓘ</button>
       </div>
       <p class="scorecard-match-item__summary">${esc(copy.plainSummary)}</p>
-      <p class="scorecard-match-item__stance">
-        You ${esc(row.user_stance)} · They voted ${esc(
-          row.member_vote || "—"
-        )}
-      </p>
-      <div class="scorecard-match-item__breakdown">
-        <p><strong>Your Stance (${esc(
-          copy.yourStanceLabel
-        )}):</strong> ${esc(copy.yourStanceImpact)}</p>
-        <p><strong>Rep Stance (${esc(
-          copy.repStanceLabel
-        )}):</strong> ${esc(copy.repStanceImpact)}</p>
-      </div>
+      <ul class="scorecard-match-item__breakdown" aria-label="Stance comparison">
+        <li class="scorecard-match-item__stance-row">
+          <span class="scorecard-match-item__stance-meta">
+            <span class="scorecard-match-item__stance-label">Your Stance</span>
+            <span class="${yourBadgeClass}">${esc(copy.yourStanceLabel)}</span>
+          </span>
+          <span class="scorecard-match-item__stance-line">${esc(
+            copy.yourStanceImpact
+          )}</span>
+        </li>
+        <li class="scorecard-match-item__stance-row">
+          <span class="scorecard-match-item__stance-meta">
+            <span class="scorecard-match-item__stance-label">Rep Stance</span>
+            <span class="${repBadgeClass}">${esc(copy.repStanceLabel)}</span>
+          </span>
+          <span class="scorecard-match-item__stance-line">${esc(
+            copy.repStanceImpact
+          )}</span>
+        </li>
+      </ul>
     </li>`;
 }
 
@@ -862,7 +995,7 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
   const short_title = humanizeActionMatchTitle(bill, voteCopy);
   const raw_code = formatAmendmentCodePill(bill, voteCopy);
   const plain_summary =
-    firstMatchSentence(
+    clampPunchySummary(
       voteCopy?.plain_summary ||
         voteCopy?.plainSummary ||
         voteCopy?.what_it_does ||
@@ -871,15 +1004,17 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
         bill.short_pitch ||
         bill.shortPitch ||
         "",
-      220
+      { maxSentences: 2, maxWords: 30 }
     ) || "No plain-English summary is available for this roll call yet.";
   const what_it_does = plain_summary;
   const yea_impact =
-    collapseMatchWs(voteCopy?.yea_impact || voteCopy?.yeaImpact || "") ||
-    means.yea;
+    punchyImpactClause(voteCopy?.yea_impact || voteCopy?.yeaImpact || "") ||
+    punchyImpactClause(means.yea) ||
+    "Advancing this measure as written";
   const nay_impact =
-    collapseMatchWs(voteCopy?.nay_impact || voteCopy?.nayImpact || "") ||
-    means.nay;
+    punchyImpactClause(voteCopy?.nay_impact || voteCopy?.nayImpact || "") ||
+    punchyImpactClause(means.nay) ||
+    "Rejecting this measure";
 
   const userStance = String(matchRow?.user_stance || "").toLowerCase();
   const memberVote = String(matchRow?.member_vote || "").toLowerCase();
@@ -889,12 +1024,13 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
       : userStance === "oppose"
         ? "Oppose"
         : userStance || "Your stance";
+  const yourPolarity = userStance === "oppose" ? "oppose" : "support";
   const yourStanceImpact =
-    userStance === "oppose"
-      ? nay_impact
-      : userStance === "support"
-        ? yea_impact
-        : yea_impact;
+    userStance === "oppose" ? nay_impact : yea_impact;
+  const your_stance_line = formatStanceImpactLine(
+    yourStanceImpact,
+    yourPolarity
+  );
   const repIsNay = /^(nay|no)$/.test(memberVote);
   const repIsYea = /^(yea|aye|yes)$/.test(memberVote);
   const repStanceLabel = repIsNay ? "Nay" : repIsYea ? "Yea" : memberVote || "—";
@@ -902,7 +1038,15 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
     ? nay_impact
     : repIsYea
       ? yea_impact
-      : means.yea;
+      : yea_impact;
+  const rep_stance_line_core = formatStanceImpactLine(
+    repStanceImpact,
+    repIsNay ? "oppose" : "support"
+  );
+  const rep_stance_line =
+    repIsYea || repIsNay
+      ? `Voted ${repStanceLabel} — ${rep_stance_line_core}`
+      : rep_stance_line_core;
 
   return {
     short_title,
@@ -913,9 +1057,12 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
     nay_impact,
     your_stance_label: yourStanceLabel,
     your_stance_impact: yourStanceImpact,
+    your_stance_line,
     rep_stance_label: String(repStanceLabel)
       .replace(/\b\w/g, (c) => c.toUpperCase()),
     rep_stance_impact: repStanceImpact,
+    rep_stance_line_core,
+    rep_stance_line,
   };
 }
 

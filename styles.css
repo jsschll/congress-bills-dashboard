@@ -5021,7 +5021,7 @@ a.politician-badge--match {
 }
 
 .scorecard-match-item {
-  gap: 0.35rem !important;
+  gap: 0.7rem !important;
 }
 
 .scorecard-match-item__top {
@@ -5105,7 +5105,7 @@ a.politician-badge--match {
 }
 
 .scorecard-match-item__summary {
-  margin: 0.1rem 0 0;
+  margin: 0.15rem 0 0;
   color: #cbd5e1;
   font-size: 0.86rem;
   line-height: 1.45;
@@ -5120,12 +5120,86 @@ a.politician-badge--match {
 .scorecard-match-item__breakdown,
 .scorecard-match-item__means {
   display: grid;
-  gap: 0.35rem;
-  margin-top: 0.15rem;
-  padding: 0.55rem 0.65rem;
+  gap: 0.55rem;
+  margin: 0.25rem 0 0;
+  padding: 0.65rem 0.75rem;
   border-radius: 0.65rem;
+  list-style: none;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(15, 23, 42, 0.55);
+}
+
+.scorecard-match-item__stance-row {
+  display: grid;
+  grid-template-columns: 0.65rem 1fr;
+  column-gap: 0.45rem;
+  row-gap: 0.2rem;
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.scorecard-match-item__stance-row::before {
+  content: "•";
+  grid-row: 1 / span 2;
+  color: #64748b;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.scorecard-match-item__stance-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.scorecard-match-item__stance-label {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.scorecard-match-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 0.35rem;
+  padding: 0.08rem 0.42rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.scorecard-match-badge--yea {
+  color: #bbf7d0;
+  background: rgba(22, 163, 74, 0.22);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+}
+
+.scorecard-match-badge--nay {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.2);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.scorecard-match-badge--neutral {
+  color: #cbd5e1;
+  background: rgba(71, 85, 105, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.scorecard-match-item__stance-line {
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  font-weight: 550;
+  line-height: 1.35;
 }
 
 .scorecard-match-item__breakdown p,
