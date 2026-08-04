@@ -8,32 +8,50 @@
   const PENDING_FOLLOW_KEY = "article1.pendingFollow";
   const ENDPOINT = "/api/representatives/lookup";
 
+  const POLICY_TOPIC_FILTERS = [
+    "All Topics",
+    "Economy & Taxes",
+    "Healthcare",
+    "Immigration & Border",
+    "Housing & Infrastructure",
+    "Foreign Policy & Defense",
+    "Civil Rights & Justice",
+    "Energy & Environment",
+    "Education & Labor",
+  ];
+
   const CATEGORY_RULES = [
     {
-      key: "Immigration",
+      key: "Immigration & Border",
       re: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i,
-    },
-    { key: "Taxes", re: /\b(tax|irs|tariff|revenue|duty|excise)\b/i },
-    {
-      key: "Family",
-      re: /\b(family|child|parent|marriage|adoption|foster)\b/i,
     },
     {
       key: "Healthcare",
-      re: /\b(health|medicare|medicaid|hospital|drug|pharma|aca|insurance)\b/i,
-    },
-    { key: "Housing", re: /\b(hous(e|ing)|rent|mortgage|homeless|zoning)\b/i },
-    {
-      key: "Education",
-      re: /\b(school|educat|student|university|college|title ix)\b/i,
+      re: /\b(health|medicare|medicaid|hospital|drug|pharma|aca|insurance|vaccine)\b/i,
     },
     {
-      key: "Defense",
-      re: /\b(defense|military|veteran|armed forces|national security)\b/i,
+      key: "Housing & Infrastructure",
+      re: /\b(hous(e|ing)|rent|mortgage|homeless|zoning|infra|transit|highway|bridge)\b/i,
     },
     {
-      key: "Environment",
-      re: /\b(climat|environment|energy|epa|clean air|water)\b/i,
+      key: "Foreign Policy & Defense",
+      re: /\b(defense|military|veteran|armed forces|national security|foreign|war|nato|troop|sanction)\b/i,
+    },
+    {
+      key: "Civil Rights & Justice",
+      re: /\b(civil rights|voting rights|discrim|police|prison|justice|gun|court)\b/i,
+    },
+    {
+      key: "Energy & Environment",
+      re: /\b(climat|environment|energy|epa|clean air|water|emission|oil|gas|renewable)\b/i,
+    },
+    {
+      key: "Education & Labor",
+      re: /\b(school|educat|student|university|college|title ix|labor|union|wage|worker|osha)\b/i,
+    },
+    {
+      key: "Economy & Taxes",
+      re: /\b(tax|irs|tariff|revenue|duty|excise|budget|spend|deficit|debt|economy|fee|payroll)\b/i,
     },
   ];
 
@@ -348,7 +366,31 @@
     return "";
   }
 
-  function categorizeBill(bill = {}) {
+  function categorizeBill(bill = {}, voteCopy = null) {
+    if (typeof normalizePolicyCategory === "function") {
+      const haystack = [
+        bill.title,
+        bill.bill_number,
+        bill.billNumber,
+        ...(bill.tags || []),
+        bill.policyArea,
+        bill.short_pitch,
+        bill.category,
+        bill.plainEnglishSummary,
+        voteCopy?.card_summary,
+        voteCopy?.plain_summary,
+        voteCopy?.takeaway,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return normalizePolicyCategory(
+        voteCopy?.primary_category ||
+          bill.primary_category ||
+          bill.category ||
+          "",
+        haystack
+      );
+    }
     const haystack = [
       bill.title,
       bill.bill_number,
@@ -364,7 +406,7 @@
     for (const rule of CATEGORY_RULES) {
       if (rule.re.test(haystack)) return rule.key;
     }
-    return bill.category || "Other";
+    return "Economy & Taxes";
   }
 
   function siteHref(website) {
@@ -1587,7 +1629,9 @@
     const categoryMap = new Map();
     for (const row of compared) {
       const bill = row.bill || {};
-      const category = categorizeBill(bill);
+      const category =
+        row.category || categorizeBill(bill, row.voteCopy || null);
+      row.category = category;
       const entry = categoryMap.get(category) || {
         key: category,
         compared: 0,
@@ -1622,15 +1666,15 @@
       return summary;
     }
 
-    const topicPills = categories
-      .slice(0, 6)
-      .map((row) => {
-        const pct = Math.round((row.matched / row.compared) * 100);
-        return `<span class="scorecard-match-pill">${escapeHtml(
-          row.key
-        )} · ${pct}%</span>`;
-      })
-      .join("");
+    const topicFilters = POLICY_TOPIC_FILTERS.map((topic, index) => {
+      const value = topic === "All Topics" ? "all" : topic;
+      return `<button
+          type="button"
+          class="scorecard-topic-chip${index === 0 ? " is-active" : ""}"
+          data-match-topic-filter="${escapeHtml(value)}"
+          aria-pressed="${index === 0 ? "true" : "false"}"
+        >${escapeHtml(topic)}</button>`;
+    }).join("");
 
     bodyEl.innerHTML = `
       <p class="scorecard-match__summary">
@@ -1641,11 +1685,9 @@
         }.
       </p>
 
-      ${
-        topicPills
-          ? `<div class="scorecard-match-pills" aria-label="Topic breakdown">${topicPills}</div>`
-          : ""
-      }
+      <div class="scorecard-topic-filters" role="toolbar" aria-label="Filter by policy topic">
+        ${topicFilters}
+      </div>
 
       <div class="politician-match-categories" aria-label="Category breakdown">
         ${categories
@@ -1663,28 +1705,69 @@
       <div class="politician-match-split">
         <div>
           <h3>Where You Agree</h3>
-          <ul class="politician-profile-list">
+          <ul class="politician-profile-list" data-match-list="agree">
             ${
               agree.length
                 ? agree.slice(0, 12).map(billLink).join("")
-                : `<li class="politician-profile-empty">No matching votes yet.</li>`
+                : `<li class="politician-profile-empty" data-match-empty="agree">No matching votes yet.</li>`
             }
           </ul>
+          <p class="scorecard-topic-empty" data-match-filter-empty="agree" hidden>No agreeing votes in this topic.</p>
         </div>
         <div>
           <h3>Where You Differ</h3>
-          <ul class="politician-profile-list">
+          <ul class="politician-profile-list" data-match-list="differ">
             ${
               differ.length
                 ? differ.slice(0, 12).map(billLink).join("")
-                : `<li class="politician-profile-empty">No diverging votes yet.</li>`
+                : `<li class="politician-profile-empty" data-match-empty="differ">No diverging votes yet.</li>`
             }
           </ul>
+          <p class="scorecard-topic-empty" data-match-filter-empty="differ" hidden>No differing votes in this topic.</p>
         </div>
       </div>
     `;
     bindMatchListInteractions(bodyEl);
+    bindMatchTopicFilters(bodyEl);
     return summary;
+  }
+
+  function bindMatchTopicFilters(root) {
+    if (!root) return;
+    const chips = [
+      ...root.querySelectorAll("[data-match-topic-filter]"),
+    ];
+    if (!chips.length) return;
+
+    const applyFilter = (topic) => {
+      chips.forEach((chip) => {
+        const active = chip.getAttribute("data-match-topic-filter") === topic;
+        chip.classList.toggle("is-active", active);
+        chip.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+
+      ["agree", "differ"].forEach((listKey) => {
+        const list = root.querySelector(`[data-match-list="${listKey}"]`);
+        if (!list) return;
+        let visible = 0;
+        list.querySelectorAll("[data-match-item]").forEach((item) => {
+          const category = item.getAttribute("data-category") || "";
+          const show = topic === "all" || category === topic;
+          item.hidden = !show;
+          if (show) visible += 1;
+        });
+        const empty = root.querySelector(
+          `[data-match-filter-empty="${listKey}"]`
+        );
+        if (empty) empty.hidden = visible > 0;
+      });
+    };
+
+    chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        applyFilter(chip.getAttribute("data-match-topic-filter") || "all");
+      });
+    });
   }
 
   function openMatchBillDetail(payload) {
