@@ -1054,6 +1054,25 @@ function renderVotesList(target, votes, emptyMessage, person) {
         .includes("senate")
         ? "Senate roll-call vote"
         : "House roll-call vote";
+    const displayTitle =
+      copy.shortTitle ||
+      item.short_title ||
+      item.shortTitle ||
+      item.title ||
+      item.voteQuestion ||
+      titleFallback;
+    const rawTitle = String(item.rawTitle || "").trim();
+    let codeBadge = "";
+    if (
+      rawTitle &&
+      displayTitle &&
+      rawTitle.toLowerCase() !== String(displayTitle).toLowerCase()
+    ) {
+      const match = rawTitle.match(
+        /([A-Z][A-Za-z.'\-]+(?:\s+[A-Z][A-Za-z.'\-]+){0,3})\s+Amdt\.?\s*(?:No\.?\s*)?(\d+)/i
+      );
+      if (match) codeBadge = `${match[1]} Amdt. No. ${match[2]}`;
+    }
     card.innerHTML = `
       <header class="politician-vote-card__header">
         <span class="politician-vote-cast ${voteCastClass(cast)}" title="${escapeHtml(
@@ -1074,8 +1093,15 @@ function renderVotesList(target, votes, emptyMessage, person) {
             }
           </div>
           <h3 class="politician-vote-card__title">${escapeHtml(
-            item.title || item.voteQuestion || titleFallback
+            displayTitle
           )}</h3>
+          ${
+            codeBadge
+              ? `<p class="politician-vote-card__code">${escapeHtml(
+                  codeBadge
+                )}</p>`
+              : ""
+          }
           <p class="politician-vote-card__meta">${escapeHtml(
             formatVoteMeta(item)
           )}</p>
