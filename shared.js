@@ -166,25 +166,46 @@ function isShortVoteLabel(text = "") {
 }
 
 /**
- * Normalize vote-card props for Feed / politician Recent Votes.
- * No AI rewrite — prefer official summary/title text.
+ * Normalize vote-card props for Feed / politician Recent Votes / Truth in Voting.
+ * Prefer Claude fields from processed_votes when present.
  */
 function resolveVoteCardCopy(item = {}) {
-  const yeaMeansRaw = String(item.yeaMeans ?? item.yea_means ?? "").trim();
-  const nayMeansRaw = String(item.nayMeans ?? item.nay_means ?? "").trim();
+  const yeaMeansRaw = String(
+    item.yea_impact ||
+      item.yeaImpact ||
+      item.yeaMeans ||
+      item.yea_means ||
+      ""
+  ).trim();
+  const nayMeansRaw = String(
+    item.nay_impact ||
+      item.nayImpact ||
+      item.nayMeans ||
+      item.nay_means ||
+      ""
+  ).trim();
   const yeaMeans = isGenericVoteMeans(yeaMeansRaw) ? "" : yeaMeansRaw;
   const nayMeans = isGenericVoteMeans(nayMeansRaw) ? "" : nayMeansRaw;
   const showMeans = Boolean(yeaMeans && nayMeans);
 
   const summary =
     String(
-      item.officialSummary ||
+      item.plain_summary ||
+        item.plainSummary ||
+        item.plainEnglishSummary ||
+        item.what_it_does ||
+        item.whatItDoes ||
+        item.officialSummary ||
         item.shortPitch ||
         item.summary ||
         item.title ||
         item.voteQuestion ||
         ""
-    ).trim() || "No official summary available for this vote.";
+    ).trim() || "No plain-English summary is available for this vote yet.";
+
+  const shortTitle = String(
+    item.short_title || item.shortTitle || item.displayTitle || ""
+  ).trim();
 
   const yeaLabelRaw = String(item.yeaLabel || item.yea_label || "").trim();
   const nayLabelRaw = String(item.nayLabel || item.nay_label || "").trim();
@@ -197,6 +218,7 @@ function resolveVoteCardCopy(item = {}) {
 
   return {
     summary,
+    shortTitle,
     yeaMeans,
     nayMeans,
     showMeans,

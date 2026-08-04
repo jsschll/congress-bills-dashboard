@@ -277,8 +277,14 @@
   }
 
   function formatVoteTitle(vote) {
+    const shortTitle = String(
+      vote?.short_title || vote?.shortTitle || ""
+    ).trim();
+    if (shortTitle && !/amdt\.?\s*(?:no\.?\s*)?\d+/i.test(shortTitle)) {
+      return shortTitle;
+    }
     const number = normalizeBillNumber(vote?.billNumber);
-    let title = String(vote?.title || "")
+    let title = String(vote?.rawTitle || vote?.title || "")
       .replace(/^(seed|placeholder)\s*:\s*/i, "")
       .trim();
     if (!title) return number || "Congressional roll call";
@@ -294,6 +300,21 @@
     return title;
   }
 
+  function formatVoteCodeBadge(vote) {
+    const shortTitle = String(
+      vote?.short_title || vote?.shortTitle || ""
+    ).trim();
+    const raw = String(vote?.rawTitle || "").trim();
+    if (raw && shortTitle && raw.toLowerCase() !== shortTitle.toLowerCase()) {
+      const match = raw.match(
+        /([A-Z][A-Za-z.'\-]+(?:\s+[A-Z][A-Za-z.'\-]+){0,3})\s+Amdt\.?\s*(?:No\.?\s*)?(\d+)/i
+      );
+      if (match) return `${match[1]} Amdt. No. ${match[2]}`;
+      if (/amdt\.?\s*(?:no\.?\s*)?\d+/i.test(raw)) return raw;
+    }
+    return "";
+  }
+
   function sentenceClamp(text, maxSentences = 2) {
     const cleaned = String(text || "").trim();
     if (!cleaned) return "";
@@ -306,6 +327,14 @@
   }
 
   function buildPlainEnglishSummary(vote) {
+    const fromClaude = sentenceClamp(
+      vote?.plain_summary ||
+        vote?.plainSummary ||
+        vote?.plainEnglishSummary ||
+        "",
+      2
+    );
+    if (fromClaude) return fromClaude;
     const fromSummary = sentenceClamp(vote?.plainEnglishSummary || "", 2);
     if (fromSummary) return fromSummary;
     const impacts = [
@@ -465,12 +494,16 @@
             ? normalizeBillNumber(billNumber)
             : billNumber;
         const rawTitle = String(
-          vote.title || vote.voteQuestion || "Congressional roll call"
+          vote.rawTitle || vote.title || vote.voteQuestion || "Congressional roll call"
         )
           .replace(/^(seed|placeholder)\s*:\s*/i, "")
           .trim();
+        const shortTitle = String(
+          vote.short_title || vote.shortTitle || ""
+        ).trim();
         const title =
-          normalizedNumber &&
+          shortTitle ||
+          (normalizedNumber &&
           !String(rawTitle)
             .replace(/\./g, "")
             .replace(/\s+/g, "")
@@ -482,17 +515,30 @@
                 .toLowerCase()
             )
             ? `${normalizedNumber}: ${rawTitle}`
-            : rawTitle;
-        return {
-          votePosition,
-          billId: String(vote.billId || vote.id || title),
-          billNumber: normalizedNumber,
-          title,
-          plainEnglishSummary:
+            : rawTitle);
+        const plainSummary = String(
+          vote.plain_summary ||
+            vote.plainSummary ||
+            vote.plainEnglishSummary ||
             vote.shortPitch ||
             vote.officialSummary ||
             vote.voteQuestion ||
-            null,
+            ""
+        ).trim();
+        return {
+          votePosition,
+          billId: String(vote.billId || vote.id || vote.rollCallId || title),
+          rollCallId: String(vote.rollCallId || vote.billId || vote.id || ""),
+          billNumber: normalizedNumber,
+          title,
+          rawTitle,
+          short_title: shortTitle || null,
+          shortTitle: shortTitle || null,
+          plain_summary: plainSummary || null,
+          plainSummary: plainSummary || null,
+          plainEnglishSummary: plainSummary || null,
+          yea_impact: vote.yea_impact || vote.yeaImpact || null,
+          nay_impact: vote.nay_impact || vote.nayImpact || null,
           category: vote.subjectCategory || vote.policyArea || categorizeBill(vote),
           voteDate: vote.date || (vote.lastUpdated || "").slice(0, 10) || null,
           impacts: {
@@ -500,6 +546,7 @@
             community: null,
             rights: null,
           },
+          summarySource: vote.summarySource || null,
         };
       })
       .filter((vote) => {
@@ -2153,6 +2200,7 @@
                     .replace(/_/g, " ");
                   const billNumber = normalizeBillNumber(vote.billNumber);
                   const displayTitle = formatVoteTitle(vote);
+                  const codeBadge = formatVoteCodeBadge(vote);
                   const summary = buildPlainEnglishSummary(vote);
                   const impacts = [
                     ["wallet", vote.impacts?.wallet],
@@ -2177,6 +2225,13 @@
                             : ""
                         }
                         <h4>${escapeHtml(displayTitle)}</h4>
+                        ${
+                          codeBadge
+                            ? `<span class="scorecard-vote__code">${escapeHtml(
+                                codeBadge
+                              )}</span>`
+                            : ""
+                        }
                       </div>
                       <span class="scorecard-vote-pill is-${tone}" aria-label="Voted ${escapeHtml(
                         positionLabel
@@ -2209,10 +2264,9 @@
                     }
                     ${
                       summary
-                        ? `<details class="scorecard-vote__summary">
-                            <summary>What this means</summary>
-                            <p>${escapeHtml(summary)}</p>
-                          </details>`
+                        ? `<p class="scorecard-vote__plain">${escapeHtml(
+                            summary
+                          )}</p>`
                         : ""
                     }
                   </li>`;

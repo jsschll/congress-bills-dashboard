@@ -560,7 +560,16 @@ async function enrichVoteCardsFromProcessedVotes(found = []) {
     const matched = new Set();
     for (const vote of found) {
       const row = byId.get(rollCallIdForVote(vote));
-      if (!row || !String(row.summary || "").trim()) continue;
+      if (
+        !row ||
+        !(
+          String(row.plain_summary || "").trim() ||
+          String(row.summary || "").trim() ||
+          String(row.short_title || "").trim()
+        )
+      ) {
+        continue;
+      }
       applyProcessedSummaryToVoteItem(vote, row);
       matched.add(rollCallIdForVote(vote));
     }
