@@ -5111,15 +5111,65 @@ a.politician-badge--match {
 .scorecard-match-item__category {
   display: inline-flex;
   align-items: center;
+  width: fit-content;
   border-radius: 0.35rem;
-  padding: 0.08rem 0.4rem;
-  background: rgba(71, 85, 105, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  color: #94a3b8;
-  font-size: 0.66rem;
-  font-weight: 750;
-  letter-spacing: 0.03em;
+  padding: 0.12rem 0.45rem;
+  background: rgba(51, 65, 85, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #cbd5e1;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.scorecard-topic-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.15rem 0.1rem 0.35rem;
+  margin: 0.35rem 0 0.55rem;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scorecard-topic-filters::-webkit-scrollbar {
+  height: 0.35rem;
+}
+
+.scorecard-topic-chip {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.85);
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.38rem 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scorecard-topic-chip:hover,
+.scorecard-topic-chip:focus-visible {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #e2e8f0;
+  outline: none;
+}
+
+.scorecard-topic-chip.is-active {
+  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(16, 185, 129, 0.16);
+  color: #a7f3d0;
+}
+
+.scorecard-topic-empty {
+  margin: 0.45rem 0 0;
+  color: #94a3b8;
+  font-size: 0.82rem;
 }
 
 .scorecard-stance-pill {

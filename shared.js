@@ -763,6 +763,28 @@ async function uploadProfileAvatar(userId, file) {
  * Action Match helpers — humanize amendment titles + Yea/Nay context.
  */
 
+const POLICY_CATEGORIES = [
+  "Economy & Taxes",
+  "Healthcare",
+  "Immigration & Border",
+  "Housing & Infrastructure",
+  "Foreign Policy & Defense",
+  "Civil Rights & Justice",
+  "Energy & Environment",
+  "Education & Labor",
+];
+
+const POLICY_CATEGORY_BADGE_LABELS = {
+  "Economy & Taxes": "ECONOMY",
+  Healthcare: "HEALTHCARE",
+  "Immigration & Border": "IMMIGRATION",
+  "Housing & Infrastructure": "HOUSING",
+  "Foreign Policy & Defense": "FOREIGN POLICY",
+  "Civil Rights & Justice": "CIVIL RIGHTS",
+  "Energy & Environment": "ENERGY",
+  "Education & Labor": "EDUCATION",
+};
+
 function collapseMatchWs(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
@@ -1136,6 +1158,7 @@ function resolveActionMatchCardCopy(row = {}) {
           }; they voted ${repVoteLabel}.`
         : yourStanceImpactLine;
   const category = inferMatchCategory(row, bill, voteCopy);
+  const categoryBadge = formatPolicyCategoryBadge(category);
   const resultLabel = collapseMatchWs(
     voteCopy?.result || row.vote_result || row.result || ""
   );
@@ -1158,6 +1181,7 @@ function resolveActionMatchCardCopy(row = {}) {
     conArgument,
     detailHref,
     category,
+    categoryBadge,
     matched,
     matchReason,
     resultLabel,
@@ -1204,30 +1228,69 @@ function normalizeMatchKeyPoints(value, fallbacks = []) {
   return points.slice(0, 3);
 }
 
-function inferMatchCategory(row = {}, bill = {}, voteCopy = null) {
-  const explicit = collapseMatchWs(
-    row.category ||
-      bill.category ||
-      voteCopy?.category ||
-      (Array.isArray(bill.tags) ? bill.tags[0] : "") ||
-      ""
+function normalizePolicyCategory(value, haystack = "") {
+  const raw = collapseMatchWs(value);
+  const exact = POLICY_CATEGORIES.find(
+    (category) => category.toLowerCase() === raw.toLowerCase()
   );
-  if (explicit && !/^other$/i.test(explicit)) return explicit;
+  if (exact) return exact;
+
+  const lower = `${raw} ${haystack}`.toLowerCase();
+  const aliasMap = [
+    [/immigra|border|asylum|visa|deport|refugee|customs/, "Immigration & Border"],
+    [/health|medicare|medicaid|hospital|pharma|vaccine|aca/, "Healthcare"],
+    [
+      /hous|rent|mortgage|homeless|infra|transit|highway|bridge/,
+      "Housing & Infrastructure",
+    ],
+    [
+      /foreign|defense|military|war|nato|troop|sanction/,
+      "Foreign Policy & Defense",
+    ],
+    [
+      /civil|justice|voting|police|prison|gun|court|rights/,
+      "Civil Rights & Justice",
+    ],
+    [
+      /energy|environ|climate|epa|emission|oil|gas|renewable/,
+      "Energy & Environment",
+    ],
+    [/educat|school|student|labor|union|wage|worker|osha/, "Education & Labor"],
+    [
+      /tax|budget|economy|spend|deficit|debt|tariff|irs|fee|payroll/,
+      "Economy & Taxes",
+    ],
+  ];
+  for (const [re, category] of aliasMap) {
+    if (re.test(lower)) return category;
+  }
+  return "Economy & Taxes";
+}
+
+function formatPolicyCategoryBadge(category = "") {
+  const normalized = normalizePolicyCategory(category);
+  return (
+    POLICY_CATEGORY_BADGE_LABELS[normalized] ||
+    String(normalized || "POLICY")
+      .replace(/&/g, " ")
+      .toUpperCase()
+  );
+}
+
+function inferMatchCategory(row = {}, bill = {}, voteCopy = null) {
+  const explicit =
+    voteCopy?.primary_category ||
+    voteCopy?.primaryCategory ||
+    row.primary_category ||
+    row.category ||
+    bill.category ||
+    voteCopy?.category ||
+    (Array.isArray(bill.tags) ? bill.tags[0] : "") ||
+    "";
   const hay = `${bill.title || ""} ${voteCopy?.title || ""} ${
-    voteCopy?.plain_summary || voteCopy?.card_summary || ""
-  }`.toLowerCase();
-  if (/border|immigra|asylum|deport|visa/.test(hay)) return "Immigration";
-  if (/tax|budget|spend|deficit|debt|fee|wage|payroll/.test(hay))
-    return "Economy";
-  if (/health|medicare|medicaid|hospital|drug|vaccine/.test(hay))
-    return "Health";
-  if (/climate|energy|oil|gas|environ|epa|emission/.test(hay))
-    return "Energy";
-  if (/gun|police|crime|justice|court|prison/.test(hay)) return "Justice";
-  if (/war|military|defense|nato|israel|ukraine|troop/.test(hay))
-    return "National Security";
-  if (/educat|school|student|loan|college/.test(hay)) return "Education";
-  return "Policy";
+    voteCopy?.plain_summary || voteCopy?.card_summary || voteCopy?.takeaway || ""
+  }`;
+  return normalizePolicyCategory(explicit, hay);
 }
 
 function buildRollCallMeta(voteCopy = null, row = {}) {
@@ -1329,7 +1392,9 @@ function renderActionMatchScorecardItem(row, escapeHtmlFn) {
       ? "Rep: Voted Yea"
       : `Rep: ${copy.repStanceLabel || "—"}`;
 
-  return `<li class="scorecard-match-item scorecard-match-item--compact" data-match-item>
+  return `<li class="scorecard-match-item scorecard-match-item--compact" data-match-item data-category="${esc(
+    copy.category
+  )}">
       <button
         type="button"
         class="scorecard-match-item__row"
@@ -1341,7 +1406,7 @@ function renderActionMatchScorecardItem(row, escapeHtmlFn) {
           <span class="scorecard-match-item__name">${esc(copy.shortTitle)}</span>
           <span class="scorecard-match-item__meta-row">
             <span class="scorecard-match-item__category">${esc(
-              copy.category
+              copy.categoryBadge || copy.category
             )}</span>
             <span class="scorecard-stance-pill scorecard-stance-pill--${yourPillTone}">${esc(
               yourPill
@@ -1555,13 +1620,13 @@ async function enrichActionMatchRows(client, rows) {
   ({ data, error } = await client
     .from("processed_votes")
     .select(
-      "roll_call_id, title, summary, yea_means, nay_means, short_title, plain_summary, what_it_does, yea_impact, nay_impact, card_summary, takeaway, key_points, pro_argument, con_argument, bill_number, official_url, vote_kind, vote_question, result, chamber, roll_call_number, vote_date, raw_payload"
+      "roll_call_id, title, summary, yea_means, nay_means, short_title, plain_summary, what_it_does, yea_impact, nay_impact, card_summary, takeaway, key_points, pro_argument, con_argument, primary_category, bill_number, official_url, vote_kind, vote_question, result, chamber, roll_call_number, vote_date, raw_payload"
     )
     .in("roll_call_id", ids));
   // Older DBs may not have breakdown fields yet — retry without them.
   if (
     error &&
-    /card_summary|takeaway|key_points|pro_argument|con_argument|raw_payload/i.test(
+    /card_summary|takeaway|key_points|pro_argument|con_argument|raw_payload|primary_category/i.test(
       error.message || ""
     )
   ) {
@@ -1611,6 +1676,12 @@ async function enrichActionMatchRows(client, rows) {
       ...row,
       voteCopy,
       impact,
+      category:
+        voteCopy?.primary_category ||
+        impact.primary_category ||
+        (typeof inferMatchCategory === "function"
+          ? inferMatchCategory(row, bill, voteCopy)
+          : "Economy & Taxes"),
       displayTitle: impact.short_title,
       voteMeans: {
         yea: impact.yea_impact,
