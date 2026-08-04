@@ -549,10 +549,21 @@ async function enrichVoteCardsFromProcessedVotes(found = []) {
   if (!unique.length) return new Set();
 
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("processed_votes")
       .select(PROCESSED_VOTES_SELECT)
       .in("roll_call_id", unique);
+    if (error && /is_key_vote/i.test(error.message || "")) {
+      ({ data, error } = await supabase
+        .from("processed_votes")
+        .select(
+          PROCESSED_VOTES_SELECT.replace(/,?is_key_vote,?/, ",").replace(
+            /,,/g,
+            ","
+          )
+        )
+        .in("roll_call_id", unique));
+    }
     if (error) throw error;
     const byId = new Map(
       (data || []).map((row) => [String(row.roll_call_id), row])
