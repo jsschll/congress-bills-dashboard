@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260804ps1" />
+    <link rel="stylesheet" href="styles.css?v=20260804pd1" />
   </head>
   <body class="page-app page-scorecard page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -276,14 +276,14 @@
         data-close-match-detail="1"
       ></div>
       <div
-        class="scorecard-match-detail__panel"
+        class="scorecard-match-detail__panel scorecard-match-detail__panel--breakdown"
         role="dialog"
         aria-modal="true"
         aria-labelledby="scorecard-match-detail-title"
       >
         <header class="scorecard-match-detail__header">
           <div>
-            <p class="scorecard-match-detail__eyebrow">Legislative context</p>
+            <p class="scorecard-match-detail__eyebrow">Bill Breakdown</p>
             <p id="scorecard-match-detail-bill" class="scorecard-match-detail__bill"></p>
             <h2 id="scorecard-match-detail-title">Roll-call detail</h2>
           </div>
@@ -297,17 +297,38 @@
           </button>
         </header>
         <p id="scorecard-match-detail-stance" class="scorecard-match-detail__stance"></p>
-        <p id="scorecard-match-detail-summary" class="scorecard-match-detail__summary"></p>
-        <div class="scorecard-match-detail__means">
-          <div class="is-yea">
-            <strong id="scorecard-match-detail-yea-label">Your Stance</strong>
-            <p id="scorecard-match-detail-yea"></p>
+
+        <section class="bill-breakdown__block" aria-labelledby="scorecard-match-detail-takeaway-label">
+          <h3 id="scorecard-match-detail-takeaway-label" class="bill-breakdown__label">10-Second Takeaway</h3>
+          <p id="scorecard-match-detail-takeaway" class="bill-breakdown__takeaway"></p>
+        </section>
+
+        <section class="bill-breakdown__block" aria-labelledby="scorecard-match-detail-summary-label">
+          <h3 id="scorecard-match-detail-summary-label" class="bill-breakdown__label">Plain-English Summary</h3>
+          <p id="scorecard-match-detail-summary" class="scorecard-match-detail__summary"></p>
+        </section>
+
+        <section class="bill-breakdown__block" aria-labelledby="scorecard-match-detail-points-label">
+          <h3 id="scorecard-match-detail-points-label" class="bill-breakdown__label">Key Policy Impacts</h3>
+          <ul id="scorecard-match-detail-points" class="bill-breakdown__points"></ul>
+        </section>
+
+        <section class="bill-breakdown__sides" aria-label="Two sides">
+          <div class="bill-breakdown__side is-pro">
+            <strong>Why Supporters Voted Yea</strong>
+            <p id="scorecard-match-detail-pro"></p>
           </div>
-          <div class="is-nay">
-            <strong id="scorecard-match-detail-nay-label">Representative Stance</strong>
-            <p id="scorecard-match-detail-nay"></p>
+          <div class="bill-breakdown__side is-con">
+            <strong>Why Opponents Voted Nay</strong>
+            <p id="scorecard-match-detail-con"></p>
           </div>
-        </div>
+        </section>
+
+        <section class="bill-breakdown__block" aria-labelledby="scorecard-match-detail-roll-label">
+          <h3 id="scorecard-match-detail-roll-label" class="bill-breakdown__label">Full Roll Call Breakdown &amp; Vote Totals</h3>
+          <p id="scorecard-match-detail-roll" class="bill-breakdown__roll"></p>
+        </section>
+
         <footer class="scorecard-match-detail__footer">
           <a
             id="scorecard-match-detail-link"
@@ -315,7 +336,7 @@
             href="bills-policies.html?tab=votes"
             target="_blank"
             rel="noopener noreferrer"
-            >View full detail</a
+            >Open official roll call</a
           >
           <button
             type="button"
@@ -329,10 +350,10 @@
     </div>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260804ps1"></script>
+    <script src="shared.js?v=20260804pd1"></script>
     <script src="nav.js?v=20260804a1"></script>
     <script src="politicians-shared.js?v=20260804un1"></script>
-    <script src="representatives-scorecard.js?v=20260804ps1"></script>
+    <script src="representatives-scorecard.js?v=20260804pd1"></script>
     <script>
       (async () => {
         await bootNav("politicians");

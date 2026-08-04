@@ -580,7 +580,7 @@ function indexProcessedVotesByBill(rows = []) {
 function applyProcessedSummaryToBillItem(item, row) {
   if (!item || !row) return item;
   const plain = String(
-    row.plain_summary || row.what_it_does || ""
+    row.card_summary || row.plain_summary || row.what_it_does || ""
   ).trim();
   const summary = plain || String(row.summary || "").trim();
   if (!summary) return item;
@@ -588,6 +588,21 @@ function applyProcessedSummaryToBillItem(item, row) {
   item.plainSummary = plain || summary;
   item.plainEnglishSummary = plain || summary;
   item.what_it_does = plain || summary;
+  item.card_summary = String(row.card_summary || plain || summary).trim();
+  item.cardSummary = item.card_summary;
+  if (row.takeaway) item.takeaway = String(row.takeaway).trim();
+  if (row.key_points) {
+    item.key_points = row.key_points;
+    item.keyPoints = row.key_points;
+  }
+  if (row.pro_argument) {
+    item.pro_argument = String(row.pro_argument).trim();
+    item.proArgument = item.pro_argument;
+  }
+  if (row.con_argument) {
+    item.con_argument = String(row.con_argument).trim();
+    item.conArgument = item.con_argument;
+  }
   item.shortPitch = summary;
   item.summary = summary;
   item.officialSummary = summary;
@@ -1000,7 +1015,7 @@ function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
 
 /**
  * Resolve header/body copy for an Action Match agree/differ card.
- * Prefer Claude fields on the enriched vote (`short_title`, `plain_summary`).
+ * Prefer Claude fields on the enriched vote (`short_title`, `plain_summary` / `card_summary`).
  */
 function resolveActionMatchCardCopy(row = {}) {
   const bill = row.bill || {};
@@ -1027,13 +1042,16 @@ function resolveActionMatchCardCopy(row = {}) {
   const rawCode = collapseMatchWs(
     impact.raw_code || formatAmendmentCodePill(bill, voteCopy)
   );
-  // vote.plain_summary is the primary card-body explanation.
-  const plainSummary =
+  const cardSummary =
     clampPunchySummary(
-      voteCopy?.plain_summary ||
+      voteCopy?.card_summary ||
+        voteCopy?.cardSummary ||
+        voteCopy?.plain_summary ||
         voteCopy?.plainSummary ||
+        row.card_summary ||
         row.plain_summary ||
         row.plainSummary ||
+        impact.card_summary ||
         impact.plain_summary ||
         impact.what_it_does ||
         row.detailSummary ||
@@ -1043,6 +1061,42 @@ function resolveActionMatchCardCopy(row = {}) {
         "",
       { maxSentences: 2, maxWords: 35 }
     ) || "No plain-English summary is available for this roll call yet.";
+  const takeaway =
+    collapseMatchWs(
+      voteCopy?.takeaway ||
+        row.takeaway ||
+        impact.takeaway ||
+        shortTitle
+    ) || shortTitle;
+  const keyPoints = normalizeMatchKeyPoints(
+    voteCopy?.key_points ||
+      voteCopy?.keyPoints ||
+      row.key_points ||
+      impact.key_points,
+    [
+      cardSummary,
+      impact.yea_impact,
+      impact.nay_impact,
+    ]
+  );
+  const proArgument =
+    clampPunchySummary(
+      voteCopy?.pro_argument ||
+        voteCopy?.proArgument ||
+        impact.pro_argument ||
+        impact.yea_impact ||
+        "",
+      { maxSentences: 1, maxWords: 28 }
+    ) || "Supporters want to advance this measure.";
+  const conArgument =
+    clampPunchySummary(
+      voteCopy?.con_argument ||
+        voteCopy?.conArgument ||
+        impact.con_argument ||
+        impact.nay_impact ||
+        "",
+      { maxSentences: 1, maxWords: 28 }
+    ) || "Opponents want to block this measure.";
   const detailHref =
     row.detailHref || actionMatchDetailHref(bill, voteCopy);
   const yourStanceImpactLine =
@@ -1065,6 +1119,28 @@ function resolveActionMatchCardCopy(row = {}) {
     (/^(yea|aye|yes|nay|no)$/i.test(String(repVoteLabel))
       ? `Voted ${repVoteLabel} — ${repImpactCore}`
       : repImpactCore);
+  const matched =
+    row.matched === true ? true : row.matched === false ? false : null;
+  const matchReason =
+    matched === true
+      ? `You aligned — both ${
+          /oppose/i.test(String(impact.your_stance_label || ""))
+            ? "opposed"
+            : "supported"
+        } this change.`
+      : matched === false
+        ? `You ${
+            /oppose/i.test(String(impact.your_stance_label || ""))
+              ? "opposed"
+              : "supported"
+          }; they voted ${repVoteLabel}.`
+        : yourStanceImpactLine;
+  const category = inferMatchCategory(row, bill, voteCopy);
+  const resultLabel = collapseMatchWs(
+    voteCopy?.result || row.vote_result || row.result || ""
+  );
+  const rollMeta = buildRollCallMeta(voteCopy, row);
+
   return {
     bill,
     voteCopy,
@@ -1074,8 +1150,18 @@ function resolveActionMatchCardCopy(row = {}) {
     showCode:
       Boolean(rawCode) &&
       rawCode.toLowerCase() !== String(shortTitle).toLowerCase(),
-    plainSummary,
+    plainSummary: cardSummary,
+    cardSummary,
+    takeaway,
+    keyPoints,
+    proArgument,
+    conArgument,
     detailHref,
+    category,
+    matched,
+    matchReason,
+    resultLabel,
+    rollMeta,
     yourStanceLabel: impact.your_stance_label || "Your stance",
     yourStanceImpact: yourStanceImpactLine,
     yourStanceTone: stanceBadgeTone(impact.your_stance_label || row.user_stance),
@@ -1087,10 +1173,109 @@ function resolveActionMatchCardCopy(row = {}) {
   };
 }
 
+function normalizeMatchKeyPoints(value, fallbacks = []) {
+  let points = [];
+  if (Array.isArray(value)) {
+    points = value.map((item) => collapseMatchWs(item)).filter(Boolean);
+  } else if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        points = parsed.map((item) => collapseMatchWs(item)).filter(Boolean);
+      }
+    } catch {
+      points = [];
+    }
+  }
+  for (const fallback of fallbacks) {
+    if (points.length >= 3) break;
+    const text = collapseMatchWs(fallback);
+    if (text && !points.includes(text)) points.push(text);
+  }
+  while (points.length < 3) {
+    points.push(
+      [
+        "This vote changes how a federal policy works in practice.",
+        "It affects people or communities tied to the issue.",
+        "Supporters and opponents disagree about the tradeoffs.",
+      ][points.length]
+    );
+  }
+  return points.slice(0, 3);
+}
+
+function inferMatchCategory(row = {}, bill = {}, voteCopy = null) {
+  const explicit = collapseMatchWs(
+    row.category ||
+      bill.category ||
+      voteCopy?.category ||
+      (Array.isArray(bill.tags) ? bill.tags[0] : "") ||
+      ""
+  );
+  if (explicit && !/^other$/i.test(explicit)) return explicit;
+  const hay = `${bill.title || ""} ${voteCopy?.title || ""} ${
+    voteCopy?.plain_summary || voteCopy?.card_summary || ""
+  }`.toLowerCase();
+  if (/border|immigra|asylum|deport|visa/.test(hay)) return "Immigration";
+  if (/tax|budget|spend|deficit|debt|fee|wage|payroll/.test(hay))
+    return "Economy";
+  if (/health|medicare|medicaid|hospital|drug|vaccine/.test(hay))
+    return "Health";
+  if (/climate|energy|oil|gas|environ|epa|emission/.test(hay))
+    return "Energy";
+  if (/gun|police|crime|justice|court|prison/.test(hay)) return "Justice";
+  if (/war|military|defense|nato|israel|ukraine|troop/.test(hay))
+    return "National Security";
+  if (/educat|school|student|loan|college/.test(hay)) return "Education";
+  return "Policy";
+}
+
+function buildRollCallMeta(voteCopy = null, row = {}) {
+  const result = collapseMatchWs(
+    voteCopy?.result || row.vote_result || row.result || ""
+  );
+  const chamber = collapseMatchWs(
+    voteCopy?.chamber || row.chamber || ""
+  );
+  const roll = voteCopy?.roll_call_number || row.roll_call_number || "";
+  const date = collapseMatchWs(
+    voteCopy?.vote_date || row.vote_date || ""
+  );
+  const raw = voteCopy?.raw_payload || row.raw_payload || null;
+  let yeaCount = null;
+  let nayCount = null;
+  if (raw && typeof raw === "object") {
+    yeaCount =
+      raw.yeaTotal ??
+      raw.yesTotal ??
+      raw.democraticYea ??
+      raw.RepublicanYea ??
+      null;
+    nayCount =
+      raw.nayTotal ??
+      raw.noTotal ??
+      raw.democraticNay ??
+      raw.RepublicanNay ??
+      null;
+    // House API sometimes nests totals.
+    if (yeaCount == null && raw.voteTotals) {
+      yeaCount = raw.voteTotals.yeaTotal ?? raw.voteTotals.yes ?? null;
+      nayCount = raw.voteTotals.nayTotal ?? raw.voteTotals.no ?? null;
+    }
+  }
+  return {
+    result: result || "Result unavailable",
+    chamber: chamber || "",
+    rollCallNumber: roll ? String(roll) : "",
+    date: date ? String(date).slice(0, 10) : "",
+    yeaCount: yeaCount != null ? Number(yeaCount) : null,
+    nayCount: nayCount != null ? Number(nayCount) : null,
+  };
+}
+
 /**
- * Render one Where You Agree / Differ list item using Claude vote fields.
- * @param {object} row
- * @param {(value: unknown) => string} escapeHtmlFn
+ * Render one Where You Agree / Differ list item — progressive disclosure.
+ * Tier 1: compact row. Tier 2: accordion. Tier 3: deep-dive via payload.
  */
 function renderActionMatchScorecardItem(row, escapeHtmlFn) {
   const esc =
@@ -1102,7 +1287,12 @@ function renderActionMatchScorecardItem(row, escapeHtmlFn) {
     JSON.stringify({
       title: copy.shortTitle,
       number: copy.rawCode,
-      summary: copy.plainSummary,
+      summary: copy.cardSummary,
+      cardSummary: copy.cardSummary,
+      takeaway: copy.takeaway,
+      keyPoints: copy.keyPoints,
+      proArgument: copy.proArgument,
+      conArgument: copy.conArgument,
       yea: copy.yeaImpact,
       nay: copy.nayImpact,
       href: copy.detailHref,
@@ -1113,62 +1303,68 @@ function renderActionMatchScorecardItem(row, escapeHtmlFn) {
       yourStanceImpact: copy.yourStanceImpact,
       repStanceLabel: copy.repStanceLabel,
       repStanceImpact: copy.repStanceImpact,
+      matched: copy.matched,
+      matchReason: copy.matchReason,
+      category: copy.category,
+      resultLabel: copy.resultLabel,
+      rollMeta: copy.rollMeta,
     })
   );
-  const yourBadgeClass = `scorecard-match-badge scorecard-match-badge--${
-    copy.yourStanceTone || "neutral"
-  }`;
-  const repBadgeClass = `scorecard-match-badge scorecard-match-badge--${
-    copy.repStanceTone || "neutral"
-  }`;
+  const yourPillTone = copy.yourStanceTone || "neutral";
+  const repPillTone = copy.repStanceTone || "neutral";
+  const matchTone =
+    copy.matched === true ? "match" : copy.matched === false ? "differ" : "neutral";
+  const matchLabel =
+    copy.matched === true
+      ? "Match"
+      : copy.matched === false
+        ? "Differ"
+        : "Compared";
+  const yourPill = /oppose/i.test(String(copy.yourStanceLabel || ""))
+    ? "You: Opposed"
+    : "You: Supported";
+  const repPill = /^(nay|no)$/i.test(String(copy.repStanceLabel || ""))
+    ? "Rep: Voted Nay"
+    : /^(yea|aye|yes)$/i.test(String(copy.repStanceLabel || ""))
+      ? "Rep: Voted Yea"
+      : `Rep: ${copy.repStanceLabel || "—"}`;
 
-  return `<li class="scorecard-match-item">
-      <div class="scorecard-match-item__top">
+  return `<li class="scorecard-match-item scorecard-match-item--compact" data-match-item>
+      <button
+        type="button"
+        class="scorecard-match-item__row"
+        data-toggle-match-accordion
+        aria-expanded="false"
+        aria-controls=""
+      >
+        <span class="scorecard-match-item__row-main">
+          <span class="scorecard-match-item__name">${esc(copy.shortTitle)}</span>
+          <span class="scorecard-match-item__meta-row">
+            <span class="scorecard-match-item__category">${esc(
+              copy.category
+            )}</span>
+            <span class="scorecard-stance-pill scorecard-stance-pill--${yourPillTone}">${esc(
+              yourPill
+            )}</span>
+            <span class="scorecard-stance-pill scorecard-stance-pill--${repPillTone}">${esc(
+              repPill
+            )}</span>
+            <span class="scorecard-match-indicator scorecard-match-indicator--${matchTone}">${esc(
+              matchLabel
+            )}</span>
+          </span>
+        </span>
+        <span class="scorecard-match-item__chevron" aria-hidden="true"></span>
+      </button>
+      <div class="scorecard-match-item__accordion" hidden>
+        <p class="scorecard-match-item__summary">${esc(copy.cardSummary)}</p>
+        <p class="scorecard-match-item__reason">${esc(copy.matchReason)}</p>
         <button
           type="button"
-          class="scorecard-match-item__title"
+          class="scorecard-match-item__deep-link"
           data-open-match-detail="${detailPayload}"
-        >
-          <span class="scorecard-match-item__name">${esc(
-            copy.shortTitle
-          )}</span>
-          ${
-            copy.showCode
-              ? `<span class="scorecard-match-item__code">${esc(
-                  copy.rawCode
-                )}</span>`
-              : ""
-          }
-        </button>
-        <button
-          type="button"
-          class="scorecard-match-item__info"
-          data-open-match-detail="${detailPayload}"
-          aria-label="Open roll-call detail"
-          title="Open roll-call detail"
-        >ⓘ</button>
+        >Explore Full Bill Breakdown &amp; Roll Call →</button>
       </div>
-      <p class="scorecard-match-item__summary">${esc(copy.plainSummary)}</p>
-      <ul class="scorecard-match-item__breakdown" aria-label="Stance comparison">
-        <li class="scorecard-match-item__stance-row">
-          <span class="scorecard-match-item__stance-meta">
-            <span class="scorecard-match-item__stance-label">Your Stance</span>
-            <span class="${yourBadgeClass}">${esc(copy.yourStanceLabel)}</span>
-          </span>
-          <span class="scorecard-match-item__stance-line">${esc(
-            copy.yourStanceImpact
-          )}</span>
-        </li>
-        <li class="scorecard-match-item__stance-row">
-          <span class="scorecard-match-item__stance-meta">
-            <span class="scorecard-match-item__stance-label">Rep Stance</span>
-            <span class="${repBadgeClass}">${esc(copy.repStanceLabel)}</span>
-          </span>
-          <span class="scorecard-match-item__stance-line">${esc(
-            copy.repStanceImpact
-          )}</span>
-        </li>
-      </ul>
     </li>`;
 }
 
@@ -1181,7 +1377,9 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
   const raw_code = formatAmendmentCodePill(bill, voteCopy);
   const plain_summary =
     clampPunchySummary(
-      voteCopy?.plain_summary ||
+      voteCopy?.card_summary ||
+        voteCopy?.cardSummary ||
+        voteCopy?.plain_summary ||
         voteCopy?.plainSummary ||
         voteCopy?.what_it_does ||
         voteCopy?.whatItDoes ||
@@ -1192,14 +1390,33 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
       { maxSentences: 2, maxWords: 35 }
     ) || "No plain-English summary is available for this roll call yet.";
   const what_it_does = plain_summary;
+  const card_summary = plain_summary;
+  const takeaway =
+    collapseMatchWs(voteCopy?.takeaway || "") || short_title;
   const yea_impact =
     punchyImpactClause(voteCopy?.yea_impact || voteCopy?.yeaImpact || "") ||
+    punchyImpactClause(voteCopy?.pro_argument || "") ||
     punchyImpactClause(means.yea) ||
     "Advancing this measure as written";
   const nay_impact =
     punchyImpactClause(voteCopy?.nay_impact || voteCopy?.nayImpact || "") ||
+    punchyImpactClause(voteCopy?.con_argument || "") ||
     punchyImpactClause(means.nay) ||
     "Rejecting this measure";
+  const pro_argument =
+    clampPunchySummary(
+      voteCopy?.pro_argument || voteCopy?.proArgument || "",
+      { maxSentences: 1, maxWords: 28 }
+    ) || `Supporters back ${yea_impact.charAt(0).toLowerCase()}${yea_impact.slice(1)}.`;
+  const con_argument =
+    clampPunchySummary(
+      voteCopy?.con_argument || voteCopy?.conArgument || "",
+      { maxSentences: 1, maxWords: 28 }
+    ) || `Opponents want to stop ${nay_impact.charAt(0).toLowerCase()}${nay_impact.slice(1)}.`;
+  const key_points = normalizeMatchKeyPoints(
+    voteCopy?.key_points || voteCopy?.keyPoints,
+    [plain_summary, yea_impact, nay_impact]
+  );
 
   const userStance = String(matchRow?.user_stance || "").toLowerCase();
   const memberVote = String(matchRow?.member_vote || "").toLowerCase();
@@ -1238,6 +1455,11 @@ function buildActionMatchImpact(bill = {}, voteCopy = null, matchRow = null) {
     raw_code,
     plain_summary,
     what_it_does,
+    card_summary,
+    takeaway,
+    key_points,
+    pro_argument,
+    con_argument,
     yea_impact,
     nay_impact,
     your_stance_label: yourStanceLabel,
@@ -1333,9 +1555,23 @@ async function enrichActionMatchRows(client, rows) {
   ({ data, error } = await client
     .from("processed_votes")
     .select(
-      "roll_call_id, title, summary, yea_means, nay_means, short_title, plain_summary, what_it_does, yea_impact, nay_impact, bill_number, official_url, vote_kind, vote_question"
+      "roll_call_id, title, summary, yea_means, nay_means, short_title, plain_summary, what_it_does, yea_impact, nay_impact, card_summary, takeaway, key_points, pro_argument, con_argument, bill_number, official_url, vote_kind, vote_question, result, chamber, roll_call_number, vote_date, raw_payload"
     )
     .in("roll_call_id", ids));
+  // Older DBs may not have breakdown fields yet — retry without them.
+  if (
+    error &&
+    /card_summary|takeaway|key_points|pro_argument|con_argument|raw_payload/i.test(
+      error.message || ""
+    )
+  ) {
+    ({ data, error } = await client
+      .from("processed_votes")
+      .select(
+        "roll_call_id, title, summary, yea_means, nay_means, short_title, plain_summary, what_it_does, yea_impact, nay_impact, bill_number, official_url, vote_kind, vote_question, result, chamber, roll_call_number, vote_date"
+      )
+      .in("roll_call_id", ids));
+  }
   // Older DBs may not have plain_summary yet — retry without it.
   if (error && /plain_summary/i.test(error.message || "")) {
     ({ data, error } = await client
@@ -1386,3 +1622,144 @@ async function enrichActionMatchRows(client, rows) {
   });
 }
 
+
+/**
+ * Fill a Tier 3 Bill Breakdown modal/panel from an Action Match detail payload.
+ * Works with scorecard-match-detail-* or politician-match-detail-* id prefixes.
+ */
+function fillBillBreakdownModal(payload = {}, options = {}) {
+  const prefix = options.prefix || "scorecard-match-detail";
+  const byId = (suffix) =>
+    typeof document !== "undefined"
+      ? document.getElementById(`${prefix}-${suffix}`)
+      : null;
+
+  const titleEl = byId("title");
+  const billEl = byId("bill");
+  const takeawayEl = byId("takeaway");
+  const summaryEl = byId("summary");
+  const pointsEl = byId("points");
+  const proEl = byId("pro");
+  const conEl = byId("con");
+  const rollEl = byId("roll");
+  const linkEl = byId("link");
+  const stanceEl = byId("stance");
+
+  if (titleEl) titleEl.textContent = payload.title || "Bill Breakdown";
+  if (billEl) {
+    billEl.textContent = payload.number || payload.rawTitle || "";
+    billEl.hidden = !billEl.textContent;
+  }
+  if (takeawayEl) {
+    takeawayEl.textContent =
+      payload.takeaway || payload.title || "Congressional roll-call vote";
+  }
+  if (summaryEl) {
+    summaryEl.textContent =
+      payload.cardSummary ||
+      payload.summary ||
+      "No plain-English summary is available for this roll call yet.";
+  }
+  if (pointsEl) {
+    const points = Array.isArray(payload.keyPoints)
+      ? payload.keyPoints
+      : [];
+    pointsEl.innerHTML = points
+      .slice(0, 3)
+      .map((point) => `<li>${String(point || "").replace(/</g, "&lt;")}</li>`)
+      .join("");
+    pointsEl.hidden = !points.length;
+  }
+  if (proEl) {
+    proEl.textContent =
+      payload.proArgument || payload.yea || "Supporters want to advance this measure.";
+  }
+  if (conEl) {
+    conEl.textContent =
+      payload.conArgument || payload.nay || "Opponents want to block this measure.";
+  }
+  if (rollEl) {
+    const meta = payload.rollMeta || {};
+    const bits = [];
+    if (meta.result) bits.push(meta.result);
+    if (meta.chamber) bits.push(String(meta.chamber).replace(/\b\w/g, (c) => c.toUpperCase()));
+    if (meta.rollCallNumber) bits.push(`Roll Call ${meta.rollCallNumber}`);
+    if (meta.date) bits.push(meta.date);
+    if (meta.yeaCount != null && meta.nayCount != null) {
+      bits.push(`Yea ${meta.yeaCount} · Nay ${meta.nayCount}`);
+    }
+    rollEl.textContent = bits.join(" · ") || payload.resultLabel || "Roll-call totals unavailable.";
+  }
+  if (stanceEl) {
+    const stance = payload.stance
+      ? `You ${payload.stance}`
+      : payload.yourStanceLabel
+        ? `You: ${payload.yourStanceLabel}`
+        : "";
+    const member = payload.memberVote
+      ? `They voted ${payload.memberVote}`
+      : "";
+    const match =
+      payload.matched === true
+        ? "Match"
+        : payload.matched === false
+          ? "Differ"
+          : "";
+    stanceEl.textContent = [stance, member, match].filter(Boolean).join(" · ");
+    stanceEl.hidden = !stanceEl.textContent;
+  }
+  if (linkEl) {
+    linkEl.href = payload.href || "bills-policies.html?tab=votes";
+    linkEl.hidden = !linkEl.href;
+  }
+}
+
+/**
+ * Bind Tier 1 accordion toggles + Tier 3 deep-link buttons inside a match list.
+ */
+function bindActionMatchProgressiveDisclosure(root, openDetailFn) {
+  if (!root) return;
+  root.querySelectorAll("[data-toggle-match-accordion]").forEach((button, index) => {
+    const item = button.closest(".scorecard-match-item");
+    const panel = item?.querySelector(".scorecard-match-item__accordion");
+    if (!panel) return;
+    if (!panel.id) panel.id = `scorecard-match-accordion-${index}-${Date.now()}`;
+    button.setAttribute("aria-controls", panel.id);
+    button.addEventListener("click", () => {
+      const open = panel.hasAttribute("hidden");
+      // Close siblings for a clean accordion feel.
+      root.querySelectorAll(".scorecard-match-item__accordion").forEach((other) => {
+        if (other === panel) return;
+        other.setAttribute("hidden", "");
+        const otherBtn = other
+          .closest(".scorecard-match-item")
+          ?.querySelector("[data-toggle-match-accordion]");
+        otherBtn?.setAttribute("aria-expanded", "false");
+        other.closest(".scorecard-match-item")?.classList.remove("is-expanded");
+      });
+      if (open) {
+        panel.removeAttribute("hidden");
+        button.setAttribute("aria-expanded", "true");
+        item?.classList.add("is-expanded");
+      } else {
+        panel.setAttribute("hidden", "");
+        button.setAttribute("aria-expanded", "false");
+        item?.classList.remove("is-expanded");
+      }
+    });
+  });
+  root.querySelectorAll("[data-open-match-detail]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        const payload = JSON.parse(
+          decodeURIComponent(button.getAttribute("data-open-match-detail") || "")
+        );
+        if (typeof openDetailFn === "function") openDetailFn(payload);
+      } catch (error) {
+        console.warn(error);
+      }
+    });
+  });
+}

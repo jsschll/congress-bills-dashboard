@@ -862,53 +862,12 @@ function renderMatchScorecard({ user, rows }, person) {
 function openPoliticianMatchDetail(payload) {
   const modal = document.getElementById("politician-match-detail-modal");
   if (!modal || !payload) return;
-  const titleEl = document.getElementById("politician-match-detail-title");
-  const billEl = document.getElementById("politician-match-detail-bill");
-  const summaryEl = document.getElementById("politician-match-detail-summary");
-  const yeaEl = document.getElementById("politician-match-detail-yea");
-  const nayEl = document.getElementById("politician-match-detail-nay");
-  const linkEl = document.getElementById("politician-match-detail-link");
-  const stanceEl = document.getElementById("politician-match-detail-stance");
-
-  if (titleEl) titleEl.textContent = payload.title || "Roll-call detail";
-  if (billEl) {
-    billEl.textContent = payload.number || payload.rawTitle || "";
-    billEl.hidden = !billEl.textContent;
-  }
-  if (summaryEl) {
-    summaryEl.textContent =
-      payload.summary ||
-      "No plain-English summary is available for this roll call yet.";
-  }
-  if (yeaEl) {
-    yeaEl.textContent = payload.yourStanceImpact || payload.yea || "—";
-  }
-  if (nayEl) {
-    nayEl.textContent = payload.repStanceImpact || payload.nay || "—";
-  }
-  const yeaLabelEl = document.getElementById("politician-match-detail-yea-label");
-  const nayLabelEl = document.getElementById("politician-match-detail-nay-label");
-  if (yeaLabelEl) {
-    yeaLabelEl.textContent = `Your Stance (${
-      payload.yourStanceLabel || "Support"
-    })`;
-  }
-  if (nayLabelEl) {
-    nayLabelEl.textContent = `Representative Stance (${
-      payload.repStanceLabel || "—"
-    })`;
-  }
-  if (stanceEl) {
-    const stance = payload.stance ? `You ${payload.stance}` : "";
-    const member = payload.memberVote ? `They voted ${payload.memberVote}` : "";
-    stanceEl.textContent = [stance, member].filter(Boolean).join(" · ");
-    stanceEl.hidden = !stanceEl.textContent;
-  }
-  if (linkEl) {
-    linkEl.href = payload.href || "bills-policies.html?tab=votes";
+  if (typeof fillBillBreakdownModal === "function") {
+    fillBillBreakdownModal(payload, { prefix: "politician-match-detail" });
   }
   modal.hidden = false;
   document.body.classList.add("scorecard-match-detail-open");
+  modal.querySelector(".scorecard-match-detail__close")?.focus();
 }
 
 function closePoliticianMatchDetail() {
@@ -920,17 +879,10 @@ function closePoliticianMatchDetail() {
 
 function bindPoliticianMatchListInteractions(root) {
   if (!root) return;
-  root.querySelectorAll("[data-toggle-match-means]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const item = button.closest(".scorecard-match-item");
-      const panel = item?.querySelector(".scorecard-match-item__means");
-      if (!panel) return;
-      const open = panel.hasAttribute("hidden");
-      if (open) panel.removeAttribute("hidden");
-      else panel.setAttribute("hidden", "");
-      button.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-  });
+  if (typeof bindActionMatchProgressiveDisclosure === "function") {
+    bindActionMatchProgressiveDisclosure(root, openPoliticianMatchDetail);
+    return;
+  }
   root.querySelectorAll("[data-open-match-detail]").forEach((button) => {
     button.addEventListener("click", () => {
       try {

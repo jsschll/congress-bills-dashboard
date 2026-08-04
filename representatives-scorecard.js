@@ -1690,59 +1690,8 @@
   function openMatchBillDetail(payload) {
     const modal = $("scorecard-match-detail-modal");
     if (!modal || !payload) return;
-    const titleEl = $("scorecard-match-detail-title");
-    const billEl = $("scorecard-match-detail-bill");
-    const summaryEl = $("scorecard-match-detail-summary");
-    const yeaEl = $("scorecard-match-detail-yea");
-    const nayEl = $("scorecard-match-detail-nay");
-    const linkEl = $("scorecard-match-detail-link");
-    const stanceEl = $("scorecard-match-detail-stance");
-
-    if (titleEl) titleEl.textContent = payload.title || "Roll-call detail";
-    if (billEl) {
-      billEl.textContent = payload.number || payload.rawTitle || "";
-      billEl.hidden = !billEl.textContent;
-    }
-    if (summaryEl) {
-      summaryEl.textContent =
-        payload.summary ||
-        "No plain-English summary is available for this roll call yet.";
-    }
-    if (yeaEl) {
-      yeaEl.textContent =
-        payload.yourStanceImpact ||
-        payload.yea ||
-        "—";
-    }
-    if (nayEl) {
-      nayEl.textContent =
-        payload.repStanceImpact ||
-        payload.nay ||
-        "—";
-    }
-    const yeaLabelEl = $("scorecard-match-detail-yea-label");
-    const nayLabelEl = $("scorecard-match-detail-nay-label");
-    if (yeaLabelEl) {
-      yeaLabelEl.textContent = `Your Stance (${
-        payload.yourStanceLabel || "Support"
-      })`;
-    }
-    if (nayLabelEl) {
-      nayLabelEl.textContent = `Representative Stance (${
-        payload.repStanceLabel || "—"
-      })`;
-    }
-    if (stanceEl) {
-      const stance = payload.stance ? `You ${payload.stance}` : "";
-      const member = payload.memberVote
-        ? `They voted ${payload.memberVote}`
-        : "";
-      stanceEl.textContent = [stance, member].filter(Boolean).join(" · ");
-      stanceEl.hidden = !stanceEl.textContent;
-    }
-    if (linkEl) {
-      linkEl.href = payload.href || "bills-policies.html?tab=votes";
-      linkEl.hidden = !linkEl.href;
+    if (typeof fillBillBreakdownModal === "function") {
+      fillBillBreakdownModal(payload, { prefix: "scorecard-match-detail" });
     }
     modal.hidden = false;
     document.body.classList.add("scorecard-match-detail-open");
@@ -1758,17 +1707,10 @@
 
   function bindMatchListInteractions(root) {
     if (!root) return;
-    root.querySelectorAll("[data-toggle-match-means]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const item = button.closest(".scorecard-match-item");
-        const panel = item?.querySelector(".scorecard-match-item__means");
-        if (!panel) return;
-        const open = panel.hasAttribute("hidden");
-        if (open) panel.removeAttribute("hidden");
-        else panel.setAttribute("hidden", "");
-        button.setAttribute("aria-expanded", open ? "true" : "false");
-      });
-    });
+    if (typeof bindActionMatchProgressiveDisclosure === "function") {
+      bindActionMatchProgressiveDisclosure(root, openMatchBillDetail);
+      return;
+    }
     root.querySelectorAll("[data-open-match-detail]").forEach((button) => {
       button.addEventListener("click", () => {
         try {
