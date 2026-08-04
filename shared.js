@@ -694,14 +694,20 @@ function humanizeActionMatchTitle(bill = {}, voteCopy = null) {
 
 /**
  * Resolve header/body copy for an Action Match agree/differ card.
+ * Prefer Claude fields on the enriched vote (`short_title`, `plain_summary`).
  */
 function resolveActionMatchCardCopy(row = {}) {
   const bill = row.bill || {};
-  const voteCopy = row.voteCopy || null;
+  const voteCopy = row.voteCopy || row.vote || null;
   const impact =
     row.impact || buildActionMatchImpact(bill, voteCopy, row);
+  // vote.short_title from processed_votes is the primary card heading.
   const claudeTitle = collapseMatchWs(
-    voteCopy?.short_title || voteCopy?.shortTitle || ""
+    voteCopy?.short_title ||
+      voteCopy?.shortTitle ||
+      row.short_title ||
+      row.shortTitle ||
+      ""
   );
   const impactTitle = collapseMatchWs(
     impact.short_title || row.displayTitle || ""
@@ -715,10 +721,13 @@ function resolveActionMatchCardCopy(row = {}) {
   const rawCode = collapseMatchWs(
     impact.raw_code || formatAmendmentCodePill(bill, voteCopy)
   );
+  // vote.plain_summary is the primary card-body explanation.
   const plainSummary =
     firstMatchSentence(
       voteCopy?.plain_summary ||
         voteCopy?.plainSummary ||
+        row.plain_summary ||
+        row.plainSummary ||
         impact.plain_summary ||
         impact.what_it_does ||
         row.detailSummary ||
