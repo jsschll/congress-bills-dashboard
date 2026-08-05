@@ -75,6 +75,14 @@ const SELECT_COLS = [
   "short_title",
   "plain_summary",
   "card_summary",
+  "takeaway",
+  "key_points",
+  "pro_argument",
+  "con_argument",
+  "yea_impact",
+  "nay_impact",
+  "primary_category",
+  "is_key_vote",
   "bill_number",
   "legislation_number",
   "bill_type",
@@ -101,28 +109,73 @@ function normalizeComparable(value) {
 }
 
 /**
- * True when the row still needs a Claude summary card.
+ * True when the row still needs a Claude quality refresh for Action Match.
+ * - summary IS NULL / empty / stub / UNKNOWN
+ * - summary === title
+ * - missing Action Match breakdown fields (short_title / takeaway / key_points)
+ * - oversized card text (>40 words) that likely dumped CRS into the UI
+ * - known jargon leftover in the card
  */
 function needsClaudeSummary(row = {}) {
   const summary = String(row.summary || "").trim();
+  const card = String(
+    row.card_summary || row.plain_summary || row.summary || ""
+  ).trim();
   const title = String(row.title || "").trim();
-  if (!summary) return true;
+  const shortTitle = String(row.short_title || "").trim();
+  const takeaway = String(row.takeaway || "").trim();
+  const pro = String(row.pro_argument || "").trim();
+  const keyPoints = row.key_points;
+
+  if (!summary && !card) return true;
+  if (/^<?\s*unknown\s*>?$/i.test(summary) || /^<?\s*unknown\s*>?$/i.test(card)) {
+    return true;
+  }
   if (title && summary === title) return true;
 
-  const summaryNorm = normalizeComparable(summary);
+  const summaryNorm = normalizeComparable(summary || card);
   const titleNorm = normalizeComparable(title);
   if (titleNorm && summaryNorm === titleNorm) return true;
 
-  if (/^this vote concerns\b/i.test(summary)) return true;
+  if (/^this vote concerns\b/i.test(summary) || /^this vote concerns\b/i.test(card)) {
+    return true;
+  }
   if (/^this is a recent (house |senate )?roll-?call vote\.?$/i.test(summary)) {
     return true;
   }
-  if (/^unknown\b/i.test(summary)) return true;
+  if (/^unknown\b/i.test(summary) || /^unknown\b/i.test(card)) return true;
 
   if (
     titleNorm &&
     summaryNorm.includes(titleNorm) &&
     summaryNorm.length <= titleNorm.length + 24
+  ) {
+    return true;
+  }
+
+  // Incomplete Action Match cards from older syncs.
+  if (!shortTitle || !takeaway || !pro) return true;
+
+  let points = [];
+  if (Array.isArray(keyPoints)) {
+    points = keyPoints;
+  } else if (typeof keyPoints === "string" && keyPoints.trim()) {
+    try {
+      const parsed = JSON.parse(keyPoints);
+      if (Array.isArray(parsed)) points = parsed;
+    } catch {
+      points = [];
+    }
+  }
+  if (points.filter((p) => String(p || "").trim()).length < 3) return true;
+
+  const words = card.split(/\s+/).filter(Boolean).length;
+  if (words > 40) return true;
+
+  if (
+    /\b(appropriations|reconciliation|pursuant to|title [ivx]+|weams|notwithstanding|provided that|procedural motion)\b/i.test(
+      card
+    )
   ) {
     return true;
   }
@@ -175,6 +228,8 @@ function buildUpdatePayload(card = {}) {
   if (card.primary_category) payload.primary_category = card.primary_category;
   if (typeof card.is_key_vote === "boolean") {
     payload.is_key_vote = card.is_key_vote;
+  } else if (card.is_key_vote != null) {
+    payload.is_key_vote = card.is_key_vote === true;
   }
 
   return payload;
@@ -333,6 +388,7 @@ async function main() {
               card.summary || card.plain_summary || ""
             ).slice(0, 100)}…`
           );
+          totalDone += 1;
         } else {
           const payload = buildUpdatePayload(card);
           const { error } = await supabase
@@ -345,13 +401,12 @@ async function main() {
           }
 
           console.log(`[${index}/${totalTarget}] Summarized ${label}…`);
+          totalDone += 1;
         }
-
-        totalDone += 1;
       } catch (error) {
         totalFailed += 1;
         console.warn(
-          `[${totalDone + 1}/${totalTarget}] FAILED ${label}:`,
+          `[${index}/${totalTarget}] FAILED ${label}:`,
           error.message || error
         );
       }
