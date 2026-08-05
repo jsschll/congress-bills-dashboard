@@ -53,6 +53,12 @@ alter table public.county_district_mapping enable row level security;
 alter table public.state_officials enable row level security;
 
 grant usage on schema public to anon, authenticated;
+revoke insert, update, delete, truncate
+  on table public.county_district_mapping
+  from anon, authenticated;
+revoke insert, update, delete, truncate
+  on table public.state_officials
+  from anon, authenticated;
 grant select on table public.county_district_mapping to anon, authenticated;
 grant select on table public.state_officials to anon, authenticated;
 
