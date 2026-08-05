@@ -111,12 +111,23 @@ function showAuthView(view) {
 }
 
 async function finishLogin(user) {
-  const follows = await countFollows(user.id);
   const next = getNextPath();
   if (next) {
     window.location.href = next;
     return;
   }
+  try {
+    if (
+      typeof shouldOfferVoterPulse === "function" &&
+      (await shouldOfferVoterPulse(user))
+    ) {
+      window.location.href = "onboarding.html";
+      return;
+    }
+  } catch (error) {
+    console.warn(error);
+  }
+  const follows = await countFollows(user.id);
   window.location.href =
     follows === 0 ? "topics.html" : "bills-policies.html?tab=mine";
 }

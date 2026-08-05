@@ -1621,7 +1621,7 @@
         </p>
         <p class="politician-quick-match">
           <button type="button" class="refresh-btn" data-open-match-quiz="1">🎯 Match My Votes</button>
-          <a class="scorecard-match__quiz-link" href="bills-policies.html?tab=votes&amp;quiz=1">Or take the full 2-minute quiz</a>
+          <a class="scorecard-match__quiz-link" href="onboarding.html">Or take Voter Pulse</a>
         </p>`;
       return summary;
     }
@@ -1667,7 +1667,7 @@
         </p>
         <p class="politician-quick-match">
           <button type="button" class="refresh-btn" data-open-match-quiz="1">🎯 Match My Votes</button>
-          <a class="scorecard-match__quiz-link" href="bills-policies.html?tab=votes&amp;quiz=1">Or take the full 2-minute quiz</a>
+          <a class="scorecard-match__quiz-link" href="onboarding.html">Or take Voter Pulse</a>
         </p>`;
       return summary;
     }
@@ -2798,6 +2798,62 @@
       lastEnrich: null,
     };
 
+    async function maybeShowVoterPulseBanner() {
+      const banner = $("voter-pulse-banner");
+      if (!banner) return;
+      banner.addEventListener("click", (event) => {
+        if (!event.target.closest("[data-dismiss-voter-pulse]")) return;
+        event.preventDefault();
+        if (typeof dismissVoterPulseBanner === "function") {
+          dismissVoterPulseBanner();
+        }
+        banner.hidden = true;
+      });
+
+      try {
+        const params = new URLSearchParams(global.location.search);
+        if (params.get("pulse") === "1") {
+          banner.hidden = true;
+          return;
+        }
+        if (
+          typeof isVoterPulseBannerDismissed === "function" &&
+          isVoterPulseBannerDismissed()
+        ) {
+          banner.hidden = true;
+          return;
+        }
+        const user =
+          typeof getUser === "function" ? await getUser() : null;
+        if (!user) {
+          banner.hidden = true;
+          return;
+        }
+        const offer =
+          typeof shouldOfferVoterPulse === "function"
+            ? await shouldOfferVoterPulse(user)
+            : false;
+        banner.hidden = !offer;
+      } catch (error) {
+        console.warn(error);
+        banner.hidden = true;
+      }
+    }
+
+    function maybeFocusPulseArrival() {
+      const params = new URLSearchParams(global.location.search);
+      if (params.get("pulse") !== "1") return;
+      global.setTimeout(() => {
+        focusActionMatchSection();
+        // Clean the query so refresh does not re-animate.
+        const url = new URL(global.location.href);
+        url.searchParams.delete("pulse");
+        global.history.replaceState({}, "", url.toString());
+      }, 450);
+    }
+
+    maybeShowVoterPulseBanner();
+
     async function refreshActionMatchScore() {
       const reps = state.data?.representatives || [];
       const active =
@@ -3065,6 +3121,7 @@
 
         setStatus("", "loading");
         await paint();
+        maybeFocusPulseArrival();
         mountOfficialsDirectory(
           directoryQuery ||
             payload.location?.formattedAddress ||

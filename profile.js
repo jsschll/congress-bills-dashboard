@@ -534,7 +534,7 @@ function renderAlignmentChart(payload) {
     politicians.length > 0 || levels.some((row) => row.compared > 0);
   if (!hasData) {
     alignmentChart.innerHTML =
-      "<p class=\"profile-follow-list__empty\">Support or oppose federal bills on Feed/Search to build your match scores against House roll calls. Local and state match will expand as those roll calls are added.</p>";
+      "<p class=\"profile-follow-list__empty\">Take <a href=\"onboarding.html\">Voter Pulse</a> or Support/Oppose federal bills on Feed to build your match scores against House roll calls.</p>";
     if (alignmentSummary) alignmentSummary.textContent = "No roll-call matches yet";
     return;
   }
@@ -597,6 +597,16 @@ function renderAlignmentChart(payload) {
 async function loadAlignmentBreakdown() {
   const client = getSupabase();
   if (!client || !currentUser) return;
+  const cta = document.getElementById("profile-voter-pulse-cta");
+  try {
+    if (typeof countUserBillStances === "function" && cta) {
+      const count = await countUserBillStances(currentUser.id);
+      cta.textContent =
+        count > 0 ? "Update Voter Pulse stances" : "Take Voter Pulse";
+    }
+  } catch (error) {
+    console.warn(error);
+  }
   const { data, error } = await client.rpc("get_user_rep_match_scores");
   if (error) {
     console.warn(error);
@@ -1940,6 +1950,10 @@ registrationForm?.addEventListener("submit", async (event) => {
     setProfileStatus("", "success");
     if (window.location.hash === "#account" || window.location.hash === "#settings") {
       document.getElementById("account")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (window.location.hash === "#alignment") {
+      const panel = document.querySelector('[data-accordion-key="alignment"]');
+      panel?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     if (window.location.hash === "#pocketbook") {
       const panel = document.querySelector('[data-accordion-key="pocketbook"]');
