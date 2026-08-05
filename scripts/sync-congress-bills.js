@@ -1,23 +1,22 @@
 #!/usr/bin/env node
 /**
- * Sync recent House + Senate roll-call votes into Supabase `processed_votes`
- * with Claude Haiku plain-English fields:
- *   short_title, plain_summary, yea_impact, nay_impact
+ * Congress.gov bill ingest → Supabase `processed_votes` (vote_kind: "bill").
  *
  * Usage:
- *   node scripts/sync-all-bills.js
- *   node scripts/sync-all-bills.js --limit=50
- *   node scripts/sync-all-bills.js --limit=20 --chamber=senate
- *   node scripts/sync-all-bills.js --force
- *
- * Loads keys from .env.local / .env, then process.env.
- * --force re-formats rows even if they already exist in processed_votes.
- *
- * This is the bulk runner companion to lib/sync-votes.js
- * (scripts/run-sync-votes.js is the lighter one-shot variant).
- *
- * For Congress.gov *bill* ingest (not roll calls), use:
+ *   node scripts/sync-congress-bills.js
  *   node scripts/sync-congress-bills.js --max=50
+ *   node scripts/sync-congress-bills.js --congress=119 --offset=0
+ *   node scripts/sync-congress-bills.js --max=20 --force
+ *   node scripts/sync-congress-bills.js --delay-ms=1000
+ *
+ * Prefer CRS text when useful; otherwise Claude. Skips bills that already
+ * have a real summary unless --force.
+ *
+ * Vote roll-call sync remains:
+ *   node scripts/sync-all-bills.js
+ *   node scripts/run-sync-votes.js
+ *
+ * Loads keys from .env.local / .env.
  */
 const fs = require("fs");
 const path = require("path");
@@ -70,38 +69,40 @@ async function main() {
   if (missing.length) {
     console.error("Missing required secrets in .env.local:");
     for (const key of missing) console.error(`  - ${key}`);
-    console.error(
-      "\nAdd them to .env.local, then re-run: node scripts/sync-all-bills.js"
-    );
+    console.error("\nRe-run: node scripts/sync-congress-bills.js");
     process.exit(1);
   }
 
-  const { syncVotes } = require("../lib/sync-votes");
-  const limit = Number(getArg("limit", 100));
-  const congress = Number(getArg("congress", 119));
-  const chamber = String(getArg("chamber", "both")).toLowerCase();
+  const { syncAllBills, DEFAULT_CONGRESS } = require("../lib/sync-bills");
+  const congress =
+    Number(getArg("congress", DEFAULT_CONGRESS)) || DEFAULT_CONGRESS;
+  const offset = Math.max(0, Number(getArg("offset", 0)) || 0);
+  const delayMs = Math.max(0, Number(getArg("delay-ms", 1000)) || 0);
   const force =
     args.includes("--force") ||
     String(getArg("force", "0")).toLowerCase() === "1" ||
-    String(getArg("force", "0")).toLowerCase() === "true" ||
-    String(getArg("skipExisting", "1")).toLowerCase() === "0" ||
-    String(getArg("skipExisting", "1")).toLowerCase() === "false";
+    String(getArg("force", "0")).toLowerCase() === "true";
+  const maxRaw = getArg("max", "");
+  const max =
+    maxRaw === "" || maxRaw == null
+      ? undefined
+      : Math.max(1, Number(maxRaw) || 1);
 
   console.log(
-    `Syncing up to ${limit} ${chamber} roll-call vote(s) (congress ${congress}${
-      force ? ", force re-format" : ""
-    })…`
-  );
-  console.log(
-    "Claude fields persisted: short_title, plain_summary, yea_impact, nay_impact"
+    `Syncing Congress ${congress} bills → processed_votes (delay=${delayMs}ms${
+      max ? `, max=${max}` : ""
+    }${force ? ", force" : ""})…`
   );
 
-  const result = await syncVotes({
-    limit,
+  const result = await syncAllBills({
     congress,
-    chamber,
-    skipExisting: !force,
+    max,
+    offset,
+    delayMs,
+    force,
+    log: true,
   });
+
   console.log(JSON.stringify(result, null, 2));
 }
 

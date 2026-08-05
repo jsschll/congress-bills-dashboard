@@ -3,13 +3,16 @@
  * Public URLs are preserved via vercel.json rewrites:
  *   /api/watch-bills            → ?route=watch-bills
  *   /api/deliver-notifications  → ?route=deliver-notifications
+ *   /api/cron-sync-bills        → ?route=sync-bills
  */
 const watchBills = require("../lib/api-handlers/watch-bills");
 const deliverNotifications = require("../lib/api-handlers/deliver-notifications");
+const syncBills = require("../lib/api-handlers/sync-bills");
 
 const ROUTES = {
   "watch-bills": watchBills,
   "deliver-notifications": deliverNotifications,
+  "sync-bills": syncBills,
 };
 
 function resolveRoute(req) {
