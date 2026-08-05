@@ -12,7 +12,9 @@
 --      OR (level = 'County/Magistrate' AND county_name matches)
 --
 -- Run in Supabase SQL editor if these tables are not created yet.
--- If tables already exist with data, skip CREATE and only run grants/policies.
+-- If tables already exist with data, skip CREATE and still run ENABLE RLS /
+-- grants/policies below (or run migration-fix-rls-state-tables.sql).
+-- Skipping RLS left these tables publicly writable (Supabase rls_disabled_in_public).
 
 create table if not exists public.county_district_mapping (
   id uuid primary key default gen_random_uuid(),
