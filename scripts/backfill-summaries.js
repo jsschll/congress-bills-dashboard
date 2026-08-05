@@ -145,16 +145,28 @@ function needsClaudeSummary(row = {}) {
   }
   if (/^unknown\b/i.test(summary) || /^unknown\b/i.test(card)) return true;
 
+  // Summary is basically just the title with trivial wrapping
+  // (e.g. "Title." or "On Title") — not "This vote is about Title…".
   if (
     titleNorm &&
-    summaryNorm.includes(titleNorm) &&
-    summaryNorm.length <= titleNorm.length + 24
+    summaryNorm === titleNorm
+  ) {
+    return true;
+  }
+  if (
+    titleNorm &&
+    (summaryNorm === `on ${titleNorm}` ||
+      summaryNorm === `about ${titleNorm}` ||
+      summaryNorm.startsWith(`${titleNorm} `)) &&
+    summaryNorm.length <= titleNorm.length + 16
   ) {
     return true;
   }
 
   // Incomplete Action Match cards from older syncs.
-  if (!shortTitle || !takeaway || !pro) return true;
+  if (!shortTitle || isUnknownClaudeValue(shortTitle)) return true;
+  if (!takeaway || isUnknownClaudeValue(takeaway)) return true;
+  if (!pro || isUnknownClaudeValue(pro)) return true;
 
   let points = [];
   if (Array.isArray(keyPoints)) {
@@ -167,7 +179,10 @@ function needsClaudeSummary(row = {}) {
       points = [];
     }
   }
-  if (points.filter((p) => String(p || "").trim()).length < 3) return true;
+  const cleanPoints = points
+    .map((p) => String(p || "").trim())
+    .filter((p) => p && !isUnknownClaudeValue(p));
+  if (cleanPoints.length < 3) return true;
 
   const words = card.split(/\s+/).filter(Boolean).length;
   if (words > 40) return true;
@@ -180,7 +195,26 @@ function needsClaudeSummary(row = {}) {
     return true;
   }
 
+  // Orphan roll calls with no bill metadata can't be improved further once
+  // they already have a short non-stub card — avoid infinite re-queues.
+  const hasBill =
+    String(row.bill_type || "").trim() &&
+    String(row.legislation_number || row.bill_number || "").trim();
+  if (
+    !hasBill &&
+    shortTitle &&
+    !isUnknownClaudeValue(takeaway) &&
+    cleanPoints.length >= 3 &&
+    words <= 40
+  ) {
+    return false;
+  }
+
   return false;
+}
+
+function isUnknownClaudeValue(value = "") {
+  return /^<?\s*unknown\s*>?$/i.test(String(value || "").replace(/\s+/g, " ").trim());
 }
 
 function matchesKind(row = {}) {
@@ -200,32 +234,52 @@ function labelForRow(row = {}) {
   );
 }
 
+function scrubUnknown(value) {
+  const text = String(value || "").trim();
+  if (!text || isUnknownClaudeValue(text)) return "";
+  return text;
+}
+
 function buildUpdatePayload(card = {}) {
   const plain =
-    card.plain_summary || card.card_summary || card.summary || null;
+    scrubUnknown(card.plain_summary) ||
+    scrubUnknown(card.card_summary) ||
+    scrubUnknown(card.summary) ||
+    null;
   const payload = {
-    summary: card.summary || plain,
-    yea_means: card.yea_means || null,
-    nay_means: card.nay_means || null,
-    yea_label: card.yea_label || null,
-    nay_label: card.nay_label || null,
+    summary: scrubUnknown(card.summary) || plain,
+    yea_means: scrubUnknown(card.yea_means) || null,
+    nay_means: scrubUnknown(card.nay_means) || null,
+    yea_label: scrubUnknown(card.yea_label) || null,
+    nay_label: scrubUnknown(card.nay_label) || null,
     summary_source: "llm",
     updated_at: new Date().toISOString(),
   };
 
-  if (card.short_title) payload.short_title = card.short_title;
+  const shortTitle = scrubUnknown(card.short_title);
+  if (shortTitle) payload.short_title = shortTitle;
   if (plain) {
     payload.plain_summary = plain;
-    payload.card_summary = card.card_summary || plain;
-    payload.what_it_does = card.what_it_does || plain;
+    payload.card_summary = scrubUnknown(card.card_summary) || plain;
+    payload.what_it_does = scrubUnknown(card.what_it_does) || plain;
   }
-  if (card.yea_impact) payload.yea_impact = card.yea_impact;
-  if (card.nay_impact) payload.nay_impact = card.nay_impact;
-  if (card.takeaway) payload.takeaway = card.takeaway;
-  if (card.pro_argument) payload.pro_argument = card.pro_argument;
-  if (card.con_argument) payload.con_argument = card.con_argument;
-  if (card.key_points) payload.key_points = card.key_points;
-  if (card.primary_category) payload.primary_category = card.primary_category;
+  if (scrubUnknown(card.yea_impact)) payload.yea_impact = scrubUnknown(card.yea_impact);
+  if (scrubUnknown(card.nay_impact)) payload.nay_impact = scrubUnknown(card.nay_impact);
+  const takeaway = scrubUnknown(card.takeaway) || shortTitle;
+  if (takeaway) payload.takeaway = takeaway;
+  if (scrubUnknown(card.pro_argument)) payload.pro_argument = scrubUnknown(card.pro_argument);
+  if (scrubUnknown(card.con_argument)) payload.con_argument = scrubUnknown(card.con_argument);
+  if (Array.isArray(card.key_points)) {
+    const points = card.key_points
+      .map((p) => scrubUnknown(p))
+      .filter(Boolean);
+    if (points.length) payload.key_points = points;
+  } else if (card.key_points) {
+    payload.key_points = card.key_points;
+  }
+  if (scrubUnknown(card.primary_category)) {
+    payload.primary_category = scrubUnknown(card.primary_category);
+  }
   if (typeof card.is_key_vote === "boolean") {
     payload.is_key_vote = card.is_key_vote;
   } else if (card.is_key_vote != null) {
