@@ -5159,9 +5159,10 @@ a.politician-badge--match {
 .politician-match-categories__label {
   grid-area: label;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
   font-size: 0.82rem;
   font-weight: 650;
   color: #e2e8f0;
@@ -5169,10 +5170,12 @@ a.politician-badge--match {
 
 .politician-match-categories__pct {
   grid-area: pct;
+  align-self: start;
   font-size: 0.8rem;
   font-weight: 750;
   color: #cbd5e1;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .politician-match-categories__track {
@@ -5315,8 +5318,8 @@ a.politician-badge--match {
 .scorecard-match-item__category {
   display: inline-flex;
   align-items: center;
-  max-width: min(100%, 11rem);
   width: fit-content;
+  max-width: 100%;
   border-radius: 0.35rem;
   padding: 0.12rem 0.45rem;
   background: rgba(51, 65, 85, 0.55);
@@ -5326,23 +5329,19 @@ a.politician-badge--match {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .scorecard-topic-filters {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 0.45rem;
-  overflow-x: auto;
-  overflow-y: hidden;
   max-width: 100%;
   min-width: 0;
-  padding: 0.15rem 0.1rem 0.35rem;
+  padding: 0.15rem 0;
   margin: 0.35rem 0 0.55rem;
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
 }
 
 .scorecard-topic-filters::-webkit-scrollbar {
@@ -5350,7 +5349,7 @@ a.politician-badge--match {
 }
 
 .scorecard-topic-chip {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   background: rgba(30, 41, 59, 0.85);
@@ -5360,7 +5359,9 @@ a.politician-badge--match {
   font-weight: 700;
   padding: 0.38rem 0.8rem;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .scorecard-topic-chip:hover,
@@ -5391,10 +5392,8 @@ a.politician-badge--match {
   padding: 0.08rem 0.42rem;
   font-size: 0.68rem;
   font-weight: 750;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .scorecard-stance-pill--yea {
@@ -5554,9 +5553,9 @@ a.politician-badge--match {
   display: block;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: #e8eef7;
   font-size: 0.98rem;
   font-weight: 750;
@@ -7552,7 +7551,7 @@ body.politician-notes-modal-open {
   margin-bottom: 1rem;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .scorecard-match__header h2 {
