@@ -2055,9 +2055,9 @@
   }
 
   function quizBillItemFromVote(vote, profile) {
-    const billId = String(vote.billId || "").trim();
+    const billId = engagementBillIdFromVote(vote);
     if (!billId) return null;
-    const meta = parseRollMetaFromBillId(billId);
+    const meta = parseRollMetaFromBillId(String(vote.billId || vote.id || ""));
     const billNumber =
       normalizeBillNumber(vote.billNumber) || vote.billNumber || "Roll call";
     const parts = parseBillNumberPartsLocal(billNumber);
@@ -2079,6 +2079,7 @@
       shortPitch: buildPlainEnglishSummary(vote) || vote.plainEnglishSummary || "",
       category: vote.category || null,
       votePosition: vote.votePosition,
+      voteCast: vote.votePosition || vote.voteCast || null,
       officialUrl: null,
       tags: vote.category ? [vote.category] : [],
       congress,
@@ -2087,6 +2088,20 @@
       legislationType,
       legislationNumber,
     };
+  }
+
+  /** Prefer legislation-style federal ids so stance/follow sync with Bill Details. */
+  function engagementBillIdFromVote(vote = {}) {
+    const raw = String(vote.billId || vote.id || "").trim();
+    if (/^federal-(?:bill-)?\d{2,3}-[a-z]+-\d+/i.test(raw)) {
+      return raw.toLowerCase().replace(/^federal-bill-/, "federal-");
+    }
+    const key = legislationKeyFromVote(vote);
+    if (key) {
+      const [congress, type, number] = key.split(":");
+      return `federal-${congress}-${type}-${number}`;
+    }
+    return raw;
   }
 
   async function upsertQuizBillItem(client, item) {
@@ -2662,13 +2677,7 @@
                             )}</p>`
                         : ""
                     }
-                    <div class="scorecard-vote__actions">
-                      <button
-                        type="button"
-                        class="refresh-btn policy-engage__ask-ai scorecard-vote__ask-ai"
-                        data-ask-ai-vote-index="${idx}"
-                      >Ask AI</button>
-                    </div>
+                    <div class="scorecard-vote__actions" data-vote-engage="${idx}"></div>
                   </li>`;
                 })
                 .join("")}
@@ -2686,27 +2695,18 @@
     `;
 
     el._scorecardVoteRows = filtered;
+    el._scorecardVoteOptions = {
+      politicianName,
+      bioguideId: String(
+        options.bioguideId || el.dataset.bioguideId || ""
+      ).toUpperCase(),
+      onStanceChange: options.onStanceChange || el._scorecardVoteOptions?.onStanceChange || null,
+    };
+    if (el._scorecardVoteOptions.bioguideId) {
+      el.dataset.bioguideId = el._scorecardVoteOptions.bioguideId;
+    }
 
-    el.querySelectorAll("[data-ask-ai-vote-index]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const index = Number(button.getAttribute("data-ask-ai-vote-index"));
-        const vote = el._scorecardVoteRows?.[index];
-        if (!vote) return;
-        if (typeof openVoteAskAiDrawer === "function") {
-          openVoteAskAiDrawer(vote, politicianName);
-        } else if (typeof openAskAiDrawer === "function") {
-          openAskAiDrawer({
-            context: {
-              type: "vote",
-              politicianName,
-              ...vote,
-            },
-          });
-        } else {
-          alert("Ask AI is not available on this page yet.");
-        }
-      });
-    });
+    mountScorecardVoteEngagement(el, filtered, el._scorecardVoteOptions);
 
     const scopeSelect = $("scorecard-vote-scope");
     if (scopeSelect) {
@@ -2714,6 +2714,8 @@
         renderVotes(el, sourceVotes, query, {
           scope: scopeSelect.value,
           politicianName,
+          bioguideId: el._scorecardVoteOptions?.bioguideId,
+          onStanceChange: el._scorecardVoteOptions?.onStanceChange,
         });
       });
     }
@@ -2733,9 +2735,70 @@
         renderVotes(el, next, query, {
           scope: el.dataset.voteScope || "key",
           politicianName,
+          bioguideId: el._scorecardVoteOptions?.bioguideId,
+          onStanceChange: el._scorecardVoteOptions?.onStanceChange,
         });
       });
     }
+  }
+
+  function mountScorecardVoteEngagement(el, votes, options = {}) {
+    if (!el || !window.PolicyEngagement?.mount) return;
+    const politicianName = String(options.politicianName || "").trim();
+    const bioguideId = String(options.bioguideId || "").toUpperCase();
+    const profile = {
+      chamber: /senate/i.test(
+        state?.data?.representatives?.find(
+          (rep) => rep?.profile?.id === state.activeId
+        )?.profile?.chamber || ""
+      )
+        ? "Senate"
+        : "House",
+      bioguideId,
+    };
+
+    el.querySelectorAll("[data-vote-engage]").forEach((container) => {
+      const index = Number(container.getAttribute("data-vote-engage"));
+      const vote = votes?.[index];
+      if (!vote) return;
+      const item = quizBillItemFromVote(vote, profile);
+      if (!item?.id) return;
+
+      window.PolicyEngagement.mount(container, item, {
+        compact: true,
+        supportLabel: "Support",
+        opposeLabel: "Oppose",
+        prompt: "",
+        showFollow: true,
+        showAskAi: true,
+        showTakeAction: false,
+        showCommunity: false,
+        showWhoVoted: false,
+        showAlignment: false,
+        compareBioguides: bioguideId ? [bioguideId] : [],
+        voteCast: vote.votePosition || vote.voteCast || null,
+        onAskAi: () => {
+          if (typeof openVoteAskAiDrawer === "function") {
+            openVoteAskAiDrawer(vote, politicianName);
+          } else if (typeof openAskAiDrawer === "function") {
+            openAskAiDrawer({
+              context: {
+                type: "vote",
+                politicianName,
+                ...vote,
+              },
+            });
+          } else {
+            alert("Ask AI is not available on this page yet.");
+          }
+        },
+        onStanceChange: async (payload) => {
+          if (typeof options.onStanceChange === "function") {
+            await options.onStanceChange(payload);
+          }
+        },
+      });
+    });
   }
 
   function renderTabs(tabsEl, representatives, activeId, onSelect) {
@@ -3021,6 +3084,8 @@
       } else {
         renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
           politicianName: active.profile?.name || "",
+          bioguideId: active.profile?.bioguideId || "",
+          onStanceChange: refreshActionMatchScore,
         });
       }
       renderMatch(
@@ -3039,6 +3104,8 @@
         active.recentVotes = liveVotes;
         renderVotes($("scorecard-votes"), liveVotes, state.voteQuery, {
           politicianName: active.profile?.name || "",
+          bioguideId: active.profile?.bioguideId || "",
+          onStanceChange: refreshActionMatchScore,
         });
       }
 
@@ -3089,6 +3156,8 @@
         if (active) {
           renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
             politicianName: active.profile?.name || "",
+            bioguideId: active.profile?.bioguideId || "",
+            onStanceChange: refreshActionMatchScore,
           });
         }
       });
@@ -3101,6 +3170,11 @@
 
       try {
         await ensureFollowState();
+        if (window.PolicyEngagement?.init) {
+          await window.PolicyEngagement.init().catch((error) =>
+            console.warn(error)
+          );
+        }
 
         let payload = null;
         const zipCode = query.zipCode || session?.query?.zipCode || null;

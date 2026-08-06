@@ -13,6 +13,7 @@
     ready: false,
     userId: null,
     stances: new Map(),
+    followedBills: new Set(),
     alignment: null,
     matchScores: null,
     geo: null,
@@ -193,6 +194,119 @@
     state.stances = new Map(
       (data || []).map((row) => [row.bill_id, row.stance])
     );
+  }
+
+  async function loadFollowedBills(client, user) {
+    const { data, error } = await client
+      .from("followed_bills")
+      .select("bill_id")
+      .eq("user_id", user.id);
+    if (error) {
+      console.warn(error);
+      state.followedBills = new Set();
+      return;
+    }
+    state.followedBills = new Set(
+      (data || []).map((row) => String(row.bill_id || "")).filter(Boolean)
+    );
+  }
+
+  function isFollowingBill(billId) {
+    return state.followedBills.has(String(billId || ""));
+  }
+
+  function legislationKeyFromBillId(billId = "", item = null) {
+    const id = String(billId || "").toLowerCase();
+    const fromId = id.match(/federal-(?:bill-)?(\d{2,3})-([a-z]+)-(\d+)/);
+    if (fromId) return `${fromId[1]}:${fromId[2]}:${fromId[3]}`;
+    if (item?.legislationType && item?.legislationNumber) {
+      const c = Number(item.congress || 0);
+      const t = String(item.legislationType || "")
+        .toLowerCase()
+        .replace(/\./g, "")
+        .trim();
+      const n = String(item.legislationNumber || "").replace(/\D/g, "");
+      if (c && t && n) return `${c}:${t}:${n}`;
+    }
+    return "";
+  }
+
+  /** Exact bill_id first, then same legislation under another id (roll call vs federal). */
+  function getStanceForItem(item) {
+    const id = String(item?.id || "");
+    if (id && state.stances.has(id)) return state.stances.get(id);
+    const key = legislationKeyFromBillId(id, item);
+    if (!key) return null;
+    for (const [billId, stance] of state.stances.entries()) {
+      if (legislationKeyFromBillId(billId) === key) return stance;
+    }
+    return null;
+  }
+
+  function isFollowingItem(item) {
+    const id = String(item?.id || "");
+    if (id && state.followedBills.has(id)) return true;
+    const key = legislationKeyFromBillId(id, item);
+    if (!key) return false;
+    for (const billId of state.followedBills) {
+      if (legislationKeyFromBillId(billId) === key) return true;
+    }
+    return false;
+  }
+
+  async function toggleFollowBill(item) {
+    const client = getSupabase();
+    const user = await getUser();
+    if (!client || !user) {
+      redirectToAuth();
+      return { following: false, changed: false };
+    }
+    if (!item?.id) return { following: false, changed: false };
+
+    const billId = String(item.id);
+    let existingId = state.followedBills.has(billId) ? billId : null;
+    if (!existingId) {
+      const key = legislationKeyFromBillId(billId, item);
+      if (key) {
+        for (const id of state.followedBills) {
+          if (legislationKeyFromBillId(id) === key) {
+            existingId = id;
+            break;
+          }
+        }
+      }
+    }
+
+    if (existingId) {
+      const { error } = await client
+        .from("followed_bills")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("bill_id", existingId);
+      if (error) throw error;
+      state.followedBills.delete(existingId);
+      return { following: false, changed: true };
+    }
+
+    await upsertBillItem(client, item);
+    const { error } = await client.from("followed_bills").insert({
+      user_id: user.id,
+      bill_id: billId,
+    });
+    if (error) throw error;
+    state.followedBills.add(billId);
+    return { following: true, changed: true };
+  }
+
+  function syncFollowButton(button, billIdOrItem) {
+    if (!button) return;
+    const following =
+      typeof billIdOrItem === "object" && billIdOrItem
+        ? isFollowingItem(billIdOrItem)
+        : isFollowingBill(billIdOrItem);
+    button.textContent = following ? "Following" : "Follow bill";
+    button.classList.toggle("is-following", following);
+    button.setAttribute("aria-pressed", String(following));
   }
 
   async function loadAlignment(client) {
@@ -466,6 +580,7 @@
       state.homeAddress = await loadHomeAddress(client, user);
       await Promise.all([
         loadUserStances(client, user),
+        loadFollowedBills(client, user),
         loadAlignment(client),
         loadMatchScores(client),
         refreshGeoAndReps(),
@@ -911,16 +1026,25 @@ Sincerely,
     const prompt = options.prompt || "";
     const showTakeAction = options.showTakeAction !== false;
     const showAskAi = options.showAskAi !== false;
+    const showFollow = Boolean(options.showFollow);
     const showCommunity = options.showCommunity !== false;
+    const showWhoVoted = options.showWhoVoted !== false;
+    const showAlignment = options.showAlignment !== false;
+    const compact = Boolean(options.compact);
     const whoVotedHint =
       options.whoVotedHint ||
       "Tap Support or Oppose to compare with House roll call votes.";
     if (Array.isArray(options.compareBioguides) && options.compareBioguides.length) {
       item.compareBioguides = options.compareBioguides;
     }
+    if (options.voteCast || options.memberVote) {
+      item.voteCast = options.voteCast || options.memberVote;
+    }
 
     const wrap = document.createElement("section");
-    wrap.className = "policy-engage";
+    wrap.className = compact
+      ? "policy-engage policy-engage--compact"
+      : "policy-engage";
     wrap.innerHTML = `
       ${
         prompt
@@ -938,6 +1062,11 @@ Sincerely,
         </div>
         <div class="policy-engage__logged-panel" hidden></div>
         ${
+          showFollow
+            ? `<button type="button" class="refresh-btn policy-engage__follow" aria-pressed="false">Follow bill</button>`
+            : ""
+        }
+        ${
           showAskAi
             ? `<button type="button" class="refresh-btn policy-engage__ask-ai">Ask AI</button>`
             : ""
@@ -947,14 +1076,23 @@ Sincerely,
             ? `<button type="button" class="refresh-btn policy-engage__take-action">Take Action</button>`
             : ""
         }
-        ${alignmentChipHtml() || '<span class="policy-engage__alignment is-empty" hidden></span>'}
+        ${
+          showAlignment
+            ? alignmentChipHtml() ||
+              '<span class="policy-engage__alignment is-empty" hidden></span>'
+            : ""
+        }
       </div>
-      <details class="policy-engage__votes" open>
+      ${
+        showWhoVoted
+          ? `<details class="policy-engage__votes" open>
         <summary>Who Voted With Me?</summary>
         <div class="policy-engage__vote-body">
           <p class="policy-engage__vote-empty">${escapeHtml(whoVotedHint)}</p>
         </div>
-      </details>
+      </details>`
+          : ""
+      }
       ${
         showCommunity
           ? `<details class="policy-engage__community">
@@ -970,6 +1108,7 @@ Sincerely,
     // Keep engagement actions at the bottom of the card.
     card.append(wrap);
 
+    const followBtn = wrap.querySelector(".policy-engage__follow");
     const roots = {
       root: wrap,
       supportBtn: wrap.querySelector('[data-stance="support"]'),
@@ -979,14 +1118,17 @@ Sincerely,
       communityBody: wrap.querySelector(".policy-engage__community-body"),
       voteBody: wrap.querySelector(".policy-engage__vote-body"),
       alignmentEl: wrap.querySelector(".policy-engage__alignment"),
+      followBtn,
       onStanceChange: options.onStanceChange || null,
+      onFollowChange: options.onFollowChange || null,
       supportLabel,
       opposeLabel,
       changeMode: false,
     };
 
-    const mine = state.stances.get(item.id);
+    const mine = getStanceForItem(item);
     applyLoggedStanceUI(roots, mine);
+    if (followBtn) syncFollowButton(followBtn, item);
 
     roots.supportBtn.addEventListener("click", async () => {
       try {
@@ -1014,9 +1156,31 @@ Sincerely,
         roots.opposeBtn.disabled = false;
       }
     });
+    followBtn?.addEventListener("click", async () => {
+      try {
+        followBtn.disabled = true;
+        const result = await toggleFollowBill(item);
+        syncFollowButton(followBtn, item);
+        if (typeof roots.onFollowChange === "function") {
+          await roots.onFollowChange({
+            item,
+            following: Boolean(result?.following),
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        alert(error.message || "Could not update follow.");
+      } finally {
+        followBtn.disabled = false;
+      }
+    });
     wrap
       .querySelector(".policy-engage__ask-ai")
       ?.addEventListener("click", () => {
+        if (typeof options.onAskAi === "function") {
+          options.onAskAi(item);
+          return;
+        }
         if (typeof openBillAskAiModal === "function") {
           openBillAskAiModal(item);
           return;
@@ -1043,7 +1207,7 @@ Sincerely,
       }
     });
 
-    if (mine) {
+    if (mine && showWhoVoted) {
       // Repair older null matches (e.g. senator compared via House API) and
       // refresh Who Voted / Action Match without requiring another click.
       (async () => {
@@ -1068,6 +1232,21 @@ Sincerely,
           console.warn(error);
         }
       })();
+    } else if (mine && typeof roots.onStanceChange === "function" && !showWhoVoted) {
+      // Compact cards still persist Action Match when a stance already exists.
+      (async () => {
+        try {
+          const client = getSupabase();
+          const user = await getUser();
+          if (!client || !user) return;
+          const payload = await fetchVoteMatch(item, mine);
+          if (payload?.hasRollCall) {
+            await persistVoteMatches(client, user, item, mine, payload);
+          }
+        } catch (error) {
+          console.warn(error);
+        }
+      })();
     }
   }
 
@@ -1086,6 +1265,7 @@ Sincerely,
       prompt: "How would you vote?",
       showTakeAction: false,
       showCommunity: false,
+      showFollow: true,
       whoVotedHint:
         chamber === "senate"
           ? "Tap Yea or Nay to compare with Senate roll-call votes."
@@ -1127,6 +1307,23 @@ Sincerely,
       if (typeof openBillAskAiModal === "function") openBillAskAiModal(item);
     },
     getState: () => state,
+    getStance: (billId) =>
+      getStanceForItem({ id: billId }) ||
+      state.stances.get(String(billId || "")) ||
+      null,
+    isFollowingBill,
+    isFollowingItem,
+    toggleFollowBill,
+    loadFollowedBills: async () => {
+      const client = typeof getSupabase === "function" ? getSupabase() : null;
+      const user = typeof getUser === "function" ? await getUser() : null;
+      if (!client || !user) {
+        state.followedBills = new Set();
+        return state.followedBills;
+      }
+      await loadFollowedBills(client, user);
+      return state.followedBills;
+    },
     getMatchScoreForBioguide(bioguideId) {
       const id = String(bioguideId || "").toUpperCase();
       const rows = state.matchScores?.politicians || [];
