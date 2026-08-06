@@ -156,6 +156,9 @@
   display: grid;
   gap: 1rem;
   margin-top: 1rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .policy-feed-empty {
@@ -7584,12 +7587,17 @@ body.politician-notes-modal-open {
 .feed-social-card {
   display: grid;
   gap: 0.7rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 1rem 1.05rem 0.9rem;
   border-radius: 1rem;
   border: 1px solid #1e293b;
   background: rgba(15, 23, 42, 0.92);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
   color: #e8eef7;
+  overflow: hidden;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
@@ -7603,7 +7611,10 @@ body.politician-notes-modal-open {
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
 }
 
 .feed-social-card__badges {
@@ -7611,6 +7622,8 @@ body.politician-notes-modal-open {
   flex-wrap: wrap;
   gap: 0.35rem;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .feed-social-card__badge {
@@ -7670,12 +7683,16 @@ body.politician-notes-modal-open {
 .feed-social-card__middle {
   display: grid;
   gap: 0.3rem;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
   cursor: pointer;
 }
 
 .feed-social-card__headline {
   margin: 0;
+  max-width: 100%;
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.35;
@@ -7685,10 +7702,13 @@ body.politician-notes-modal-open {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .feed-social-card__sub {
   margin: 0;
+  max-width: 100%;
   color: #94a3b8;
   font-size: 0.82rem;
   line-height: 1.35;
@@ -7700,9 +7720,11 @@ body.politician-notes-modal-open {
 .feed-social-card__bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .feed-social-card__more {
@@ -7735,30 +7757,38 @@ body.politician-notes-modal-open {
   padding: 0;
   border: 0;
   justify-self: end;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .feed-social-card > .policy-engage .policy-engage__actions {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.4rem;
+  max-width: 100%;
 }
 
 .feed-social-card > .policy-engage .policy-engage__stances {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .feed-social-card > .policy-engage .policy-engage__stance {
-  min-width: 5.75rem;
+  min-width: 0;
+  width: 100%;
   border-radius: 0.7rem;
-  padding: 0.55rem 0.85rem;
+  padding: 0.55rem 0.75rem;
   font-size: 0.88rem;
   font-weight: 700;
   border-width: 1.5px;
   background: rgba(30, 41, 59, 0.95);
   color: #f1f5f9;
+  white-space: nowrap;
 }
 
 .feed-social-card > .policy-engage .policy-engage__stance--support.is-active {
@@ -7787,7 +7817,7 @@ body.politician-notes-modal-open {
 
 /* Put stance buttons into the bottom action bar */
 .feed-social-card {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(10.5rem, auto);
   grid-template-areas:
     "top top"
     "middle middle"
@@ -7796,18 +7826,26 @@ body.politician-notes-modal-open {
   align-items: center;
 }
 
-.feed-social-card__top { grid-area: top; }
-.feed-social-card__middle { grid-area: middle; }
-.feed-social-card__bar { grid-area: bar; }
-.feed-social-card > .policy-engage { grid-area: engage; }
+.feed-social-card__top { grid-area: top; min-width: 0; }
+.feed-social-card__middle { grid-area: middle; min-width: 0; }
+.feed-social-card__bar { grid-area: bar; min-width: 0; }
+.feed-social-card > .policy-engage {
+  grid-area: engage;
+  justify-self: end;
+  align-self: center;
+}
 
 .feed-social-card__details {
   grid-area: details;
   display: grid;
   gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 0.15rem;
   padding-top: 0.85rem;
   border-top: 1px solid rgba(51, 65, 85, 0.9);
+  overflow-wrap: anywhere;
 }
 
 .feed-social-card__details[hidden] {
@@ -7832,6 +7870,8 @@ body.politician-notes-modal-open {
   color: #e2e8f0;
   font-size: 0.95rem;
   line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .feed-social-card__meanings {
