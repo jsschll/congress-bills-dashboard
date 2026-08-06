@@ -1644,8 +1644,10 @@ addressForm?.addEventListener("submit", async (event) => {
     // Keep local profile string empty so UI treats it as cleared.
     if (clearing) profile.home_address = "";
     try {
-      if (clearing) localStorage.removeItem("policyFeed.locationAddress");
-      else localStorage.setItem("policyFeed.locationAddress", homeAddress);
+      // Never mirror address into shared localStorage — it leaked across
+      // signed-out visitors and new signups on the same browser.
+      localStorage.removeItem("policyFeed.locationAddress");
+      localStorage.removeItem("policyFeed.locationOn");
     } catch {
       // Ignore storage failures.
     }
@@ -1673,6 +1675,7 @@ async function clearSavedLocation() {
     profile.home_address = "";
     try {
       localStorage.removeItem("policyFeed.locationAddress");
+      localStorage.removeItem("policyFeed.locationOn");
     } catch {
       // Ignore storage failures.
     }
