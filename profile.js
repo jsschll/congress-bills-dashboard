@@ -24,6 +24,8 @@ const addressSaved = document.getElementById("profile-address-saved");
 const addressSavedValue = document.getElementById("profile-address-saved-value");
 const addressSavedMeta = document.getElementById("profile-address-saved-meta");
 const addressChangeBtn = document.getElementById("profile-address-change");
+const addressClearBtn = document.getElementById("profile-address-clear");
+const addressClearFormBtn = document.getElementById("profile-address-clear-form");
 const addressCancelBtn = document.getElementById("profile-address-cancel");
 const addressSummary = document.getElementById("profile-address-summary");
 const impactSummary = document.getElementById("profile-impact-summary");
@@ -40,6 +42,10 @@ const pocketbookSavedList = document.getElementById(
   "profile-pocketbook-saved-list"
 );
 const pocketbookChangeBtn = document.getElementById("profile-pocketbook-change");
+const pocketbookClearBtn = document.getElementById("profile-pocketbook-clear");
+const pocketbookClearFormBtn = document.getElementById(
+  "profile-pocketbook-clear-form"
+);
 const pocketbookCancelBtn = document.getElementById("profile-pocketbook-cancel");
 const propertyValueInput = document.getElementById("profile-property-value");
 const incomeInput = document.getElementById("profile-income");
@@ -271,6 +277,9 @@ function syncAddressView() {
   if (addressCancelBtn) {
     addressCancelBtn.hidden = !editingAddress || !hasAddress;
   }
+  if (addressClearFormBtn) {
+    addressClearFormBtn.hidden = !showForm || !hasAddress;
+  }
 
   if (addressSavedValue) {
     addressSavedValue.textContent = profile.home_address || "";
@@ -464,6 +473,9 @@ function syncPocketbookView() {
   }
   if (pocketbookCancelBtn) {
     pocketbookCancelBtn.hidden = !editingPocketbook || !hasSaved;
+  }
+  if (pocketbookClearFormBtn) {
+    pocketbookClearFormBtn.hidden = !showForm || !hasSaved;
   }
 
   if (pocketbookSavedList) {
@@ -1619,29 +1631,68 @@ addressForm?.addEventListener("submit", async (event) => {
     addressForm.querySelector('input[name="location_precision"]:checked')
       ?.value || "street";
   const homeAddress = String(addressInput.value || "").trim();
-  if (!homeAddress) {
-    setProfileStatus("Enter an address or ZIP code.", "error");
-    return;
-  }
-  setProfileStatus("Saving location…", "loading");
+  const clearing = !homeAddress;
+  setProfileStatus(
+    clearing ? "Clearing location…" : "Saving location…",
+    "loading"
+  );
   try {
     await saveProfilePatch({
-      home_address: homeAddress,
+      home_address: clearing ? null : homeAddress,
       location_precision: precision,
     });
+    // Keep local profile string empty so UI treats it as cleared.
+    if (clearing) profile.home_address = "";
     try {
-      localStorage.setItem("policyFeed.locationAddress", homeAddress);
+      if (clearing) localStorage.removeItem("policyFeed.locationAddress");
+      else localStorage.setItem("policyFeed.locationAddress", homeAddress);
     } catch {
       // Ignore storage failures.
     }
     editingAddress = false;
+    if (addressInput && clearing) addressInput.value = "";
     syncAddressView();
-    setProfileStatus("Location saved.", "success");
+    setProfileStatus(
+      clearing ? "Location cleared." : "Location saved.",
+      "success"
+    );
     await Promise.all([loadRepresentation(), loadElectionCenter()]);
   } catch (error) {
     console.error(error);
     setProfileStatus(error.message || "Could not save location.", "error");
   }
+});
+
+async function clearSavedLocation() {
+  setProfileStatus("Clearing location…", "loading");
+  try {
+    await saveProfilePatch({
+      home_address: null,
+      location_precision: profile.location_precision || "street",
+    });
+    profile.home_address = "";
+    try {
+      localStorage.removeItem("policyFeed.locationAddress");
+    } catch {
+      // Ignore storage failures.
+    }
+    editingAddress = false;
+    if (addressInput) addressInput.value = "";
+    syncAddressView();
+    setProfileStatus("Location cleared.", "success");
+    await Promise.all([loadRepresentation(), loadElectionCenter()]);
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(error.message || "Could not clear location.", "error");
+  }
+}
+
+addressClearBtn?.addEventListener("click", () => {
+  clearSavedLocation();
+});
+
+addressClearFormBtn?.addEventListener("click", () => {
+  clearSavedLocation();
 });
 
 impactForm?.addEventListener("submit", async (event) => {
@@ -1741,6 +1792,45 @@ pocketbookChangeBtn?.addEventListener("click", () => {
 pocketbookCancelBtn?.addEventListener("click", () => {
   editingPocketbook = false;
   fillFormsFromProfile();
+});
+
+async function clearPocketbookBaselines() {
+  setProfileStatus("Clearing pocketbook baselines…", "loading");
+  try {
+    await saveProfilePatch({
+      estimated_property_value: null,
+      estimated_income: null,
+      filing_status: null,
+      vehicle_count: null,
+      impact_roles: [],
+    });
+    editingPocketbook = false;
+    if (propertyValueInput) propertyValueInput.value = "";
+    if (incomeInput) incomeInput.value = "";
+    if (filingStatusInput) filingStatusInput.value = "single";
+    if (vehicleCountInput) vehicleCountInput.value = "";
+    pocketbookForm
+      ?.querySelectorAll('input[name="impact_roles"]')
+      .forEach((input) => {
+        input.checked = false;
+      });
+    syncPreferenceSummaries();
+    setProfileStatus("Pocketbook baselines cleared.", "success");
+  } catch (error) {
+    console.error(error);
+    setProfileStatus(
+      error.message || "Could not clear pocketbook baselines.",
+      "error"
+    );
+  }
+}
+
+pocketbookClearBtn?.addEventListener("click", () => {
+  clearPocketbookBaselines();
+});
+
+pocketbookClearFormBtn?.addEventListener("click", () => {
+  clearPocketbookBaselines();
 });
 
 pocketbookForm?.addEventListener("submit", async (event) => {
