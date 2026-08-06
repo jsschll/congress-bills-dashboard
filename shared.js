@@ -1888,7 +1888,10 @@ function resetBillAskAi(prefix = "scorecard-match-detail", payload = null) {
   const logEl = document.getElementById(`${prefix}-ask-log`);
   const statusEl = document.getElementById(`${prefix}-ask-status`);
   const inputEl = document.getElementById(`${prefix}-ask-input`);
-  if (modal) modal._askAiBillPayload = payload || null;
+  if (modal) {
+    modal._askAiContext = payload || null;
+    modal._askAiBillPayload = payload || null;
+  }
   if (logEl) logEl.innerHTML = "";
   if (statusEl) {
     statusEl.hidden = true;
@@ -1913,7 +1916,7 @@ async function askAiAboutBill(prefix, question) {
   const formEl = document.getElementById(`${prefix}-ask-form`);
   const inputEl = document.getElementById(`${prefix}-ask-input`);
   const chips = modal?.querySelectorAll("[data-ask-ai-chip]") || [];
-  const payload = modal?._askAiBillPayload || null;
+  const payload = modal?._askAiContext || modal?._askAiBillPayload || null;
   const q = String(question || "").trim();
   if (!modal || !logEl || !q || !payload) return;
 
@@ -1951,46 +1954,88 @@ async function askAiAboutBill(prefix, question) {
     chip.disabled = true;
   });
 
+  const type = String(payload.type || "bill").toLowerCase() === "vote" ? "vote" : "bill";
+  const requestBody =
+    type === "vote"
+      ? {
+          question: q,
+          type: "vote",
+          context: payload,
+          vote: {
+            type: "vote",
+            politicianName: payload.politicianName || "",
+            voteCast: payload.voteCast || payload.votePosition || "",
+            billTitle: payload.billTitle || payload.title || "",
+            billNumber: payload.billNumber || payload.number || "",
+            billSummary:
+              payload.billSummary ||
+              payload.summary ||
+              payload.cardSummary ||
+              "",
+            takeaway: payload.takeaway || "",
+            congress: payload.congress || null,
+            billType: payload.billType || "",
+            legislationNumber: payload.legislationNumber || "",
+            billId: payload.billId || payload.id || "",
+            congress_url:
+              payload.congress_url ||
+              payload.congressUrl ||
+              payload.officialUrl ||
+              "",
+            officialUrl:
+              payload.officialUrl ||
+              payload.congress_url ||
+              payload.href ||
+              "",
+            keyPoints: payload.keyPoints || [],
+            proArgument: payload.proArgument || "",
+            conArgument: payload.conArgument || "",
+          },
+        }
+      : {
+          question: q,
+          type: "bill",
+          context: payload,
+          bill: {
+            id: payload.id || "",
+            title: payload.title || "",
+            rawTitle: payload.rawTitle || "",
+            number: payload.number || "",
+            congress: payload.congress || null,
+            billType: payload.billType || "",
+            legislationNumber: payload.legislationNumber || "",
+            takeaway: payload.takeaway || "",
+            summary: payload.summary || "",
+            cardSummary: payload.cardSummary || "",
+            statusLabel: payload.statusLabel || "",
+            keyPoints: payload.keyPoints || [],
+            proArgument: payload.proArgument || payload.yea || "",
+            conArgument: payload.conArgument || payload.nay || "",
+            resultLabel: payload.resultLabel || "",
+            rollMeta: payload.rollMeta || {},
+            congress_url:
+              payload.congress_url ||
+              payload.congressUrl ||
+              payload.officialUrl ||
+              payload.official_url ||
+              payload.href ||
+              "",
+            officialUrl:
+              payload.officialUrl ||
+              payload.official_url ||
+              payload.congress_url ||
+              payload.href ||
+              "",
+            href: payload.href || "",
+          },
+        };
+
   try {
     const response = await fetch("/api/chat-bill", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-      body: JSON.stringify({
-        question: q,
-        bill: {
-          id: payload.id || "",
-          title: payload.title || "",
-          rawTitle: payload.rawTitle || "",
-          number: payload.number || "",
-          congress: payload.congress || null,
-          billType: payload.billType || "",
-          legislationNumber: payload.legislationNumber || "",
-          takeaway: payload.takeaway || "",
-          summary: payload.summary || "",
-          cardSummary: payload.cardSummary || "",
-          statusLabel: payload.statusLabel || "",
-          keyPoints: payload.keyPoints || [],
-          proArgument: payload.proArgument || payload.yea || "",
-          conArgument: payload.conArgument || payload.nay || "",
-          resultLabel: payload.resultLabel || "",
-          rollMeta: payload.rollMeta || {},
-          congress_url:
-            payload.congress_url ||
-            payload.congressUrl ||
-            payload.officialUrl ||
-            payload.official_url ||
-            payload.href ||
-            "",
-          officialUrl:
-            payload.officialUrl ||
-            payload.official_url ||
-            payload.congress_url ||
-            payload.href ||
-            "",
-          href: payload.href || "",
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -2262,10 +2307,134 @@ function billAskAiPayloadFromItem(item = {}) {
 }
 
 /**
- * Standalone Ask AI modal for Feed / Search cards (and any page without the
- * embedded Tier 3 breakdown panel).
+ * Reusable Ask AI drawer (vanilla equivalent of <AskAiDrawer />).
+ * Supports context.type = "bill" | "vote" against the same /api/chat-bill endpoint.
  */
-function ensureStandaloneBillAskAiModal() {
+function askAiPresetChips(context = {}) {
+  const type = String(context.type || "bill").toLowerCase();
+  if (type === "vote") {
+    const cast = String(context.voteCast || context.votePosition || "YEA")
+      .trim()
+      .toUpperCase()
+      .replace(/_/g, " ") || "YEA";
+    return [
+      `Why did they vote ${cast}?`,
+      `What does a ${cast} vote mean here?`,
+      "Who supported this measure?",
+    ];
+  }
+  return [
+    "How is this measure funded?",
+    "Who is most impacted by this?",
+    "What is the implementation timeline?",
+  ];
+}
+
+function congressUrlFromBillParts(item = {}) {
+  const existing = String(
+    item.congress_url ||
+      item.congressUrl ||
+      item.officialUrl ||
+      item.official_url ||
+      item.href ||
+      ""
+  ).trim();
+  if (existing) return existing;
+  let congress =
+    Number(item.congress || item.bill_congress || item.billCongress || 0) || 0;
+  let billType = String(item.billType || item.bill_type || item.type || "")
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, "")
+    .trim();
+  let legislationNumber = String(
+    item.legislationNumber || item.legislation_number || ""
+  ).replace(/\D/g, "");
+  if ((!billType || !legislationNumber) && typeof parseBillNumberParts === "function") {
+    const parts = parseBillNumberParts(item.billNumber || item.bill_number || item.number);
+    if (parts) {
+      if (!billType) billType = parts.billType;
+      if (!legislationNumber) legislationNumber = parts.legislationNumber;
+    }
+  }
+  if (!congress) congress = 119;
+  if (!billType || !legislationNumber) return "";
+  return `https://www.congress.gov/bill/${congress}th-congress/${billType}/${legislationNumber}`;
+}
+
+function voteAskAiPayloadFromItem(item = {}, politicianName = "") {
+  const billTitle = String(
+    item.billTitle || item.title || item.voteQuestion || "Untitled measure"
+  ).trim();
+  const billNumber = String(item.billNumber || item.bill_number || item.number || "").trim();
+  const billSummary = String(
+    item.billSummary ||
+      item.plainEnglishSummary ||
+      item.plain_summary ||
+      item.plainSummary ||
+      item.cardSummary ||
+      item.summary ||
+      item.shortPitch ||
+      ""
+  ).trim();
+  const voteCast = String(
+    item.voteCast || item.votePosition || item.vote_position || ""
+  )
+    .trim()
+    .toUpperCase()
+    .replace(/_/g, " ");
+  const congressUrl = congressUrlFromBillParts(item);
+  let congress = Number(item.congress || 0) || 0;
+  let billType = String(item.billType || item.legislationType || "").toLowerCase();
+  let legislationNumber = String(
+    item.legislationNumber || item.legislation_number || ""
+  ).replace(/\D/g, "");
+  if ((!billType || !legislationNumber) && typeof parseBillNumberParts === "function") {
+    const parts = parseBillNumberParts(billNumber);
+    if (parts) {
+      if (!billType) billType = parts.billType;
+      if (!legislationNumber) legislationNumber = parts.legislationNumber;
+    }
+  }
+  if (!congress) congress = 119;
+
+  return {
+    type: "vote",
+    politicianName: String(politicianName || item.politicianName || "This legislator").trim(),
+    voteCast,
+    votePosition: voteCast,
+    billTitle,
+    billNumber,
+    number: billNumber,
+    title: billTitle,
+    billSummary,
+    summary: billSummary,
+    cardSummary: billSummary,
+    takeaway: String(item.takeaway || item.short_title || item.shortTitle || "").trim(),
+    congress,
+    billType,
+    legislationNumber,
+    billId: String(item.billId || item.id || "").trim(),
+    id: String(item.billId || item.id || "").trim(),
+    congress_url: congressUrl,
+    congressUrl,
+    officialUrl: congressUrl,
+    href: congressUrl,
+    keyPoints: Array.isArray(item.keyPoints) ? item.keyPoints : [],
+    proArgument: String(item.proArgument || item.yea_impact || item.yeaImpact || "").trim(),
+    conArgument: String(item.conArgument || item.nay_impact || item.nayImpact || "").trim(),
+  };
+}
+
+function normalizeAskAiContext(raw = {}) {
+  const type = String(raw.type || "bill").toLowerCase() === "vote" ? "vote" : "bill";
+  if (type === "vote") {
+    return voteAskAiPayloadFromItem(raw, raw.politicianName || "");
+  }
+  return { type: "bill", ...billAskAiPayloadFromItem(raw) };
+}
+
+function ensureAskAiDrawer() {
   if (typeof document === "undefined") return null;
   const prefix = "feed-ask";
   let modal = document.getElementById(`${prefix}-modal`);
@@ -2273,10 +2442,10 @@ function ensureStandaloneBillAskAiModal() {
 
   modal = document.createElement("div");
   modal.id = `${prefix}-modal`;
-  modal.className = "scorecard-match-detail";
+  modal.className = "scorecard-match-detail ask-ai-drawer";
   modal.hidden = true;
   modal.innerHTML = `
-    <div class="scorecard-match-detail__backdrop" data-close-feed-ask="1"></div>
+    <div class="scorecard-match-detail__backdrop" data-close-ask-ai="1"></div>
     <div
       class="scorecard-match-detail__panel scorecard-match-detail__panel--breakdown"
       role="dialog"
@@ -2287,12 +2456,12 @@ function ensureStandaloneBillAskAiModal() {
         <div>
           <p class="scorecard-match-detail__eyebrow">Ask AI</p>
           <p id="feed-ask-bill" class="scorecard-match-detail__bill"></p>
-          <h2 id="feed-ask-title">Ask AI about this bill</h2>
+          <h2 id="feed-ask-title">Ask AI</h2>
         </div>
         <button
           type="button"
           class="scorecard-match-detail__close"
-          data-close-feed-ask="1"
+          data-close-ask-ai="1"
           aria-label="Close Ask AI"
         >✕</button>
       </header>
@@ -2300,23 +2469,18 @@ function ensureStandaloneBillAskAiModal() {
 
       <section class="bill-ask-ai" aria-labelledby="feed-ask-ask-label">
         <h3 id="feed-ask-ask-label" class="bill-breakdown__label">
-          Ask AI about this bill
+          Ask AI
         </h3>
-        <div class="bill-ask-ai__chips" role="group" aria-label="Suggested questions">
-          <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
-            How is this measure funded?
-          </button>
-          <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
-            Who is most impacted by this?
-          </button>
-          <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
-            What is the implementation timeline?
-          </button>
-        </div>
+        <div
+          id="feed-ask-chips"
+          class="bill-ask-ai__chips"
+          role="group"
+          aria-label="Suggested questions"
+        ></div>
         <div id="feed-ask-ask-log" class="bill-ask-ai__log" aria-live="polite"></div>
         <form id="feed-ask-ask-form" class="bill-ask-ai__form">
           <label class="visually-hidden" for="feed-ask-ask-input"
-            >Ask a specific question about this bill</label
+            >Ask a specific question</label
           >
           <input
             id="feed-ask-ask-input"
@@ -2324,7 +2488,7 @@ function ensureStandaloneBillAskAiModal() {
             type="text"
             maxlength="280"
             autocomplete="off"
-            placeholder="Ask a specific question about this bill..."
+            placeholder="Ask a specific question..."
           />
           <button type="submit" class="refresh-btn bill-ask-ai__submit">Ask</button>
         </form>
@@ -2335,7 +2499,7 @@ function ensureStandaloneBillAskAiModal() {
         <button
           type="button"
           class="scorecard-match-detail__secondary"
-          data-close-feed-ask="1"
+          data-close-ask-ai="1"
         >Close</button>
       </footer>
     </div>
@@ -2343,18 +2507,40 @@ function ensureStandaloneBillAskAiModal() {
   document.body.append(modal);
 
   modal.addEventListener("click", (event) => {
-    if (event.target.closest("[data-close-feed-ask]")) {
-      closeBillAskAiModal();
+    if (event.target.closest("[data-close-ask-ai], [data-close-feed-ask]")) {
+      closeAskAiDrawer();
     }
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) closeBillAskAiModal();
+    if (event.key === "Escape" && !modal.hidden) closeAskAiDrawer();
   });
 
   return modal;
 }
 
-function closeBillAskAiModal() {
+function renderAskAiDrawerChips(modal, context) {
+  const chipsEl = modal.querySelector("#feed-ask-chips");
+  if (!chipsEl) return;
+  const chips = askAiPresetChips(context);
+  chipsEl.innerHTML = chips
+    .map(
+      (label) =>
+        `<button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>${String(
+          label
+        )
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")}</button>`
+    )
+    .join("");
+  chipsEl.querySelectorAll("[data-ask-ai-chip]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      askAiAboutBill("feed-ask", chip.textContent || "");
+    });
+  });
+}
+
+function closeAskAiDrawer() {
   const modal = document.getElementById("feed-ask-modal");
   if (!modal) return;
   if (modal._askAiAbort) {
@@ -2367,37 +2553,102 @@ function closeBillAskAiModal() {
   }
   modal.hidden = true;
   document.body.classList.remove("scorecard-match-detail-open");
+  if (typeof modal._askAiOnClose === "function") {
+    try {
+      modal._askAiOnClose();
+    } catch {
+      /* ignore */
+    }
+  }
+  modal._askAiOnClose = null;
 }
 
-function openBillAskAiModal(itemOrPayload = {}) {
-  const modal = ensureStandaloneBillAskAiModal();
+/**
+ * Open the reusable Ask AI drawer.
+ * @param {{ isOpen?: boolean, onClose?: Function, context?: object }|object} options
+ */
+function openAskAiDrawer(options = {}) {
+  const modal = ensureAskAiDrawer();
   if (!modal) return;
-  // Always normalize so feed cards and breakdown payloads both work.
-  const payload = billAskAiPayloadFromItem(itemOrPayload);
+  if (options && options.isOpen === false) {
+    closeAskAiDrawer();
+    return;
+  }
+
+  const context = normalizeAskAiContext(options.context || options);
+  modal._askAiOnClose =
+    typeof options.onClose === "function" ? options.onClose : null;
 
   const billEl = document.getElementById("feed-ask-bill");
   const titleEl = document.getElementById("feed-ask-title");
   const summaryEl = document.getElementById("feed-ask-summary");
+  const labelEl = document.getElementById("feed-ask-ask-label");
+  const inputEl = document.getElementById("feed-ask-ask-input");
+
+  const isVote = context.type === "vote";
   if (billEl) {
-    billEl.textContent = payload.number || "";
+    billEl.textContent = isVote
+      ? [context.politicianName, context.voteCast, context.billNumber]
+          .filter(Boolean)
+          .join(" · ")
+      : context.number || "";
     billEl.hidden = !billEl.textContent;
   }
   if (titleEl) {
-    titleEl.textContent = payload.title || "Ask AI about this bill";
+    titleEl.textContent = isVote
+      ? `Ask AI about this vote`
+      : context.title || "Ask AI about this bill";
   }
   if (summaryEl) {
-    summaryEl.textContent =
-      payload.takeaway ||
-      payload.cardSummary ||
-      payload.summary ||
-      "Ask a question about this measure.";
+    summaryEl.textContent = isVote
+      ? context.billSummary ||
+        context.takeaway ||
+        `${context.politicianName || "This legislator"} voted ${
+          context.voteCast || "—"
+        } on ${context.billTitle || "this measure"}.`
+      : context.takeaway ||
+        context.cardSummary ||
+        context.summary ||
+        "Ask a question about this measure.";
+  }
+  if (labelEl) {
+    labelEl.textContent = isVote
+      ? "Ask AI about this vote"
+      : "Ask AI about this bill";
+  }
+  if (inputEl) {
+    inputEl.placeholder = isVote
+      ? "Ask a specific question about this vote..."
+      : "Ask a specific question about this bill...";
   }
 
-  resetBillAskAi("feed-ask", payload);
+  renderAskAiDrawerChips(modal, context);
+  resetBillAskAi("feed-ask", context);
   bindBillAskAi("feed-ask");
   modal.hidden = false;
   document.body.classList.add("scorecard-match-detail-open");
   document.getElementById("feed-ask-ask-input")?.focus();
+}
+
+// Backward-compatible aliases for Feed / engagement callers.
+function ensureStandaloneBillAskAiModal() {
+  return ensureAskAiDrawer();
+}
+
+function closeBillAskAiModal() {
+  closeAskAiDrawer();
+}
+
+function openBillAskAiModal(itemOrPayload = {}) {
+  openAskAiDrawer({
+    context: { type: "bill", ...itemOrPayload },
+  });
+}
+
+function openVoteAskAiDrawer(voteOrPayload = {}, politicianName = "") {
+  openAskAiDrawer({
+    context: voteAskAiPayloadFromItem(voteOrPayload, politicianName),
+  });
 }
 
 /**

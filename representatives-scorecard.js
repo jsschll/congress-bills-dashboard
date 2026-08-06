@@ -2468,6 +2468,16 @@
       options.scope ||
       el.dataset.voteScope ||
       "key";
+    const politicianName = String(
+      options.politicianName ||
+        el.dataset.politicianName ||
+        state?.data?.representative?.profile?.name ||
+        state?.data?.representatives?.find(
+          (rep) => rep?.profile?.id === state.activeId
+        )?.profile?.name ||
+        ""
+    ).trim();
+    if (politicianName) el.dataset.politicianName = politicianName;
     el.dataset.voteScope = scope;
     const sourceVotes = (votes || []).filter((vote) => {
       const title = String(vote.title || "");
@@ -2565,7 +2575,7 @@
         filtered.length
           ? `<ul class="scorecard-vote-list">
               ${filtered
-                .map((vote) => {
+                .map((vote, idx) => {
                   const tone = voteTone(vote.votePosition);
                   const positionLabel = String(vote.votePosition || "—")
                     .toUpperCase()
@@ -2652,6 +2662,13 @@
                             )}</p>`
                         : ""
                     }
+                    <div class="scorecard-vote__actions">
+                      <button
+                        type="button"
+                        class="refresh-btn policy-engage__ask-ai scorecard-vote__ask-ai"
+                        data-ask-ai-vote-index="${idx}"
+                      >Ask AI</button>
+                    </div>
                   </li>`;
                 })
                 .join("")}
@@ -2668,10 +2685,36 @@
       }
     `;
 
+    el._scorecardVoteRows = filtered;
+
+    el.querySelectorAll("[data-ask-ai-vote-index]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.getAttribute("data-ask-ai-vote-index"));
+        const vote = el._scorecardVoteRows?.[index];
+        if (!vote) return;
+        if (typeof openVoteAskAiDrawer === "function") {
+          openVoteAskAiDrawer(vote, politicianName);
+        } else if (typeof openAskAiDrawer === "function") {
+          openAskAiDrawer({
+            context: {
+              type: "vote",
+              politicianName,
+              ...vote,
+            },
+          });
+        } else {
+          alert("Ask AI is not available on this page yet.");
+        }
+      });
+    });
+
     const scopeSelect = $("scorecard-vote-scope");
     if (scopeSelect) {
       scopeSelect.addEventListener("change", () => {
-        renderVotes(el, sourceVotes, query, { scope: scopeSelect.value });
+        renderVotes(el, sourceVotes, query, {
+          scope: scopeSelect.value,
+          politicianName,
+        });
       });
     }
 
@@ -2687,7 +2730,10 @@
                   String(vote.category || "").toLowerCase() ===
                   topic.toLowerCase()
               );
-        renderVotes(el, next, query, { scope: el.dataset.voteScope || "key" });
+        renderVotes(el, next, query, {
+          scope: el.dataset.voteScope || "key",
+          politicianName,
+        });
       });
     }
   }
@@ -2973,7 +3019,9 @@
             </div>`;
         }
       } else {
-        renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery);
+        renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
+          politicianName: active.profile?.name || "",
+        });
       }
       renderMatch(
         $("scorecard-match"),
@@ -2989,7 +3037,9 @@
       if (!hasUsableVotes(active.recentVotes)) {
         const liveVotes = mapProfileVotesToScorecard(enrich?.recentVotes);
         active.recentVotes = liveVotes;
-        renderVotes($("scorecard-votes"), liveVotes, state.voteQuery);
+        renderVotes($("scorecard-votes"), liveVotes, state.voteQuery, {
+          politicianName: active.profile?.name || "",
+        });
       }
 
       // Project existing user stances (often from Senate quiz) onto this
@@ -3037,7 +3087,9 @@
         const active =
           reps.find((rep) => rep.profile.id === state.activeId) || reps[0];
         if (active) {
-          renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery);
+          renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
+            politicianName: active.profile?.name || "",
+          });
         }
       });
     }

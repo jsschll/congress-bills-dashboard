@@ -8150,11 +8150,17 @@ body.scorecard-match-modal-open {
   padding: 0.85rem;
 }
 
-.scorecard-vote__top {
+.scorecard-vote__actions {
   display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.65rem;
+}
+
+.scorecard-vote__ask-ai {
+  font-size: 0.82rem !important;
+  padding: 0.35rem 0.75rem !important;
 }
 
 .scorecard-vote__meta {
