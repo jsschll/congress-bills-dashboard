@@ -2310,16 +2310,49 @@ function billAskAiPayloadFromItem(item = {}) {
  * Reusable Ask AI drawer (vanilla equivalent of <AskAiDrawer />).
  * Supports context.type = "bill" | "vote" against the same /api/chat-bill endpoint.
  */
+function normalizeAskAiVoteCastLabel(raw = "") {
+  const value = String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/_/g, " ");
+  if (!value) return "YEA";
+  if (
+    value === "YEA" ||
+    value === "AYE" ||
+    value === "YES" ||
+    value === "SUPPORTED" ||
+    value === "SUPPORT"
+  ) {
+    return "YEA";
+  }
+  if (
+    value === "NAY" ||
+    value === "NO" ||
+    value === "OPPOSED" ||
+    value === "OPPOSE"
+  ) {
+    return "NAY";
+  }
+  if (
+    value.includes("PRESENT") ||
+    value.includes("ABSTAIN") ||
+    value.includes("NOT VOTING") ||
+    value === "NV"
+  ) {
+    return "PRESENT";
+  }
+  return value;
+}
+
 function askAiPresetChips(context = {}) {
   const type = String(context.type || "bill").toLowerCase();
   if (type === "vote") {
-    const cast = String(context.voteCast || context.votePosition || "YEA")
-      .trim()
-      .toUpperCase()
-      .replace(/_/g, " ") || "YEA";
+    const cast = normalizeAskAiVoteCastLabel(
+      context.voteCast || context.votePosition || "YEA"
+    );
     return [
-      `Why did they vote ${cast}?`,
       `What does a ${cast} vote mean here?`,
+      "What are the main arguments for and against?",
       "Who supported this measure?",
     ];
   }
@@ -2377,12 +2410,9 @@ function voteAskAiPayloadFromItem(item = {}, politicianName = "") {
       item.shortPitch ||
       ""
   ).trim();
-  const voteCast = String(
+  const voteCast = normalizeAskAiVoteCastLabel(
     item.voteCast || item.votePosition || item.vote_position || ""
-  )
-    .trim()
-    .toUpperCase()
-    .replace(/_/g, " ");
+  );
   const congressUrl = congressUrlFromBillParts(item);
   let congress = Number(item.congress || 0) || 0;
   let billType = String(item.billType || item.legislationType || "").toLowerCase();
