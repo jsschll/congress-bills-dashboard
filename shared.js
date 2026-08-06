@@ -715,6 +715,22 @@ function mapProcessedVoteToFeedItem(row = {}) {
   const nayLabel =
     String(row.nay_label || row.nayLabel || "").trim() ||
     VOTE_CARD_DEFAULT_NAY_LABEL;
+  const shortTitle = String(row.short_title || row.shortTitle || "").trim();
+  const plainSummary = String(
+    row.plain_summary ||
+      row.plainSummary ||
+      row.what_it_does ||
+      row.whatItDoes ||
+      row.card_summary ||
+      row.cardSummary ||
+      ""
+  ).trim();
+  const displaySummary = plainSummary || summary;
+  const yeaImpact = String(row.yea_impact || row.yeaImpact || "").trim();
+  const nayImpact = String(row.nay_impact || row.nayImpact || "").trim();
+  const primaryCategory = String(
+    row.primary_category || row.primaryCategory || row.category || ""
+  ).trim();
   const officialUrl =
     String(row.official_url || "").trim() ||
     String(row.clerk_url || "").trim() ||
@@ -728,13 +744,30 @@ function mapProcessedVoteToFeedItem(row = {}) {
     rollCallId,
     billNumber: billNumber || (rollCallNumber ? `Roll Call ${rollCallNumber}` : ""),
     title,
-    summary,
-    officialSummary: summary,
-    shortPitch: summary || title,
-    yeaMeans,
-    nayMeans,
+    summary: displaySummary,
+    officialSummary: displaySummary,
+    shortPitch: displaySummary || title,
+    yeaMeans: yeaImpact || yeaMeans,
+    nayMeans: nayImpact || nayMeans,
+    yea_means: yeaImpact || yeaMeans,
+    nay_means: nayImpact || nayMeans,
+    yeaImpact,
+    yea_impact: yeaImpact,
+    nayImpact,
+    nay_impact: nayImpact,
     yeaLabel,
     nayLabel,
+    shortTitle,
+    short_title: shortTitle,
+    plainSummary,
+    plain_summary: plainSummary,
+    whatItDoes: plainSummary,
+    what_it_does: plainSummary,
+    card_summary: plainSummary || summary,
+    cardSummary: plainSummary || summary,
+    primaryCategory,
+    primary_category: primaryCategory,
+    category: primaryCategory,
     level: "Federal",
     jurisdiction: chamber === "senate" ? "U.S. Senate" : "U.S. House",
     chamber,
@@ -747,9 +780,9 @@ function mapProcessedVoteToFeedItem(row = {}) {
     date,
     officialUrl,
     clerkUrl,
-    policyArea: "",
-    subjectCategory: "",
-    tags: [],
+    policyArea: primaryCategory,
+    subjectCategory: primaryCategory,
+    tags: primaryCategory ? [primaryCategory] : [],
     statusLabel: result || voteQuestion || "Roll-call vote",
     hasLinkedBill: Boolean(billNumber),
     summarySource: String(row.summary_source || "llm"),
@@ -758,7 +791,7 @@ function mapProcessedVoteToFeedItem(row = {}) {
 }
 
 const PROCESSED_VOTES_FEED_SELECT =
-  "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, short_title, plain_summary, what_it_does, yea_impact, nay_impact, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
+  "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, short_title, plain_summary, what_it_does, yea_impact, nay_impact, primary_category, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
 
 function normalizeLegislationType(type) {
   return String(type || "")

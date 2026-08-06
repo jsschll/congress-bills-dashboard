@@ -7573,13 +7573,401 @@ body.politician-notes-modal-open {
   line-height: 1.4;
 }
 
+
 .policy-feed-list,
 .votes-feed-list {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
-/* Compact social-style feed cards — scannable first, details on demand */
+/* —— Polished social feed cards (Votes + shared) —— */
+.feed-social-card {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1.05rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid #1e293b;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  color: #e8eef7;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.feed-social-card:hover {
+  border-color: rgba(52, 211, 153, 0.35);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+}
+
+.feed-social-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.feed-social-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.feed-social-card__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-social-card__badge.is-chamber {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.28);
+  color: #6ee7b7;
+}
+
+.feed-social-card__badge.is-topic {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.28);
+  color: #7dd3fc;
+}
+
+.feed-social-card__result {
+  flex-shrink: 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.85);
+  color: #cbd5e1;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-social-card__result.is-passed {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+}
+
+.feed-social-card__result.is-failed {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
+}
+
+.feed-social-card__middle {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.feed-social-card__headline {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #f8fafc;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.feed-social-card__sub {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-social-card__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.feed-social-card__more {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: #6ee7b7;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  padding: 0.25rem 0;
+  cursor: pointer;
+}
+
+.feed-social-card__more:hover,
+.feed-social-card__more:focus-visible {
+  color: #a7f3d0;
+}
+
+.feed-social-card__chevron {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+
+.feed-social-card > .policy-engage {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  justify-self: end;
+}
+
+.feed-social-card > .policy-engage .policy-engage__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.feed-social-card > .policy-engage .policy-engage__stances {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.feed-social-card > .policy-engage .policy-engage__stance {
+  min-width: 5.75rem;
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-width: 1.5px;
+  background: rgba(30, 41, 59, 0.95);
+  color: #f1f5f9;
+}
+
+.feed-social-card > .policy-engage .policy-engage__stance--support.is-active {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(52, 211, 153, 0.55);
+  color: #a7f3d0;
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.2);
+}
+
+.feed-social-card > .policy-engage .policy-engage__stance--oppose.is-active {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.18);
+}
+
+.feed-social-card:not(.is-expanded) > .policy-engage .policy-engage__ask-ai,
+.feed-social-card:not(.is-expanded) > .policy-engage .policy-engage__follow,
+.feed-social-card:not(.is-expanded) > .policy-engage .policy-engage__votes,
+.feed-social-card:not(.is-expanded) > .policy-engage .policy-engage__community,
+.feed-social-card:not(.is-expanded) > .policy-engage .policy-engage__prompt,
+.feed-social-card:not(.is-expanded) > .policy-engage .policy-engage__take-action,
+.feed-social-card:not(.is-expanded) > .policy-engage .policy-engage__alignment {
+  display: none !important;
+}
+
+/* Put stance buttons into the bottom action bar */
+.feed-social-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "top top"
+    "middle middle"
+    "bar engage"
+    "details details";
+  align-items: center;
+}
+
+.feed-social-card__top { grid-area: top; }
+.feed-social-card__middle { grid-area: middle; }
+.feed-social-card__bar { grid-area: bar; }
+.feed-social-card > .policy-engage { grid-area: engage; }
+
+.feed-social-card__details {
+  grid-area: details;
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.15rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(51, 65, 85, 0.9);
+}
+
+.feed-social-card__details[hidden] {
+  display: none !important;
+}
+
+.feed-social-card__official {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.feed-social-card__note {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.84rem;
+}
+
+.feed-social-card__summary p {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.feed-social-card__meanings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.feed-social-card__meaning {
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.feed-social-card__meaning.is-yea {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.feed-social-card__meaning.is-nay {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.feed-social-card__meaning strong {
+  display: block;
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e2e8f0;
+}
+
+.feed-social-card__meaning p {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.feed-social-card.is-expanded {
+  grid-template-areas:
+    "top top"
+    "middle middle"
+    "bar engage"
+    "details details";
+  align-items: start;
+}
+
+.feed-social-card.is-expanded > .policy-engage {
+  display: contents;
+}
+
+.feed-social-card.is-expanded > .policy-engage .policy-engage__actions {
+  grid-area: engage;
+  justify-self: end;
+  align-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.feed-social-card.is-expanded > .policy-engage .policy-engage__votes,
+.feed-social-card.is-expanded > .policy-engage .policy-engage__community {
+  grid-column: 1 / -1;
+  margin-top: 0.15rem;
+}
+
+#votes-feed-status:empty,
+#votes-feed-status[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .feed-social-card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "top"
+      "middle"
+      "engage"
+      "bar"
+      "details";
+    gap: 0.6rem;
+  }
+
+  .feed-social-card > .policy-engage {
+    justify-self: stretch;
+  }
+
+  .feed-social-card > .policy-engage .policy-engage__actions {
+    width: 100%;
+  }
+
+  .feed-social-card > .policy-engage .policy-engage__stances {
+    width: 100%;
+  }
+
+  .feed-social-card > .policy-engage .policy-engage__stance {
+    min-width: 0;
+  }
+
+  .feed-social-card__meanings {
+    grid-template-columns: 1fr;
+  }
+
+  .feed-social-card.is-expanded {
+    grid-template-areas:
+      "top"
+      "middle"
+      "engage"
+      "bar"
+      "details";
+  }
+
+  .feed-social-card.is-expanded > .policy-engage .policy-engage__actions {
+    justify-self: stretch;
+    width: 100%;
+  }
+}
+
+/* Legacy compact bill cards (All News / My Feed) keep a contained slate look */
+.compact-feed-card {
+  border: 1px solid #1e293b;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.compact-feed-card:hover {
+  border-color: rgba(52, 211, 153, 0.35);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+}
+
 .compact-feed-card,
 .vote-feed-card--compact {
   display: grid;
@@ -7590,49 +7978,28 @@ body.politician-notes-modal-open {
     "details details";
   gap: 0.55rem 0.85rem;
   align-items: center;
-  padding: 0.85rem 0.95rem;
+  padding: 0.95rem 1rem;
 }
 
-.vote-feed-card__main {
-  grid-area: main;
-  min-width: 0;
-}
-
-.vote-feed-card__body {
-  display: grid;
-  gap: 0.3rem;
-  min-width: 0;
-}
-
-.vote-feed-card__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  min-width: 0;
-}
-
+.vote-feed-card__main { grid-area: main; min-width: 0; }
+.vote-feed-card__body { display: grid; gap: 0.3rem; min-width: 0; }
+.vote-feed-card__tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .vote-feed-card__tag {
   display: inline-flex;
   align-items: center;
-  max-width: 100%;
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(30, 41, 59, 0.7);
+  background: rgba(30, 41, 59, 0.75);
   color: #cbd5e1;
   font-size: 0.72rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 700;
 }
-
 .vote-feed-card__headline {
   margin: 0;
-  font-size: 1.02rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.35;
   color: #f8fafc;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -7640,49 +8007,35 @@ body.politician-notes-modal-open {
   line-clamp: 2;
   overflow: hidden;
 }
-
 .vote-feed-card__meta {
   margin: 0;
   color: #94a3b8;
-  font-size: 0.8rem;
-  line-height: 1.35;
+  font-size: 0.82rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
 .compact-feed-card > .policy-engage,
 .vote-feed-card--compact > .policy-engage {
   grid-area: engage;
   margin: 0;
   padding: 0;
   border: 0;
-  align-self: center;
   justify-self: end;
 }
-
-.compact-feed-card > .policy-engage .policy-engage__actions,
-.vote-feed-card--compact > .policy-engage .policy-engage__actions {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.35rem;
-}
-
 .compact-feed-card > .policy-engage .policy-engage__stances,
 .vote-feed-card--compact > .policy-engage .policy-engage__stances {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
-
 .compact-feed-card > .policy-engage .policy-engage__stance,
 .vote-feed-card--compact > .policy-engage .policy-engage__stance {
   min-width: 5.5rem;
-  padding: 0.45rem 0.7rem;
-  font-size: 0.84rem;
+  border-radius: 0.7rem;
+  padding: 0.5rem 0.8rem;
   font-weight: 700;
 }
-
 .vote-feed-card__toggle {
   grid-area: toggle;
   justify-self: start;
@@ -7691,124 +8044,19 @@ body.politician-notes-modal-open {
   background: transparent;
   color: #6ee7b7;
   font: inherit;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   font-weight: 650;
-  padding: 0.1rem 0;
   cursor: pointer;
+  padding: 0.15rem 0;
 }
-
-.vote-feed-card__toggle:hover,
-.vote-feed-card__toggle:focus-visible {
-  color: #a7f3d0;
-  text-decoration: underline;
-}
-
 .vote-feed-card__details {
   grid-area: details;
   display: grid;
   gap: 0.7rem;
-  padding-top: 0.55rem;
-  border-top: 1px solid rgba(51, 65, 85, 0.85);
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(51, 65, 85, 0.9);
 }
-
-.vote-feed-card__details[hidden] {
-  display: none !important;
-}
-
-.vote-feed-card__official-title {
-  margin: 0;
-  color: #cbd5e1;
-  font-size: 0.88rem;
-  line-height: 1.4;
-}
-
-.vote-feed-card__motion-note {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 0.84rem;
-}
-
-.vote-feed-card__summary-text {
-  margin: 0;
-  color: #e2e8f0;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-
-.vote-feed-card__roll-link {
-  justify-self: start;
-}
-
-.vote-feed-card__date {
-  margin: 0.35rem 0 0;
-  color: #e2e8f0;
-  font-size: 0.88rem;
-}
-
-.vote-feed-card__date time {
-  font-variant-numeric: tabular-nums;
-}
-
-.vote-feed-card__subject {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(30, 41, 59, 0.75);
-  color: #cbd5e1;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.vote-feed-card__question {
-  margin: 0.55rem 0 0;
-  color: #e2e8f0;
-  font-size: 0.86rem;
-  line-height: 1.4;
-}
-
-.vote-feed-card__meanings {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
-  margin: 0;
-}
-
-.vote-feed-card__meaning {
-  padding: 0.7rem 0.75rem;
-  border-radius: 0.7rem;
-  border: 1px solid #334155;
-  background: rgba(15, 23, 42, 0.55);
-}
-
-.vote-feed-card__meaning.is-yea {
-  border-color: rgba(52, 211, 153, 0.35);
-  background: rgba(52, 211, 153, 0.08);
-}
-
-.vote-feed-card__meaning.is-nay {
-  border-color: rgba(248, 113, 113, 0.35);
-  background: rgba(248, 113, 113, 0.08);
-}
-
-.vote-feed-card__meaning strong {
-  display: block;
-  margin: 0 0 0.35rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #e2e8f0;
-}
-
-.vote-feed-card__meaning p {
-  margin: 0;
-  color: #e2e8f0;
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
-/* Collapsed: only stance buttons + optional logged chip */
+.vote-feed-card__details[hidden] { display: none !important; }
 .compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__ask-ai,
 .compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__follow,
 .compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__votes,
@@ -7825,12 +8073,10 @@ body.politician-notes-modal-open {
 .vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__alignment {
   display: none !important;
 }
-
 .compact-feed-card:not(.is-expanded) .policy-impact,
 .vote-feed-card--compact:not(.is-expanded) .policy-impact {
   display: none !important;
 }
-
 .compact-feed-card.is-expanded,
 .vote-feed-card--compact.is-expanded {
   grid-template-areas:
@@ -7840,30 +8086,15 @@ body.politician-notes-modal-open {
     "engage engage";
   align-items: start;
 }
-
 .compact-feed-card.is-expanded > .policy-engage,
 .vote-feed-card--compact.is-expanded > .policy-engage {
   grid-area: engage;
-  justify-self: stretch;
   width: 100%;
+  justify-self: stretch;
   margin-top: 0.15rem;
   padding-top: 0.7rem;
-  border-top: 1px solid rgba(51, 65, 85, 0.85);
+  border-top: 1px solid rgba(51, 65, 85, 0.9);
 }
-
-.compact-feed-card.is-expanded > .policy-engage .policy-engage__actions,
-.vote-feed-card--compact.is-expanded > .policy-engage .policy-engage__actions {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.compact-feed-card.is-expanded > .policy-engage .policy-engage__stances,
-.vote-feed-card--compact.is-expanded > .policy-engage .policy-engage__stances {
-  display: inline-flex;
-  grid-template-columns: none;
-}
-
 @media (max-width: 640px) {
   .compact-feed-card,
   .vote-feed-card--compact {
@@ -7874,39 +8105,10 @@ body.politician-notes-modal-open {
       "toggle"
       "details";
   }
-
-  .compact-feed-card > .policy-engage,
-  .vote-feed-card--compact > .policy-engage {
-    justify-self: stretch;
-  }
-
-  .compact-feed-card > .policy-engage .policy-engage__actions,
-  .vote-feed-card--compact > .policy-engage .policy-engage__actions {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .compact-feed-card > .policy-engage .policy-engage__stances,
-  .vote-feed-card--compact > .policy-engage .policy-engage__stances {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
   .compact-feed-card > .policy-engage .policy-engage__stance,
   .vote-feed-card--compact > .policy-engage .policy-engage__stance {
     min-width: 0;
   }
-
-  .vote-feed-card__meanings {
-    grid-template-columns: 1fr;
-  }
-}
-
-.compact-feed-card .policy-engage__prompt,
-.vote-feed-card .policy-engage__prompt {
-  margin: 0 0 0.55rem;
-  font-weight: 600;
-  color: #e2e8f0;
 }
 
 .politician-quick-match {
