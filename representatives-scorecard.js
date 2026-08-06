@@ -295,16 +295,6 @@
       (category ? topicSlugFromCategory(category) : "");
     if (voteTopicSlug && voteTopicSlug === sector.slug) return true;
 
-    const policyCategorySlug = topicSlugFromCategory(sector.policyCategory);
-    if (
-      voteTopicSlug &&
-      policyCategorySlug &&
-      voteTopicSlug === policyCategorySlug &&
-      allowRelatedCategory
-    ) {
-      return true;
-    }
-
     if (category) {
       if (categoryLower === sector.label.toLowerCase()) return true;
       // Unique owners (e.g. Healthcare) can match on policy category directly.
