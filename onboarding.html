@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voter Pulse · Article 1</title>
+    <meta
+      name="description"
+      content="Set your stances on a few key votes so Article 1 can score how your representatives match you."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260805pulse" />
+  </head>
+  <body class="page-app page-onboarding">
+    <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
+
+    <main class="voter-pulse" aria-labelledby="voter-pulse-brand">
+      <div class="voter-pulse__glow" aria-hidden="true"></div>
+
+      <header class="voter-pulse__intro">
+        <p class="voter-pulse__brand" id="voter-pulse-brand">Article 1</p>
+        <h1 class="voter-pulse__title">Voter Pulse</h1>
+        <p class="voter-pulse__lede">
+          Answer a few key votes in plain English. We’ll score how your
+          representatives match you.
+        </p>
+      </header>
+
+      <p id="voter-pulse-status" class="status voter-pulse__status" hidden></p>
+
+      <section
+        class="voter-pulse__stage"
+        aria-label="Stance quiz"
+        aria-live="polite"
+      >
+        <div class="voter-pulse__progress" aria-hidden="true">
+          <div
+            id="voter-pulse-progress-fill"
+            class="voter-pulse__progress-fill"
+          ></div>
+        </div>
+        <p id="voter-pulse-step" class="voter-pulse__step">Loading…</p>
+
+        <div id="voter-pulse-card" class="voter-pulse__card" hidden>
+          <span id="voter-pulse-category" class="voter-pulse__badge"></span>
+          <p id="voter-pulse-bill" class="voter-pulse__bill"></p>
+          <h2 id="voter-pulse-question" class="voter-pulse__question"></h2>
+
+          <div
+            class="voter-pulse__actions"
+            role="group"
+            aria-label="Your stance"
+          >
+            <button
+              type="button"
+              class="voter-pulse__btn voter-pulse__btn--support"
+              data-pulse-stance="support"
+            >
+              Support
+            </button>
+            <button
+              type="button"
+              class="voter-pulse__btn voter-pulse__btn--oppose"
+              data-pulse-stance="oppose"
+            >
+              Oppose
+            </button>
+            <button
+              type="button"
+              class="voter-pulse__btn voter-pulse__btn--skip"
+              data-pulse-stance="skip"
+            >
+              Skip / No Opinion
+            </button>
+          </div>
+        </div>
+
+        <div id="voter-pulse-empty" class="voter-pulse__empty" hidden>
+          <p>
+            We couldn’t load key votes right now. You can still browse your
+            representatives and set stances anytime.
+          </p>
+          <a class="refresh-btn" href="representatives.html">Go to scorecard</a>
+        </div>
+      </section>
+
+      <footer class="voter-pulse__footer">
+        <button
+          type="button"
+          id="voter-pulse-back"
+          class="voter-pulse__nav-btn"
+          hidden
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          id="voter-pulse-finish"
+          class="voter-pulse__nav-btn voter-pulse__nav-btn--ghost"
+        >
+          Skip to scorecard
+        </button>
+      </footer>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="shared.js?v=20260805pulse"></script>
+    <script src="nav.js?v=20260804a1"></script>
+    <script src="onboarding.js?v=20260805pulse"></script>
+  </body>
+</html>

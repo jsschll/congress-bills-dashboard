@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260805toast" />
+    <link rel="stylesheet" href="styles.css?v=20260805pulse" />
   </head>
   <body class="page-app page-scorecard page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -33,6 +33,29 @@
           attendance, and recent votes — then browse full regional &amp; state
           representation below.
         </p>
+
+        <div
+          id="voter-pulse-banner"
+          class="voter-pulse-banner"
+          hidden
+          role="region"
+          aria-label="Voter Pulse"
+        >
+          <p class="voter-pulse-banner__copy">
+            <strong>Voter Pulse:</strong> answer a few key votes so Action Match
+            scores light up for your representatives.
+          </p>
+          <div class="voter-pulse-banner__actions">
+            <a class="refresh-btn" href="onboarding.html">Start quiz</a>
+            <button
+              type="button"
+              class="voter-pulse-banner__dismiss"
+              data-dismiss-voter-pulse="1"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
 
         <div
           id="scorecard-view-toggle"
@@ -350,10 +373,10 @@
     </div>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260805toast"></script>
+    <script src="shared.js?v=20260805pulse"></script>
     <script src="nav.js?v=20260804a1"></script>
     <script src="politicians-shared.js?v=20260805toast"></script>
-    <script src="representatives-scorecard.js?v=20260805toast"></script>
+    <script src="representatives-scorecard.js?v=20260805pulse"></script>
     <script>
       (async () => {
         await bootNav("politicians");

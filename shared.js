@@ -72,6 +72,75 @@ async function countFollows(userId) {
   return count || 0;
 }
 
+const VOTER_PULSE_STORAGE_KEY = "voterPulse.completedAt";
+const VOTER_PULSE_BANNER_DISMISS_KEY = "voterPulse.bannerDismissedAt";
+
+async function countUserBillStances(userId) {
+  const client = getSupabase();
+  if (!client || !userId) return 0;
+  const { count, error } = await client
+    .from("bill_stances")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (error) {
+    console.warn(error);
+    return 0;
+  }
+  return count || 0;
+}
+
+function markVoterPulseComplete(meta = {}) {
+  try {
+    localStorage.setItem(
+      VOTER_PULSE_STORAGE_KEY,
+      JSON.stringify({
+        at: new Date().toISOString(),
+        savedCount: Number(meta.savedCount) || 0,
+      })
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function hasMarkedVoterPulseComplete() {
+  try {
+    return Boolean(localStorage.getItem(VOTER_PULSE_STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+function dismissVoterPulseBanner() {
+  try {
+    localStorage.setItem(
+      VOTER_PULSE_BANNER_DISMISS_KEY,
+      new Date().toISOString()
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function isVoterPulseBannerDismissed() {
+  try {
+    return Boolean(localStorage.getItem(VOTER_PULSE_BANNER_DISMISS_KEY));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Offer Voter Pulse when the user has no saved stances and has not finished
+ * (or skipped) the onboarding quiz yet.
+ */
+async function shouldOfferVoterPulse(user) {
+  if (!user?.id) return false;
+  if (hasMarkedVoterPulseComplete()) return false;
+  const count = await countUserBillStances(user.id);
+  return count === 0;
+}
+
 async function fetchNotifications({ limit = 20, unreadOnly = false } = {}) {
   const client = getSupabase();
   const user = await getUser();

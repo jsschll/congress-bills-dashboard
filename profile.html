@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260805toast" />
+    <link rel="stylesheet" href="styles.css?v=20260805pulse" />
   </head>
   <body class="page-app page-profile">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -585,6 +585,19 @@
           <span class="profile-accordion__icon" aria-hidden="true"></span>
         </button>
         <div class="profile-accordion__body">
+          <div class="profile-voter-pulse">
+            <p class="profile-voter-pulse__copy">
+              <strong>Voter Pulse stances</strong>
+              Set or update your Support / Oppose answers on key votes. Action
+              Match scores rebuild from these preferences.
+            </p>
+            <a
+              class="refresh-btn"
+              href="onboarding.html?retake=1"
+              id="profile-voter-pulse-cta"
+              >Retake Voter Pulse</a
+            >
+          </div>
           <p class="profile-panel__lede">
             Match rates between your Support/Oppose stances and House roll call
             votes for representatives you’ve been compared against.
@@ -922,10 +935,10 @@
     </main>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260805toast"></script>
+    <script src="shared.js?v=20260805pulse"></script>
     <script src="nav.js?v=20260804a1"></script>
     <script src="politicians-shared.js?v=20260805toast"></script>
     <script src="engagement.js?v=20260729t"></script>
-    <script src="profile.js?v=20260730c" defer></script>
+    <script src="profile.js?v=20260805pulse" defer></script>
   </body>
 </html>
