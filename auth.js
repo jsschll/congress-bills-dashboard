@@ -78,9 +78,8 @@ function showAuthView(view) {
 
   if (view === "signup") {
     document.title = "Create account · Article 1";
-    title.textContent = "Create your account";
-    subtitle.textContent =
-      "Pick a username, email, and password. Takes less than a minute.";
+    title.textContent = "Create account";
+    subtitle.textContent = "Choose a username, email, and password.";
     signupForm.hidden = false;
     return;
   }
@@ -88,15 +87,15 @@ function showAuthView(view) {
   if (view === "check-email") {
     document.title = "Check your email · Article 1";
     title.textContent = "Check your email";
-    subtitle.textContent = "One more step to finish creating your account.";
+    subtitle.textContent = "Open the verification link, then sign in.";
     setModeTabsVisible(false);
     if (checkEmailPanel) {
       checkEmailPanel.hidden = false;
       const copy = document.getElementById("check-email-copy");
       if (copy) {
         copy.textContent = pendingSignupEmail
-          ? `We sent a verification link to ${pendingSignupEmail}. Open it, then sign in here.`
-          : "We sent a verification link. Open it, then sign in here.";
+          ? `We sent a link to ${pendingSignupEmail}.`
+          : "We sent a verification link to your inbox.";
       }
     }
     return;
@@ -104,8 +103,8 @@ function showAuthView(view) {
 
   if (view === "forgot") {
     document.title = "Forgot password · Article 1";
-    title.textContent = "Reset your password";
-    subtitle.textContent = "Enter the email or username on your account.";
+    title.textContent = "Reset password";
+    subtitle.textContent = "We’ll email a reset link.";
     setModeTabsVisible(false);
     forgotForm.hidden = false;
     return;
@@ -113,8 +112,8 @@ function showAuthView(view) {
 
   if (view === "reset") {
     document.title = "Choose a new password · Article 1";
-    title.textContent = "Choose a new password";
-    subtitle.textContent = "Save a new password to finish resetting your account.";
+    title.textContent = "New password";
+    subtitle.textContent = "Save a new password for your account.";
     setModeTabsVisible(false);
     resetForm.hidden = false;
     return;
@@ -122,8 +121,8 @@ function showAuthView(view) {
 
   if (view === "otp") {
     document.title = "Email code · Article 1";
-    title.textContent = "Sign in with an email code";
-    subtitle.textContent = "We’ll send a one-time code to your inbox.";
+    title.textContent = "Email code";
+    subtitle.textContent = "We’ll send a one-time sign-in code.";
     setModeTabsVisible(false);
     otpRequestForm.hidden = false;
     return;
@@ -131,24 +130,23 @@ function showAuthView(view) {
 
   if (view === "otp-verify") {
     document.title = "Enter email code · Article 1";
-    title.textContent = "Enter your code";
-    subtitle.textContent = "Type the code from your email to finish signing in.";
+    title.textContent = "Enter code";
+    subtitle.textContent = "Use the code from your email.";
     setModeTabsVisible(false);
     otpVerifyForm.hidden = false;
     const sentTo = document.getElementById("otp-sent-to");
     if (sentTo) {
       sentTo.hidden = !pendingOtpEmail;
       sentTo.textContent = pendingOtpEmail
-        ? `Code sent to ${pendingOtpEmail}.`
+        ? `Sent to ${pendingOtpEmail}.`
         : "";
     }
     return;
   }
 
   document.title = "Sign in · Article 1";
-  title.textContent = "Welcome back";
-  subtitle.textContent =
-    "Sign in to follow politicians, save votes, and track your Action Match.";
+  title.textContent = "Sign in";
+  subtitle.textContent = "Use your email or username and password.";
   signinForm.hidden = false;
 }
 

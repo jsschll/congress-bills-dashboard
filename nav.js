@@ -66,6 +66,23 @@ function createNavShell(activePage = "home") {
     document.body.prepend(nav);
   }
 
+  // Auth gets logo-only chrome so the panel brand + form are the only job.
+  if (activePage === "auth") {
+    nav.className = "app-nav app-nav--auth";
+    nav.setAttribute("aria-label", "Article 1");
+    nav.innerHTML = `
+      <div class="app-nav__inner app-nav__inner--auth">
+        <a class="app-nav__brand" href="index.html" aria-label="Article 1 home">
+          ${NAV_LOGO_SVG}
+          <span class="app-nav__brand-text">Article 1</span>
+        </a>
+        <div class="app-nav__actions" id="app-nav-actions"></div>
+      </div>
+    `;
+    const actions = nav.querySelector("#app-nav-actions");
+    return { nav, actions };
+  }
+
   nav.className = "app-nav";
   nav.setAttribute("aria-label", "Main");
 
@@ -369,6 +386,12 @@ function buildNotificationBell(notifications, unreadCount) {
 
 async function renderAppNav(activePage = "home") {
   const { actions } = createNavShell(activePage);
+
+  // Keep the auth page free of app chrome (links, bells, sign-in CTAs).
+  if (activePage === "auth") {
+    actions.replaceChildren();
+    return;
+  }
 
   let user = null;
   try {
