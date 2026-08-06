@@ -765,6 +765,9 @@ function mapProcessedVoteToFeedItem(row = {}) {
     what_it_does: plainSummary,
     card_summary: plainSummary || summary,
     cardSummary: plainSummary || summary,
+    takeaway: String(row.takeaway || "").trim(),
+    key_points: row.key_points || row.keyPoints || null,
+    keyPoints: row.key_points || row.keyPoints || null,
     primaryCategory,
     primary_category: primaryCategory,
     category: primaryCategory,
@@ -791,7 +794,7 @@ function mapProcessedVoteToFeedItem(row = {}) {
 }
 
 const PROCESSED_VOTES_FEED_SELECT =
-  "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, short_title, plain_summary, what_it_does, yea_impact, nay_impact, primary_category, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
+  "roll_call_id, bill_id, title, summary, yea_means, nay_means, yea_label, nay_label, short_title, plain_summary, what_it_does, yea_impact, nay_impact, takeaway, key_points, primary_category, bill_number, legislation_number, bill_type, result, vote_date, vote_question, vote_kind, chamber, congress, session_number, roll_call_number, official_url, clerk_url, summary_source, updated_at";
 
 function normalizeLegislationType(type) {
   return String(type || "")
