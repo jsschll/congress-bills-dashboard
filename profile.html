@@ -198,13 +198,22 @@
             <div id="profile-address-saved" class="profile-saved" hidden>
               <p id="profile-address-saved-value" class="profile-saved__value"></p>
               <p id="profile-address-saved-meta" class="profile-form__note"></p>
-              <button
-                id="profile-address-change"
-                class="refresh-btn"
-                type="button"
-              >
-                Change address/ZIP
-              </button>
+              <div class="profile-form__actions">
+                <button
+                  id="profile-address-change"
+                  class="refresh-btn"
+                  type="button"
+                >
+                  Change address/ZIP
+                </button>
+                <button
+                  id="profile-address-clear"
+                  class="profile-btn profile-btn--ghost"
+                  type="button"
+                >
+                  Clear location
+                </button>
+              </div>
             </div>
 
             <form id="profile-address-form" class="profile-form">
@@ -237,12 +246,23 @@
                   type="text"
                   autocomplete="street-address"
                   placeholder="123 Main St, City, ST"
-                  required
                 />
+                <span class="profile-form__note">
+                  Optional. Clear the field and save, or use Clear location, to
+                  browse without a saved address.
+                </span>
               </label>
 
               <div class="profile-form__actions">
                 <button class="refresh-btn" type="submit">Save location</button>
+                <button
+                  id="profile-address-clear-form"
+                  class="profile-btn profile-btn--ghost"
+                  type="button"
+                  hidden
+                >
+                  Clear location
+                </button>
                 <button
                   id="profile-address-cancel"
                   class="profile-btn profile-btn--ghost"
@@ -340,13 +360,22 @@
 
             <div id="profile-pocketbook-saved" class="profile-saved" hidden>
               <dl id="profile-pocketbook-saved-list" class="profile-saved-facts"></dl>
-              <button
-                id="profile-pocketbook-change"
-                class="refresh-btn"
-                type="button"
-              >
-                Change
-              </button>
+              <div class="profile-form__actions">
+                <button
+                  id="profile-pocketbook-change"
+                  class="refresh-btn"
+                  type="button"
+                >
+                  Change
+                </button>
+                <button
+                  id="profile-pocketbook-clear"
+                  class="profile-btn profile-btn--ghost"
+                  type="button"
+                >
+                  Clear baselines
+                </button>
+              </div>
             </div>
 
             <form id="profile-pocketbook-form" class="profile-form">
@@ -457,6 +486,14 @@
 
               <div class="profile-form__actions">
                 <button class="refresh-btn" type="submit">Save baselines</button>
+                <button
+                  id="profile-pocketbook-clear-form"
+                  class="profile-btn profile-btn--ghost"
+                  type="button"
+                  hidden
+                >
+                  Clear baselines
+                </button>
                 <button
                   id="profile-pocketbook-cancel"
                   class="profile-btn profile-btn--ghost"
@@ -939,6 +976,6 @@
     <script src="nav.js?v=20260804a1"></script>
     <script src="politicians-shared.js?v=20260805toast"></script>
     <script src="engagement.js?v=20260729t"></script>
-    <script src="profile.js?v=20260805pulse" defer></script>
+    <script src="profile.js?v=20260806clearloc" defer></script>
   </body>
 </html>
