@@ -259,10 +259,21 @@
               JSON.stringify({
                 ...data,
                 activeId: data.representatives[0]?.profile?.id || null,
+                query: {
+                  zipCode: parsed.zipCode || null,
+                  address: parsed.address || null,
+                },
               })
             );
           } catch {
             /* ignore */
+          }
+          if (typeof saveGuestLocationContext === "function") {
+            saveGuestLocationContext({
+              zipCode: parsed.zipCode || null,
+              address: parsed.address || null,
+              query,
+            });
           }
           const params = new URLSearchParams();
           if (parsed.zipCode) params.set("zipCode", parsed.zipCode);

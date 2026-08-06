@@ -39,16 +39,135 @@ async function getUser() {
   return session?.user || null;
 }
 
-async function requireUser(redirectTo = "auth.html") {
+const GUEST_LOCATION_KEY = "article1.guestLocation";
+
+function currentPageNextPath() {
+  const path = `${window.location.pathname || ""}${window.location.search || ""}`;
+  return path.replace(/^\//, "") || "index.html";
+}
+
+function authHrefForNext(nextPath = "", mode = "") {
+  const url = new URL("auth.html", window.location.href);
+  const next = String(nextPath || currentPageNextPath()).replace(/^\//, "");
+  if (next) url.searchParams.set("next", next);
+  if (mode) url.searchParams.set("mode", mode);
+  return url.pathname.split("/").pop() + url.search;
+}
+
+/**
+ * In-page auth gate — prefer this over hard redirects so guests keep context.
+ * @param {{ next?: string, title?: string, body?: string, reason?: string }} [options]
+ */
+function promptAuthGate(options = {}) {
+  const next = String(options.next || currentPageNextPath()).replace(/^\//, "");
+  const title = options.title || "Create a free account";
+  const body =
+    options.body ||
+    "Create a free account to track topics, receive personalized alerts, and contact your representatives directly.";
+
+  let root = document.getElementById("auth-gate-modal");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "auth-gate-modal";
+    root.className = "auth-gate-modal";
+    root.hidden = true;
+    root.innerHTML = `
+      <div class="auth-gate-modal__backdrop" data-auth-gate-close></div>
+      <div class="auth-gate-modal__panel" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
+        <button type="button" class="auth-gate-modal__close" data-auth-gate-close aria-label="Close">×</button>
+        <p class="auth-gate-modal__eyebrow">Article 1</p>
+        <h2 id="auth-gate-title" class="auth-gate-modal__title"></h2>
+        <p class="auth-gate-modal__body"></p>
+        <div class="auth-gate-modal__actions">
+          <a class="auth-gate-modal__btn auth-gate-modal__btn--primary" data-auth-gate-signup>Create account</a>
+          <a class="auth-gate-modal__btn auth-gate-modal__btn--ghost" data-auth-gate-signin>Sign in</a>
+        </div>
+        <button type="button" class="auth-gate-modal__dismiss" data-auth-gate-close>Not now</button>
+      </div>
+    `;
+    document.body.append(root);
+
+    const close = () => {
+      root.hidden = true;
+      document.body.classList.remove("auth-gate-modal-open");
+    };
+    root.addEventListener("click", (event) => {
+      if (event.target.closest("[data-auth-gate-close]")) close();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !root.hidden) close();
+    });
+    root._authGateClose = close;
+  }
+
+  root.querySelector(".auth-gate-modal__title").textContent = title;
+  root.querySelector(".auth-gate-modal__body").textContent = body;
+  root.querySelector("[data-auth-gate-signup]").href = authHrefForNext(
+    next,
+    "signup"
+  );
+  root.querySelector("[data-auth-gate-signin]").href = authHrefForNext(next);
+  root.hidden = false;
+  document.body.classList.add("auth-gate-modal-open");
+  root.querySelector("[data-auth-gate-signup]")?.focus?.();
+  return null;
+}
+
+async function requireUser(redirectTo = "auth.html", options = {}) {
+  const opts =
+    typeof redirectTo === "object" && redirectTo
+      ? redirectTo
+      : { redirectTo, ...options };
   const user = await getUser();
-  if (!user) {
-    const next = encodeURIComponent(
-      `${window.location.pathname}${window.location.search}`
-    );
-    window.location.href = `${redirectTo}?next=${next}`;
+  if (user) return user;
+
+  const next = String(opts.next || currentPageNextPath()).replace(/^\//, "");
+  const forceRedirect = opts.forceRedirect === true;
+  if (forceRedirect) {
+    const base = String(opts.redirectTo || "auth.html").replace(/\?.*$/, "");
+    window.location.href = `${base}?next=${encodeURIComponent(next)}`;
     return null;
   }
-  return user;
+
+  promptAuthGate({
+    next,
+    title: opts.title,
+    body: opts.body,
+    reason: opts.reason,
+  });
+  return null;
+}
+
+function saveGuestLocationContext({ zipCode = null, address = null, query = null } = {}) {
+  const zip = String(zipCode || "").trim() || null;
+  const addr = String(address || "").trim() || null;
+  const q = String(query || zip || addr || "").trim() || null;
+  if (!q) return;
+  try {
+    sessionStorage.setItem(
+      GUEST_LOCATION_KEY,
+      JSON.stringify({
+        zipCode: zip,
+        address: addr,
+        query: q,
+        savedAt: Date.now(),
+      })
+    );
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function readGuestLocationContext() {
+  try {
+    const raw = sessionStorage.getItem(GUEST_LOCATION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data?.query && !data?.zipCode && !data?.address) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 /** Clear device-local location so one account's address never seeds another. */

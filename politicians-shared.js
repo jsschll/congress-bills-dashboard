@@ -2242,9 +2242,14 @@ function renderPoliticianCard(
   followBtn.addEventListener("click", async () => {
     if (isDistrictOnly) return;
     if (!user) {
-      window.location.href = `auth.html?next=${encodeURIComponent(
-        window.location.pathname.split("/").pop() || "politicians.html"
-      )}`;
+      if (typeof promptAuthGate === "function") {
+        promptAuthGate({
+          next:
+            window.location.pathname.split("/").pop() || "politicians.html",
+          title: "Follow officials with a free account",
+          body: "Create a free account to follow representatives, save votes, and get alerts when they act.",
+        });
+      }
       return;
     }
 
@@ -3221,13 +3226,32 @@ function politiciansBrowseUrl(address) {
 
 function resolveAddressLookupQuery(search = window.location.search) {
   const params = new URLSearchParams(search);
-  return (
+  const fromUrl = (
     params.get("address") ||
     params.get("q") ||
     params.get("zipCode") ||
     params.get("zip") ||
     ""
   ).trim();
+  if (fromUrl) return fromUrl;
+  if (typeof readGuestLocationContext === "function") {
+    const guest = readGuestLocationContext();
+    return String(guest?.query || guest?.zipCode || guest?.address || "").trim();
+  }
+  return "";
+}
+
+function persistGuestLookupQuery(address) {
+  const value = String(address || "").trim();
+  if (!value || typeof saveGuestLocationContext !== "function") return;
+  if (/^\d{5}(-\d{4})?$/.test(value)) {
+    saveGuestLocationContext({
+      zipCode: value.slice(0, 5),
+      query: value.slice(0, 5),
+    });
+  } else {
+    saveGuestLocationContext({ address: value, query: value });
+  }
 }
 
 /**
@@ -3244,6 +3268,7 @@ function mountAddressLookup({ formId, inputId, destination = "results" } = {}) {
     event.preventDefault();
     const address = input.value.trim();
     if (!address) return;
+    persistGuestLookupQuery(address);
     window.location.href =
       destination === "politicians"
         ? politiciansBrowseUrl(address)

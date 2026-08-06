@@ -360,7 +360,16 @@ function setupMyRepresentativesQuickLoad({ addressInput, addressForm, user }) {
   const params = new URLSearchParams(window.location.search);
   const addressInput = document.getElementById("address-input");
   const addressForm = document.getElementById("address-form");
-  const prefillAddress = params.get("address")?.trim();
+  const guestLocation =
+    typeof readGuestLocationContext === "function"
+      ? readGuestLocationContext()
+      : null;
+  const prefillAddress =
+    params.get("address")?.trim() ||
+    params.get("zipCode")?.trim() ||
+    params.get("zip")?.trim() ||
+    String(guestLocation?.query || guestLocation?.zipCode || guestLocation?.address || "").trim() ||
+    "";
   const prefillName =
     params.get("q")?.trim() ||
     params.get("name")?.trim() ||
@@ -379,9 +388,9 @@ function setupMyRepresentativesQuickLoad({ addressInput, addressForm, user }) {
     inputId: "address-input",
   });
 
-  // Homepage hero lands here with ?address=… already filled, then continues
-  // into the lookup so users are not asked to click Look up again.
-  if (prefillAddress && addressForm) {
+  // Homepage hero or stored guest ZIP/address → continue into the localized
+  // audit view so navigating away and back does not clear their search.
+  if (prefillAddress && addressForm && params.get("browse") !== "1") {
     addressForm.requestSubmit();
     return;
   }
