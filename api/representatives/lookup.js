@@ -52,7 +52,9 @@ module.exports = async function handler(req, res) {
   try {
     // Single-rep scorecard by id / bioguide / politicians roster id.
     if (id || bioguideId || politicianId) {
-      // If location is also present, return the full district set with active id.
+      // Location + deep link: only use the district set when the requested
+      // member is actually in that district. Otherwise open the deep-linked
+      // member alone (e.g. searching Josh Hawley while session has a TX ZIP).
       if (zipCode || address) {
         const payload = await lookupRepresentativesByLocation({
           zipCode,
@@ -74,14 +76,16 @@ module.exports = async function handler(req, res) {
               politicianId &&
               String(rep.profile.rosterPoliticianId || "") === politicianId
           ) ||
-          ordered[0] ||
           null;
-        return json(res, 200, {
-          ...payload,
-          representatives: ordered,
-          activeId: active?.profile?.id || null,
-          representative: active,
-        });
+        if (active) {
+          return json(res, 200, {
+            ...payload,
+            representatives: ordered,
+            activeId: active.profile.id,
+            representative: active,
+          });
+        }
+        // Fall through to single-member lookup below.
       }
 
       const single = await getScorecardById({

@@ -2484,13 +2484,7 @@
       el.dataset.voteScope ||
       "key";
     const politicianName = String(
-      options.politicianName ||
-        el.dataset.politicianName ||
-        state?.data?.representative?.profile?.name ||
-        state?.data?.representatives?.find(
-          (rep) => rep?.profile?.id === state.activeId
-        )?.profile?.name ||
-        ""
+      options.politicianName || el.dataset.politicianName || ""
     ).trim();
     if (politicianName) el.dataset.politicianName = politicianName;
     el.dataset.voteScope = scope;
@@ -2700,10 +2694,14 @@
       bioguideId: String(
         options.bioguideId || el.dataset.bioguideId || ""
       ).toUpperCase(),
+      chamber: String(options.chamber || el.dataset.chamber || ""),
       onStanceChange: options.onStanceChange || el._scorecardVoteOptions?.onStanceChange || null,
     };
     if (el._scorecardVoteOptions.bioguideId) {
       el.dataset.bioguideId = el._scorecardVoteOptions.bioguideId;
+    }
+    if (el._scorecardVoteOptions.chamber) {
+      el.dataset.chamber = el._scorecardVoteOptions.chamber;
     }
 
     mountScorecardVoteEngagement(el, filtered, el._scorecardVoteOptions);
@@ -2715,6 +2713,7 @@
           scope: scopeSelect.value,
           politicianName,
           bioguideId: el._scorecardVoteOptions?.bioguideId,
+          chamber: el._scorecardVoteOptions?.chamber,
           onStanceChange: el._scorecardVoteOptions?.onStanceChange,
         });
       });
@@ -2736,6 +2735,7 @@
           scope: el.dataset.voteScope || "key",
           politicianName,
           bioguideId: el._scorecardVoteOptions?.bioguideId,
+          chamber: el._scorecardVoteOptions?.chamber,
           onStanceChange: el._scorecardVoteOptions?.onStanceChange,
         });
       });
@@ -2746,14 +2746,9 @@
     if (!el) return;
     const politicianName = String(options.politicianName || "").trim();
     const bioguideId = String(options.bioguideId || "").toUpperCase();
+    const chamberHint = String(options.chamber || el.dataset.chamber || "");
     const profile = {
-      chamber: /senate/i.test(
-        state?.data?.representatives?.find(
-          (rep) => rep?.profile?.id === state.activeId
-        )?.profile?.chamber || ""
-      )
-        ? "Senate"
-        : "House",
+      chamber: /senate/i.test(chamberHint) ? "Senate" : "House",
       bioguideId,
     };
 
@@ -3097,6 +3092,7 @@
         renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
           politicianName: active.profile?.name || "",
           bioguideId: active.profile?.bioguideId || "",
+          chamber: active.profile?.chamber || "",
           onStanceChange: refreshActionMatchScore,
         });
       }
@@ -3117,6 +3113,7 @@
         renderVotes($("scorecard-votes"), liveVotes, state.voteQuery, {
           politicianName: active.profile?.name || "",
           bioguideId: active.profile?.bioguideId || "",
+          chamber: active.profile?.chamber || "",
           onStanceChange: refreshActionMatchScore,
         });
       }
@@ -3169,6 +3166,7 @@
           renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
             politicianName: active.profile?.name || "",
             bioguideId: active.profile?.bioguideId || "",
+            chamber: active.profile?.chamber || "",
             onStanceChange: refreshActionMatchScore,
           });
         }
@@ -3189,15 +3187,29 @@
         }
 
         let payload = null;
-        const zipCode = query.zipCode || session?.query?.zipCode || null;
-        const address = query.address || session?.query?.address || null;
-        const id = query.id || null;
-        const bioguideId = query.bioguideId || null;
-        const politicianId = query.politicianId || null;
+        const deepLinkId = query.id || null;
+        const deepLinkBioguide = query.bioguideId || null;
+        const deepLinkPoliticianId = query.politicianId || null;
+        const isDeepLink = Boolean(
+          deepLinkId || deepLinkBioguide || deepLinkPoliticianId
+        );
+        // Deep links (Politicians search → Hawley) must not reuse the session
+        // ZIP/address, or the API returns your district set and picks Cornyn.
+        const zipCode = isDeepLink
+          ? query.zipCode || null
+          : query.zipCode || session?.query?.zipCode || null;
+        const address = isDeepLink
+          ? query.address || null
+          : query.address || session?.query?.address || null;
+        const id = deepLinkId;
+        const bioguideId = deepLinkBioguide;
+        const politicianId = deepLinkPoliticianId;
         const sessionActiveId = session?.activeId || null;
         const directoryQuery =
           address ||
           zipCode ||
+          session?.query?.address ||
+          session?.query?.zipCode ||
           (typeof resolveAddressLookupQuery === "function"
             ? resolveAddressLookupQuery()
             : "") ||
@@ -3255,8 +3267,10 @@
           ...payload,
           activeId: state.activeId,
           query: {
-            zipCode,
-            address,
+            // Preserve the user's home ZIP/address across deep links so
+            // "my representatives" still works after opening Hawley etc.
+            zipCode: zipCode || session?.query?.zipCode || null,
+            address: address || session?.query?.address || null,
             bioguideId,
             politicianId,
           },
