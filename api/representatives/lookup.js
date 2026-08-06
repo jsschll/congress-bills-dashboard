@@ -50,11 +50,11 @@ module.exports = async function handler(req, res) {
   const { zipCode, address, id, bioguideId, politicianId } = readQuery(req);
 
   try {
-    // Single-rep scorecard by id / bioguide / politicians roster id.
+    // If location is also present, return the full district set with active id
+    // only when the requested member is actually in that district. Never fall
+    // back to a lone out-of-district deep link when the user asked by ZIP/address
+    // with a stale session id (that resurfaced Josh Hawley as "my reps").
     if (id || bioguideId || politicianId) {
-      // Location + deep link: only use the district set when the requested
-      // member is actually in that district. Otherwise open the deep-linked
-      // member alone (e.g. searching Josh Hawley while session has a TX ZIP).
       if (zipCode || address) {
         const payload = await lookupRepresentativesByLocation({
           zipCode,
@@ -85,7 +85,16 @@ module.exports = async function handler(req, res) {
             representative: active,
           });
         }
-        // Fall through to single-member lookup below.
+        // Location lookup wins: return the district set even if the stale id
+        // / bioguide is not in it (caller can deep-link without location).
+        if (ordered.length) {
+          return json(res, 200, {
+            ...payload,
+            representatives: ordered,
+            activeId: ordered[0]?.profile?.id || null,
+            representative: ordered[0] || null,
+          });
+        }
       }
 
       const single = await getScorecardById({
