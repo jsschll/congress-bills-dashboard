@@ -7581,6 +7581,10 @@ body.politician-notes-modal-open {
 .votes-feed-list {
   display: grid;
   gap: 0.85rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* —— Polished social feed cards (Votes + shared) —— */
