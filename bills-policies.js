@@ -1254,9 +1254,61 @@ function voteCardDateLabel(item) {
   return formatShortDate(raw) || String(raw).slice(0, 10);
 }
 
+function clampVoteHeadline(text, maxWords = 16) {
+  const cleaned = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return cleaned.replace(/[.]+$/, "");
+  return `${words
+    .slice(0, maxWords)
+    .join(" ")
+    .replace(/[,:;–—-]+$/, "")}…`;
+}
+
+function voteCardHeadline(item, copy = {}) {
+  const shortTitle = String(
+    copy.shortTitle || item.short_title || item.shortTitle || ""
+  ).trim();
+  if (shortTitle && shortTitle.length <= 110) return shortTitle;
+
+  const summary = String(
+    copy.summary ||
+      item.card_summary ||
+      item.cardSummary ||
+      item.plain_summary ||
+      item.shortPitch ||
+      item.summary ||
+      ""
+  ).trim();
+  if (summary) {
+    const first = summary.split(/(?<=[.!?])\s+/)[0] || summary;
+    return clampVoteHeadline(first, 16);
+  }
+
+  const title =
+    String(item.title || "").trim() ||
+    String(item.voteQuestion || "").trim() ||
+    "Congressional vote";
+  return clampVoteHeadline(title, 14);
+}
+
+function voteCardTags(item, chamberLabel, motion) {
+  const tags = [];
+  if (chamberLabel) tags.push(chamberLabel);
+  const motionLabel = String(motion?.label || "").trim();
+  if (motionLabel && motionLabel.toLowerCase() !== "floor vote") {
+    tags.push(motionLabel);
+  } else if (item.result) {
+    tags.push(String(item.result).trim());
+  }
+  return tags.slice(0, 2);
+}
+
 function renderVoteCard(item) {
   const card = document.createElement("article");
-  card.className = "vote-feed-card policy-bill-card";
+  card.className = "vote-feed-card vote-feed-card--compact policy-bill-card";
 
   const title =
     String(item.title || "").trim() ||
@@ -1269,31 +1321,27 @@ function renderVoteCard(item) {
       : {
           yeaLabel:
             String(item.yeaLabel || item.yea_label || "").trim() ||
-            "Support Measure",
+            "Support",
           nayLabel:
             String(item.nayLabel || item.nay_label || "").trim() ||
-            "Oppose Measure",
+            "Oppose",
         };
-  const yeaLabel = copy.yeaLabel || "Support Measure";
-  const nayLabel = copy.nayLabel || "Oppose Measure";
+  const yeaLabel = copy.yeaLabel || "Support";
+  const nayLabel = copy.nayLabel || "Oppose";
   const yeaMeans = String(
     copy.yeaMeans || item.yeaMeans || item.yea_means || ""
   ).trim();
   const nayMeans = String(
     copy.nayMeans || item.nayMeans || item.nay_means || ""
   ).trim();
-  const summaryHtml =
-    typeof renderCollapsibleSummaryHtml === "function"
-      ? renderCollapsibleSummaryHtml(item, {
-          escapeHtmlFn: escapePolicyHtml,
-          paragraphClass: "policy-bill-card__pitch vote-card__summary-text",
-        })
-      : `<p class="policy-bill-card__pitch vote-card__summary-text">${escapePolicyHtml(
-          copy.summary ||
-            item.plain_summary ||
-            item.summary ||
-            "No summary available for this vote."
-        )}</p>`;
+  const fullSummary = String(
+    copy.displaySummary?.full ||
+      copy.summary ||
+      item.plain_summary ||
+      item.summary ||
+      "No summary available for this vote."
+  ).trim();
+  const headline = voteCardHeadline(item, copy);
   const billNumber =
     item.billNumber ||
     (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "");
@@ -1311,79 +1359,116 @@ function renderVoteCard(item) {
           detail: voteKindLabel(item.voteKind, item),
           isProcedural: false,
         };
+  const tags = voteCardTags(item, chamberLabel, motion);
+  const metaParts = [
+    billNumber,
+    dateLabel,
+    item.result ? String(item.result).trim() : "",
+  ].filter(Boolean);
+  const detailsId = `vote-details-${String(item.id || item.rollCallId || Math.random())
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 48)}`;
 
   card.innerHTML = `
-    <div class="policy-bill-card__header">
-      <div>
-        <div class="policy-bill-card__badges">
-          <span class="policy-bill-card__level">${escapePolicyHtml(
-            chamberLabel
-          )}</span>
-          ${
-            billNumber
-              ? `<span class="policy-bill-card__bill-number">${escapePolicyHtml(
-                  billNumber
+    <div class="vote-feed-card__main">
+      <div class="vote-feed-card__body">
+        <div class="vote-feed-card__tags" aria-label="Vote tags">
+          ${tags
+            .map(
+              (tag) =>
+                `<span class="vote-feed-card__tag">${escapePolicyHtml(
+                  tag
                 )}</span>`
-              : ""
-          }
-          <span
-            class="policy-bill-card__motion${
-              motion.isProcedural ? " is-procedural" : ""
-            }"
-            title="${escapePolicyHtml(motion.detail || motion.label)}"
-          >${escapePolicyHtml(motion.label)}</span>
+            )
+            .join("")}
         </div>
-        <h2 class="policy-bill-card__title">${escapePolicyHtml(title)}</h2>
+        <h2 class="vote-feed-card__headline">${escapePolicyHtml(headline)}</h2>
         ${
-          motion.isProcedural
-            ? `<p class="policy-bill-card__motion-note">${escapePolicyHtml(
-                motion.detail || motion.label
+          metaParts.length
+            ? `<p class="vote-feed-card__meta">${escapePolicyHtml(
+                metaParts.join(" · ")
               )}</p>`
-            : ""
-        }
-        ${
-          dateLabel
-            ? `<p class="policy-bill-card__meta vote-feed-card__date"><time datetime="${escapePolicyHtml(
-                String(item.date || item.vote_date || "").slice(0, 10)
-              )}">${escapePolicyHtml(dateLabel)}</time></p>`
             : ""
         }
       </div>
     </div>
-    <section class="policy-bill-card__summary" aria-label="Summary">
-      <h3 class="policy-bill-card__summary-label">Summary</h3>
-      ${summaryHtml}
-    </section>
-    ${
-      yeaMeans || nayMeans
-        ? `<div class="vote-feed-card__meanings" aria-label="Action impact">
-      <div class="vote-feed-card__meaning is-yea">
-        <strong>Yea means</strong>
-        <p>${escapePolicyHtml(yeaMeans || "—")}</p>
-      </div>
-      <div class="vote-feed-card__meaning is-nay">
-        <strong>Nay means</strong>
-        <p>${escapePolicyHtml(nayMeans || "—")}</p>
-      </div>
-    </div>`
-        : ""
-    }
-    <a class="bill-card__link" href="${escapePolicyHtml(
-      item.clerkUrl || item.officialUrl || "#"
-    )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
+    <button
+      type="button"
+      class="vote-feed-card__toggle"
+      aria-expanded="false"
+      aria-controls="${detailsId}"
+    >
+      Tap for more
+    </button>
+    <div class="vote-feed-card__details" id="${detailsId}" hidden>
+      <p class="vote-feed-card__official-title">${escapePolicyHtml(title)}</p>
+      ${
+        motion.isProcedural
+          ? `<p class="vote-feed-card__motion-note">${escapePolicyHtml(
+              motion.detail || motion.label
+            )}</p>`
+          : ""
+      }
+      <section class="vote-feed-card__summary" aria-label="Full summary">
+        <p class="vote-feed-card__summary-text">${escapePolicyHtml(
+          fullSummary
+        )}</p>
+      </section>
+      ${
+        yeaMeans || nayMeans
+          ? `<div class="vote-feed-card__meanings" aria-label="Action impact">
+        <div class="vote-feed-card__meaning is-yea">
+          <strong>Yea means</strong>
+          <p>${escapePolicyHtml(yeaMeans || "—")}</p>
+        </div>
+        <div class="vote-feed-card__meaning is-nay">
+          <strong>Nay means</strong>
+          <p>${escapePolicyHtml(nayMeans || "—")}</p>
+        </div>
+      </div>`
+          : ""
+      }
+      <a class="bill-card__link vote-feed-card__roll-link" href="${escapePolicyHtml(
+        item.clerkUrl || item.officialUrl || "#"
+      )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
+    </div>
   `;
+
+  const toggle = card.querySelector(".vote-feed-card__toggle");
+  const details = card.querySelector(".vote-feed-card__details");
+  const setExpanded = (open) => {
+    card.classList.toggle("is-expanded", open);
+    if (details) details.hidden = !open;
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.textContent = open ? "Show less" : "Tap for more";
+    }
+  };
+  toggle?.addEventListener("click", () => {
+    setExpanded(!card.classList.contains("is-expanded"));
+  });
+  card.querySelector(".vote-feed-card__main")?.addEventListener("click", () => {
+    if (!card.classList.contains("is-expanded")) setExpanded(true);
+  });
 
   if (window.PolicyEngagement?.mountVote) {
     window.PolicyEngagement.mountVote(card, item, {
       supportLabel: yeaLabel,
       opposeLabel: nayLabel,
+      prompt: "",
+      compact: true,
+      showFollow: true,
+      showAskAi: true,
+      showWhoVoted: true,
+      showAlignment: true,
       whoVotedHint: `Tap ${yeaLabel} or ${nayLabel} to compare with representatives.`,
     });
   } else if (window.PolicyEngagement?.mount) {
     window.PolicyEngagement.mount(card, item, {
       supportLabel: yeaLabel,
       opposeLabel: nayLabel,
-      prompt: "How would you vote?",
+      prompt: "",
+      compact: true,
       showTakeAction: false,
     });
   }
