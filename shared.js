@@ -1868,7 +1868,17 @@ function fillBillBreakdownModal(payload = {}, options = {}) {
     linkEl.hidden = !linkEl.href;
   }
 
-  resetBillAskAi(prefix, payload);
+  const askPayload = {
+    ...payload,
+    congress_url:
+      payload.congress_url ||
+      payload.congressUrl ||
+      payload.officialUrl ||
+      payload.official_url ||
+      payload.href ||
+      "",
+  };
+  resetBillAskAi(prefix, askPayload);
   bindBillAskAi(prefix);
 }
 
@@ -1960,6 +1970,20 @@ async function askAiAboutBill(prefix, question) {
           conArgument: payload.conArgument || payload.nay || "",
           resultLabel: payload.resultLabel || "",
           rollMeta: payload.rollMeta || {},
+          congress_url:
+            payload.congress_url ||
+            payload.congressUrl ||
+            payload.officialUrl ||
+            payload.official_url ||
+            payload.href ||
+            "",
+          officialUrl:
+            payload.officialUrl ||
+            payload.official_url ||
+            payload.congress_url ||
+            payload.href ||
+            "",
+          href: payload.href || "",
         },
       }),
     });
@@ -2027,6 +2051,8 @@ async function askAiAboutBill(prefix, question) {
     if (!full.trim()) {
       assistantMsg.textContent =
         "I couldn’t find enough detail in this bill card to answer that.";
+    } else if (typeof formatAskAiAnswerHtml === "function") {
+      assistantMsg.innerHTML = formatAskAiAnswerHtml(full);
     }
     assistantMsg.classList.remove("is-streaming");
     if (statusEl) statusEl.hidden = true;
@@ -2072,6 +2098,20 @@ function bindBillAskAi(prefix = "scorecard-match-detail") {
 }
 
 /** Normalize a feed / vote card item into Ask AI bill context. */
+function formatAskAiAnswerHtml(text) {
+  const escaped = String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  return escaped
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    )
+    .replace(/\n/g, "<br />");
+}
+
 function billAskAiPayloadFromItem(item = {}) {
   const keyPoints = Array.isArray(item.keyPoints)
     ? item.keyPoints
@@ -2085,6 +2125,16 @@ function billAskAiPayloadFromItem(item = {}) {
       item.plainSummary ||
       item.shortPitch ||
       item.summary ||
+      ""
+  ).trim();
+  const congressUrl = String(
+    item.congress_url ||
+      item.congressUrl ||
+      item.officialUrl ||
+      item.official_url ||
+      item.clerkUrl ||
+      item.clerk_url ||
+      item.href ||
       ""
   ).trim();
   return {
@@ -2119,6 +2169,11 @@ function billAskAiPayloadFromItem(item = {}) {
         ""
     ).trim(),
     resultLabel: String(item.result || item.resultLabel || "").trim(),
+    congress_url: congressUrl,
+    congressUrl,
+    officialUrl: congressUrl,
+    official_url: congressUrl,
+    href: congressUrl || String(item.href || "").trim(),
     rollMeta: {
       result: item.result || item.rollMeta?.result || "",
       chamber: item.chamber || item.rollMeta?.chamber || "",
