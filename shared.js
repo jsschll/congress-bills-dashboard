@@ -1959,12 +1959,17 @@ async function askAiAboutBill(prefix, question) {
       body: JSON.stringify({
         question: q,
         bill: {
+          id: payload.id || "",
           title: payload.title || "",
           rawTitle: payload.rawTitle || "",
           number: payload.number || "",
+          congress: payload.congress || null,
+          billType: payload.billType || "",
+          legislationNumber: payload.legislationNumber || "",
           takeaway: payload.takeaway || "",
           summary: payload.summary || "",
           cardSummary: payload.cardSummary || "",
+          statusLabel: payload.statusLabel || "",
           keyPoints: payload.keyPoints || [],
           proArgument: payload.proArgument || payload.yea || "",
           conArgument: payload.conArgument || payload.nay || "",
@@ -2112,21 +2117,53 @@ function formatAskAiAnswerHtml(text) {
     .replace(/\n/g, "<br />");
 }
 
+function looksLikeLegislativeStatusText(text) {
+  const t = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t || t.length > 420) return false;
+  return /^(received in the (senate|house)|referred to the (committee|subcommittee)|passed\/agreed to|became public law|read (the )?(first|second) time|placed on (the )?(senate|house|legislative|union) calendar|introduced in the (house|senate)|message on (senate|house) action)/i.test(
+    t
+  );
+}
+
 function billAskAiPayloadFromItem(item = {}) {
   const keyPoints = Array.isArray(item.keyPoints)
     ? item.keyPoints
     : Array.isArray(item.key_points)
       ? item.key_points
       : [];
-  const summary = String(
-    item.cardSummary ||
+  const policySummary = String(
+    (typeof preferPlainSummaryText === "function"
+      ? preferPlainSummaryText(item)
+      : "") ||
+      item.cardSummary ||
       item.card_summary ||
       item.plain_summary ||
       item.plainSummary ||
-      item.shortPitch ||
-      item.summary ||
+      item.what_it_does ||
       ""
   ).trim();
+  const rawPitch = String(
+    item.shortPitch || item.summary || item.officialSummary || ""
+  ).trim();
+  const statusLabel = String(
+    item.statusLabel || item.status_label || item.status?.stepName || ""
+  ).trim();
+  // Prefer real policy copy; keep status separate so Ask AI does not treat
+  // "Received in the Senate…" as the bill's policy summary.
+  let summary = policySummary;
+  if (!summary && rawPitch && !looksLikeLegislativeStatusText(rawPitch)) {
+    summary = rawPitch;
+  }
+  if (!summary && rawPitch && looksLikeLegislativeStatusText(rawPitch)) {
+    summary = "";
+  }
+  const effectiveStatus =
+    statusLabel ||
+    (looksLikeLegislativeStatusText(rawPitch) ? rawPitch : "") ||
+    "";
+
   const congressUrl = String(
     item.congress_url ||
       item.congressUrl ||
@@ -2137,7 +2174,38 @@ function billAskAiPayloadFromItem(item = {}) {
       item.href ||
       ""
   ).trim();
+
+  let congress =
+    Number(item.congress || item.bill_congress || item.billCongress || 0) || 0;
+  let billType = String(
+    item.billType || item.bill_type || item.type || ""
+  )
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, "")
+    .trim();
+  let legislationNumber = String(
+    item.legislationNumber || item.legislation_number || ""
+  ).replace(/\D/g, "");
+
+  const id = String(item.id || item.billId || "").toLowerCase();
+  const fromId = id.match(/federal-(?:bill-)?(\d{2,3})-([a-z]+)-(\d+)/);
+  if (fromId) {
+    if (!congress) congress = Number(fromId[1]);
+    if (!billType) billType = fromId[2];
+    if (!legislationNumber) legislationNumber = fromId[3];
+  }
+  if ((!billType || !legislationNumber) && typeof parseBillNumberParts === "function") {
+    const parts = parseBillNumberParts(item.billNumber || item.bill_number);
+    if (parts) {
+      if (!billType) billType = parts.billType;
+      if (!legislationNumber) legislationNumber = parts.legislationNumber;
+    }
+  }
+  if (!congress) congress = 119;
+
   return {
+    id: String(item.id || item.billId || "").trim(),
     title: String(item.title || item.voteQuestion || "Untitled measure").trim(),
     rawTitle: String(item.rawTitle || item.title || "").trim(),
     number: String(
@@ -2146,11 +2214,15 @@ function billAskAiPayloadFromItem(item = {}) {
         (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "") ||
         ""
     ).trim(),
+    congress,
+    billType,
+    legislationNumber,
     takeaway: String(
       item.takeaway || item.short_title || item.shortTitle || ""
     ).trim(),
     summary,
     cardSummary: summary,
+    statusLabel: effectiveStatus,
     keyPoints,
     proArgument: String(
       item.proArgument ||
