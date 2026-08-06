@@ -1468,13 +1468,13 @@ function renderActionMatchScorecardItem(row, escapeHtmlFn) {
         ? "Differ"
         : "Compared";
   const yourPill = /oppose/i.test(String(copy.yourStanceLabel || ""))
-    ? "You: Opposed"
-    : "You: Supported";
+    ? "You · Oppose"
+    : "You · Support";
   const repPill = /^(nay|no)$/i.test(String(copy.repStanceLabel || ""))
-    ? "Rep: Voted Nay"
+    ? "Rep · Nay"
     : /^(yea|aye|yes)$/i.test(String(copy.repStanceLabel || ""))
-      ? "Rep: Voted Yea"
-      : `Rep: ${copy.repStanceLabel || "—"}`;
+      ? "Rep · Yea"
+      : `Rep · ${copy.repStanceLabel || "—"}`;
 
   return `<li class="scorecard-match-item scorecard-match-item--compact" data-match-item data-category="${esc(
     copy.category

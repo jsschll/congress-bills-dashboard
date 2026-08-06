@@ -1698,11 +1698,16 @@
       <div class="politician-match-categories" aria-label="Category breakdown">
         ${categories
           .map((row) => {
-            const pct = Math.round((row.matched / row.compared) * 100);
+            const pct = Math.max(
+              0,
+              Math.min(100, Math.round((row.matched / row.compared) * 100))
+            );
             return `<div class="politician-match-categories__row">
-              <span>${escapeHtml(row.key)}</span>
-              <div class="politician-match-categories__track"><i style="width:${pct}%"></i></div>
-              <strong>${pct}%</strong>
+              <span class="politician-match-categories__label" title="${escapeHtml(
+                row.key
+              )}">${escapeHtml(row.key)}</span>
+              <strong class="politician-match-categories__pct">${pct}%</strong>
+              <div class="politician-match-categories__track" aria-hidden="true"><i style="width:${pct}%"></i></div>
             </div>`;
           })
           .join("")}
@@ -1828,6 +1833,25 @@
     });
   }
 
+  function clampPct(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function normalizeFundingSlices(slices = []) {
+    const cleaned = slices.map((slice) => ({
+      ...slice,
+      pct: clampPct(slice.pct),
+    }));
+    const total = cleaned.reduce((sum, slice) => sum + slice.pct, 0);
+    if (total <= 100 || total === 0) return cleaned;
+    return cleaned.map((slice) => ({
+      ...slice,
+      pct: Math.round((slice.pct / total) * 1000) / 10,
+    }));
+  }
+
   function renderDonor(el, finance) {
     if (!el) return;
     if (!finance) {
@@ -1835,7 +1859,7 @@
         '<p class="scorecard-empty">Campaign finance data is not available yet.</p>';
       return;
     }
-    const slices = [
+    const slices = normalizeFundingSlices([
       {
         key: "small",
         label: "Small Donors (<$200)",
@@ -1852,7 +1876,7 @@
         label: "Self-Funding",
         pct: Number(finance.selfFundingPct) || 0,
       },
-    ];
+    ]);
     const industries = Array.isArray(finance.topIndustries)
       ? finance.topIndustries.slice(0, 5)
       : [];
@@ -1874,7 +1898,7 @@
         ${slices
           .map((slice) =>
             slice.pct > 0
-              ? `<span class="is-${slice.key}" style="width:${slice.pct}%"></span>`
+              ? `<span class="is-${slice.key}" style="flex:0 0 ${slice.pct}%; width:${slice.pct}%; max-width:${slice.pct}%"></span>`
               : ""
           )
           .join("")}
