@@ -1085,7 +1085,7 @@ Sincerely,
       </div>
       ${
         showWhoVoted
-          ? `<details class="policy-engage__votes" open>
+          ? `<details class="policy-engage__votes">
         <summary>Who Voted With Me?</summary>
         <div class="policy-engage__vote-body">
           <p class="policy-engage__vote-empty">${escapeHtml(whoVotedHint)}</p>

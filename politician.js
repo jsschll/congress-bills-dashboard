@@ -1228,11 +1228,40 @@ function renderVotesList(target, votes, emptyMessage, person) {
     `;
 
     if (window.PolicyEngagement?.mountVote) {
-      window.PolicyEngagement.mountVote(card, item, {
-        supportLabel: copy.yeaLabel,
-        opposeLabel: copy.nayLabel,
+      const engageItem = {
+        ...item,
+        id:
+          engagementBillIdFromVoteItem(item) ||
+          item.id ||
+          item.billId ||
+          item.rollCallId,
+      };
+      window.PolicyEngagement.mountVote(card, engageItem, {
+        supportLabel: "Support",
+        opposeLabel: "Oppose",
+        prompt: "Your stance on this bill",
+        showFollow: true,
+        showAskAi: true,
+        showTakeAction: false,
+        showCommunity: false,
         compareBioguides: bioguide ? [bioguide] : [],
-        whoVotedHint: `Tap ${copy.yeaLabel} or ${copy.nayLabel} to compare with ${personName}.`,
+        voteCast: item.voteCast || item.memberVote || null,
+        whoVotedHint: `Tap Support or Oppose to compare with ${personName}.`,
+        onAskAi: () => {
+          if (typeof openVoteAskAiDrawer === "function") {
+            openVoteAskAiDrawer(item, personName);
+          } else if (typeof openAskAiDrawer === "function") {
+            openAskAiDrawer({
+              context: {
+                type: "vote",
+                politicianName: personName,
+                ...item,
+              },
+            });
+          } else {
+            alert("Ask AI is not available on this page yet.");
+          }
+        },
         onStanceChange: async () => {
           if (!bioguide) return;
           // Live refresh — no full page reload. Persist finishes before this callback.
@@ -1251,6 +1280,27 @@ function renderVotesList(target, votes, emptyMessage, person) {
 
     target.append(card);
   }
+}
+
+function engagementBillIdFromVoteItem(item = {}) {
+  const raw = String(item.id || item.billId || "").trim();
+  if (/^federal-(?:bill-)?\d{2,3}-[a-z]+-\d+/i.test(raw)) {
+    return raw.toLowerCase().replace(/^federal-bill-/, "federal-");
+  }
+  const billNumber = String(item.billNumber || item.bill_number || "").trim();
+  const match = billNumber.match(
+    /^(h\.?\s*r\.?|s\.?|s\.?\s*j\.?\s*res\.?|h\.?\s*j\.?\s*res\.?|s\.?\s*con\.?\s*res\.?|h\.?\s*con\.?\s*res\.?|[a-z.]+)\s*(\d+)/i
+  );
+  if (match) {
+    const type = String(match[1] || "")
+      .toLowerCase()
+      .replace(/\./g, "")
+      .replace(/\s+/g, "");
+    const number = String(match[2] || "").replace(/\D/g, "");
+    const congress = Number(item.congress || 119);
+    if (congress && type && number) return `federal-${congress}-${type}-${number}`;
+  }
+  return raw || String(item.rollCallId || "").trim() || null;
 }
 
 function renderSponsoredList(target, bills, emptyMessage) {

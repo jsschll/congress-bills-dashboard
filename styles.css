@@ -4465,6 +4465,20 @@ body {
   padding: 0.35rem 0.75rem !important;
 }
 
+.politician-vote-card .policy-engage {
+  margin-top: 0.85rem;
+}
+
+.politician-vote-card .policy-engage__actions {
+  gap: 0.45rem;
+}
+
+.politician-vote-card .policy-engage__follow,
+.politician-vote-card .policy-engage__ask-ai {
+  font-size: 0.82rem !important;
+  padding: 0.35rem 0.75rem !important;
+}
+
 .policy-engage__stances {
   display: inline-flex;
   gap: 0.4rem;
