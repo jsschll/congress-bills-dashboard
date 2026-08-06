@@ -202,48 +202,21 @@ function formatShortDate(value) {
  */
 function formatVoteMotionLabel(input = {}) {
   const voteQuestion = String(
-    input.voteQuestion ||
-      input.vote_question ||
-      input.question ||
-      input.motionLabel ||
-      ""
+    input.voteQuestion || input.vote_question || input.question || ""
   )
     .replace(/\s+/g, " ")
     .trim();
   const voteKind = String(input.voteKind || input.vote_kind || "")
     .toLowerCase()
     .trim();
+  const isGenericBadge = (value) =>
+    /^(floor vote|passage vote|house vote|senate vote)$/i.test(
+      String(value || "").trim()
+    );
 
-  function titleCaseMotion(text) {
-    const small = new Set([
-      "a",
-      "an",
-      "and",
-      "as",
-      "at",
-      "by",
-      "for",
-      "in",
-      "of",
-      "on",
-      "or",
-      "the",
-      "to",
-    ]);
-    return String(text || "")
-      .split(" ")
-      .map((word, index) => {
-        const lower = word.toLowerCase();
-        if (index > 0 && small.has(lower)) return lower;
-        if (/^[A-Z0-9.]+$/.test(word) && word.length <= 6) return word;
-        return lower.charAt(0).toUpperCase() + lower.slice(1);
-      })
-      .join(" ");
-  }
-
-  if (voteQuestion) {
+  if (voteQuestion && !isGenericBadge(voteQuestion)) {
     const lower = voteQuestion.toLowerCase();
-    if (/\bon passage\b|\bfinal passage\b/.test(lower)) return "Final Passage";
+    if (/\bon passage\b|\bfinal passage\b/.test(lower)) return "On Passage";
     if (/\bmotion to recommit\b/.test(lower)) return "On Motion to Recommit";
     if (/\bmotion to table\b/.test(lower)) return "On Motion to Table";
     if (/\bmotion to reconsider\b/.test(lower)) {
@@ -254,6 +227,7 @@ function formatVoteMotionLabel(input = {}) {
       return "On Ordering the Previous Question";
     }
     if (/\bsuspend(?:ing)? the rules\b/.test(lower)) {
+      if (voteQuestion.length <= 64) return voteQuestion;
       return "On Motion to Suspend the Rules";
     }
     if (
@@ -263,19 +237,13 @@ function formatVoteMotionLabel(input = {}) {
     ) {
       return "On Agreeing to the Amendment";
     }
-    if (/\bamendment\b|\bamdt\.?\b/.test(lower) && voteQuestion.length <= 90) {
-      return titleCaseMotion(voteQuestion.replace(/^on\s+/i, "On "));
-    }
-    if (voteQuestion.length <= 72) {
-      const withOn = /^on\s+/i.test(voteQuestion)
-        ? voteQuestion
-        : `On ${voteQuestion}`;
-      return titleCaseMotion(withOn.replace(/^On On\s+/i, "On "));
-    }
+    if (voteQuestion.length <= 72) return voteQuestion;
+    return `${voteQuestion.slice(0, 69).replace(/\s+\S*$/, "")}…`;
   }
 
-  if (input.motionLabel) return String(input.motionLabel).trim();
-  if (voteKind === "final_passage") return "Final Passage";
+  const existing = String(input.motionLabel || "").trim();
+  if (existing && !isGenericBadge(existing)) return existing;
+  if (voteKind === "final_passage") return "On Passage";
   if (voteKind === "amendment") return "On Agreeing to the Amendment";
   if (voteKind === "procedural") return "Procedural Vote";
   if (voteKind === "bill") return "Passage Vote";
