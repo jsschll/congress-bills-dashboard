@@ -1065,13 +1065,117 @@ function looksLikeTruncatedHeadline(text) {
   return !/[.!?]$/.test(value) && /\s[A-Za-z]{1,3}$/.test(value);
 }
 
-function billCardHeadline(item, pitch) {
-  const shortTitle = String(item.short_title || item.shortTitle || "").trim();
-  if (shortTitle && shortTitle.length <= 110 && !looksLikeTruncatedHeadline(shortTitle)) {
-    return shortTitle;
+/** Detect official-style bill names (… Act / Resolution / etc.). */
+function looksLikeOfficialBillTitle(text) {
+  const value = String(text || "").replace(/\s+/g, " ").trim();
+  if (!value || value.length > 160) return false;
+  if (/^(this|the)\s+(bill|resolution|measure|amendment)\b/i.test(value)) {
+    return false;
   }
-  if (pitch) return firstCompleteSentence(pitch, 140);
-  return firstCompleteSentence(item.title || "Legislation", 120);
+  return /\b(act|resolution|amendments?|bill)\b(?:\s+of\s+\d{4})?\.?$/i.test(
+    value
+  );
+}
+
+/**
+ * Split glued blobs like:
+ * "Northern Border Security Enhancement and Review Act This bill requires…"
+ */
+function splitGluedTitleSummary(text) {
+  const cleaned = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return { title: "", summary: "" };
+
+  const match = cleaned.match(
+    /^(.*?\b(?:Act|Resolution|Amendments?|Bill)\b(?:\s+of\s+\d{4})?)\s+((?:This|The)\s+(?:bill|resolution|measure|amendment)\b|[A-Z][a-z]+\b(?:\s+[a-z]+)?\s+(?:the|a|an|to|for|that)\b)([\s\S]*)$/
+  );
+  if (match) {
+    return {
+      title: match[1].replace(/\.$/, "").trim(),
+      summary: `${match[2]}${match[3] || ""}`.replace(/\s+/g, " ").trim(),
+    };
+  }
+  return { title: cleaned, summary: "" };
+}
+
+function stripLeadingTitleFromSummary(summary, title) {
+  const text = String(summary || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const titleClean = String(title || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text || !titleClean) return text;
+  if (!text.toLowerCase().startsWith(titleClean.toLowerCase())) return text;
+  // Only strip when a real summary remains after the title prefix.
+  const rest = text.slice(titleClean.length).replace(/^[\s.:;,-]+/, "").trim();
+  return rest || text;
+}
+
+/**
+ * Resolve a clean collapsed-card title + expanded summary.
+ * Collapsed cards show the bill title only; summary stays in details.
+ */
+function resolveFeedCardCopy(item = {}, copy = {}) {
+  const rawTitle = String(
+    item.title || item.voteQuestion || item.displayTitle || ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const shortTitle = String(
+    copy.shortTitle || item.short_title || item.shortTitle || ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const rawSummary = String(
+    copy.summary ||
+      copy.displaySummary?.full ||
+      preferPlainSummaryText(item) ||
+      item.card_summary ||
+      item.cardSummary ||
+      item.plain_summary ||
+      item.plainSummary ||
+      item.shortPitch ||
+      item.summary ||
+      ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const gluedFromTitle = splitGluedTitleSummary(rawTitle);
+  const gluedFromShort = splitGluedTitleSummary(shortTitle);
+  const gluedFromSummary = splitGluedTitleSummary(rawSummary);
+
+  let title = "";
+  if (looksLikeOfficialBillTitle(shortTitle)) {
+    title = shortTitle.replace(/\.$/, "");
+  } else if (gluedFromShort.summary && looksLikeOfficialBillTitle(gluedFromShort.title)) {
+    title = gluedFromShort.title;
+  } else if (gluedFromTitle.summary && looksLikeOfficialBillTitle(gluedFromTitle.title)) {
+    title = gluedFromTitle.title;
+  } else if (looksLikeOfficialBillTitle(rawTitle)) {
+    title = rawTitle.replace(/\.$/, "");
+  } else if (gluedFromSummary.summary && looksLikeOfficialBillTitle(gluedFromSummary.title)) {
+    title = gluedFromSummary.title;
+  } else if (shortTitle && !looksLikeTruncatedHeadline(shortTitle) && shortTitle.length <= 120) {
+    // Plain-English Claude short_title when no official Act name is available.
+    title = firstCompleteSentence(shortTitle, 120);
+  } else if (gluedFromTitle.title) {
+    title = firstCompleteSentence(gluedFromTitle.title, 120);
+  } else {
+    title = firstCompleteSentence(rawTitle || "Legislation", 120);
+  }
+
+  let summary =
+    gluedFromSummary.summary ||
+    gluedFromTitle.summary ||
+    gluedFromShort.summary ||
+    rawSummary;
+  summary = stripLeadingTitleFromSummary(summary, title);
+  if (!summary) summary = "No summary available yet.";
+
+  return { title, summary };
 }
 
 function renderBillCard(item) {
@@ -1087,12 +1191,14 @@ function renderBillCard(item) {
   const pitch = String(
     preferPlainSummaryText(item) || item.shortPitch || ""
   ).trim();
+  const cardCopy = resolveFeedCardCopy(item, { summary: pitch });
+  const headline = cardCopy.title;
   const statusLabel = String(item.statusLabel || "").trim();
   const showStatus =
     statusLabel &&
     statusLabel.toLowerCase() !== pitch.toLowerCase() &&
+    statusLabel.toLowerCase() !== headline.toLowerCase() &&
     !/calendar no\.?\s*$/i.test(statusLabel);
-  const headline = billCardHeadline(item, pitch);
   const levelLabel = String(item.level || "Federal").trim() || "Federal";
   const topic = String(item.tags?.[0] || item.policyArea || "").trim();
   const updated =
@@ -1165,9 +1271,15 @@ function renderBillCard(item) {
     <div class="feed-social-card__details" id="${detailsId}" hidden>
       <div class="policy-bill-card__header">
         <div>
-          <p class="feed-social-card__official">${escapePolicyHtml(
-            item.title || "Legislation"
-          )}</p>
+          ${
+            item.title &&
+            String(item.title).replace(/\s+/g, " ").trim().toLowerCase() !==
+              headline.toLowerCase()
+              ? `<p class="feed-social-card__official">${escapePolicyHtml(
+                  item.title
+                )}</p>`
+              : ""
+          }
           <p class="policy-bill-card__meta">
             Sponsor: ${sponsorHtml}
             ${
@@ -1182,7 +1294,7 @@ function renderBillCard(item) {
         </button>
       </div>
       <section class="feed-social-card__summary" aria-label="Summary">
-        <p>${escapePolicyHtml(pitch || "Summary unavailable.")}</p>
+        <p>${escapePolicyHtml(cardCopy.summary)}</p>
       </section>
       <div class="policy-bill-card__progress" role="list" aria-label="Bill status">
         ${(item.allSteps || [])
@@ -1395,35 +1507,6 @@ function firstCompleteSentence(text, maxChars = 140) {
   return `${clipped.trim()}…`;
 }
 
-function voteCardHeadline(item, copy = {}) {
-  const shortTitle = String(
-    copy.shortTitle || item.short_title || item.shortTitle || ""
-  ).trim();
-  if (shortTitle && !looksLikeTruncatedHeadline(shortTitle)) {
-    return firstCompleteSentence(shortTitle, 120);
-  }
-
-  const summary = String(
-    copy.summary ||
-      item.card_summary ||
-      item.cardSummary ||
-      item.plain_summary ||
-      item.plainSummary ||
-      item.shortPitch ||
-      item.summary ||
-      ""
-  ).trim();
-  if (summary) return firstCompleteSentence(summary, 140);
-
-  if (shortTitle) return firstCompleteSentence(shortTitle, 120);
-
-  const title =
-    String(item.title || "").trim() ||
-    String(item.voteQuestion || "").trim() ||
-    "Congressional vote";
-  return firstCompleteSentence(title, 120);
-}
-
 function inferVoteTopic(item = {}) {
   const explicit = String(
     item.primaryCategory ||
@@ -1477,7 +1560,7 @@ function renderVoteCard(item) {
   const card = document.createElement("article");
   card.className = "feed-social-card vote-feed-card";
 
-  const title =
+  const officialTitle =
     String(item.title || "").trim() ||
     String(item.voteQuestion || "").trim() ||
     "Congressional vote";
@@ -1492,15 +1575,9 @@ function renderVoteCard(item) {
   const nayMeans = String(
     copy.nayMeans || item.nayMeans || item.nay_means || ""
   ).trim();
-  const fullSummary = String(
-    copy.displaySummary?.full ||
-      copy.summary ||
-      item.plain_summary ||
-      item.plainSummary ||
-      item.summary ||
-      "No summary available for this vote."
-  ).trim();
-  const headline = voteCardHeadline(item, copy);
+  const cardCopy = resolveFeedCardCopy(item, copy);
+  const headline = cardCopy.title;
+  const fullSummary = cardCopy.summary;
   const billNumber =
     item.billNumber ||
     (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "");
@@ -1530,6 +1607,11 @@ function renderVoteCard(item) {
   )
     .replace(/[^a-zA-Z0-9_-]/g, "")
     .slice(0, 48)}`;
+  const showOfficialTitle =
+    officialTitle &&
+    officialTitle.replace(/\s+/g, " ").trim().toLowerCase() !==
+      headline.toLowerCase() &&
+    !officialTitle.toLowerCase().startsWith(headline.toLowerCase());
 
   card.innerHTML = `
     <div class="feed-social-card__top">
@@ -1575,7 +1657,13 @@ function renderVoteCard(item) {
       </button>
     </div>
     <div class="feed-social-card__details" id="${detailsId}" hidden>
-      <p class="feed-social-card__official">${escapePolicyHtml(title)}</p>
+      ${
+        showOfficialTitle
+          ? `<p class="feed-social-card__official">${escapePolicyHtml(
+              officialTitle
+            )}</p>`
+          : ""
+      }
       ${
         motion.isProcedural
           ? `<p class="feed-social-card__note">${escapePolicyHtml(
