@@ -7573,12 +7573,14 @@ body.politician-notes-modal-open {
   line-height: 1.4;
 }
 
+.policy-feed-list,
 .votes-feed-list {
   display: grid;
   gap: 0.75rem;
 }
 
-/* Compact social-style vote cards — scannable first, details on demand */
+/* Compact social-style feed cards — scannable first, details on demand */
+.compact-feed-card,
 .vote-feed-card--compact {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -7649,6 +7651,7 @@ body.politician-notes-modal-open {
   white-space: nowrap;
 }
 
+.compact-feed-card > .policy-engage,
 .vote-feed-card--compact > .policy-engage {
   grid-area: engage;
   margin: 0;
@@ -7658,18 +7661,21 @@ body.politician-notes-modal-open {
   justify-self: end;
 }
 
+.compact-feed-card > .policy-engage .policy-engage__actions,
 .vote-feed-card--compact > .policy-engage .policy-engage__actions {
   flex-direction: column;
   align-items: stretch;
   gap: 0.35rem;
 }
 
+.compact-feed-card > .policy-engage .policy-engage__stances,
 .vote-feed-card--compact > .policy-engage .policy-engage__stances {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
 }
 
+.compact-feed-card > .policy-engage .policy-engage__stance,
 .vote-feed-card--compact > .policy-engage .policy-engage__stance {
   min-width: 5.5rem;
   padding: 0.45rem 0.7rem;
@@ -7803,15 +7809,29 @@ body.politician-notes-modal-open {
 }
 
 /* Collapsed: only stance buttons + optional logged chip */
+.compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__ask-ai,
+.compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__follow,
+.compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__votes,
+.compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__community,
+.compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__prompt,
+.compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__take-action,
+.compact-feed-card:not(.is-expanded) > .policy-engage .policy-engage__alignment,
 .vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__ask-ai,
 .vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__follow,
 .vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__votes,
 .vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__community,
 .vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__prompt,
+.vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__take-action,
 .vote-feed-card--compact:not(.is-expanded) > .policy-engage .policy-engage__alignment {
   display: none !important;
 }
 
+.compact-feed-card:not(.is-expanded) .policy-impact,
+.vote-feed-card--compact:not(.is-expanded) .policy-impact {
+  display: none !important;
+}
+
+.compact-feed-card.is-expanded,
 .vote-feed-card--compact.is-expanded {
   grid-template-areas:
     "main main"
@@ -7821,6 +7841,7 @@ body.politician-notes-modal-open {
   align-items: start;
 }
 
+.compact-feed-card.is-expanded > .policy-engage,
 .vote-feed-card--compact.is-expanded > .policy-engage {
   grid-area: engage;
   justify-self: stretch;
@@ -7830,18 +7851,21 @@ body.politician-notes-modal-open {
   border-top: 1px solid rgba(51, 65, 85, 0.85);
 }
 
+.compact-feed-card.is-expanded > .policy-engage .policy-engage__actions,
 .vote-feed-card--compact.is-expanded > .policy-engage .policy-engage__actions {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
 }
 
+.compact-feed-card.is-expanded > .policy-engage .policy-engage__stances,
 .vote-feed-card--compact.is-expanded > .policy-engage .policy-engage__stances {
   display: inline-flex;
   grid-template-columns: none;
 }
 
 @media (max-width: 640px) {
+  .compact-feed-card,
   .vote-feed-card--compact {
     grid-template-columns: 1fr;
     grid-template-areas:
@@ -7851,20 +7875,24 @@ body.politician-notes-modal-open {
       "details";
   }
 
+  .compact-feed-card > .policy-engage,
   .vote-feed-card--compact > .policy-engage {
     justify-self: stretch;
   }
 
+  .compact-feed-card > .policy-engage .policy-engage__actions,
   .vote-feed-card--compact > .policy-engage .policy-engage__actions {
     flex-direction: row;
     flex-wrap: wrap;
   }
 
+  .compact-feed-card > .policy-engage .policy-engage__stances,
   .vote-feed-card--compact > .policy-engage .policy-engage__stances {
     flex: 1 1 auto;
     min-width: 0;
   }
 
+  .compact-feed-card > .policy-engage .policy-engage__stance,
   .vote-feed-card--compact > .policy-engage .policy-engage__stance {
     min-width: 0;
   }
@@ -7874,6 +7902,7 @@ body.politician-notes-modal-open {
   }
 }
 
+.compact-feed-card .policy-engage__prompt,
 .vote-feed-card .policy-engage__prompt {
   margin: 0 0 0.55rem;
   font-weight: 600;

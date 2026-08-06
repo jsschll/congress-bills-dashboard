@@ -1052,9 +1052,19 @@ function renderDeltaGroup(label, values, tone) {
   `;
 }
 
+function billCardHeadline(item, pitch) {
+  const shortTitle = String(item.short_title || item.shortTitle || "").trim();
+  if (shortTitle && shortTitle.length <= 110) return shortTitle;
+  if (pitch) {
+    const first = pitch.split(/(?<=[.!?])\s+/)[0] || pitch;
+    return clampVoteHeadline(first, 16);
+  }
+  return clampVoteHeadline(item.title || "Legislation", 14);
+}
+
 function renderBillCard(item) {
   const card = document.createElement("article");
-  card.className = "policy-bill-card";
+  card.className = "policy-bill-card compact-feed-card";
 
   const followed = isFollowedBill(item);
   const delta = item.deltaSummary || { added: [], changed: [], removed: [] };
@@ -1070,65 +1080,100 @@ function renderBillCard(item) {
     statusLabel &&
     statusLabel.toLowerCase() !== pitch.toLowerCase() &&
     !/calendar no\.?\s*$/i.test(statusLabel);
-  const summaryHtml =
-    typeof renderCollapsibleSummaryHtml === "function"
-      ? renderCollapsibleSummaryHtml(item, {
-          escapeHtmlFn: escapePolicyHtml,
-          paragraphClass: "policy-bill-card__pitch",
-        })
-      : `<p class="policy-bill-card__pitch">${escapePolicyHtml(
-          pitch || "Summary unavailable."
-        )}</p>`;
+  const headline = billCardHeadline(item, pitch);
+  const tags = [item.level, item.tags?.[0]].filter(Boolean).slice(0, 2);
+  const updated =
+    formatRelativeDate(item.lastUpdated) || formatShortDate(item.lastUpdated);
+  const metaParts = [item.billNumber, item.jurisdiction, updated && `Updated ${updated}`]
+    .filter(Boolean);
+  const detailsId = `bill-details-${String(item.id || item.billNumber || Math.random())
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 48)}`;
+  const sponsorHtml =
+    item.primarySponsor?.bioguideId || item.primarySponsor?.bioguide_id
+      ? `<a class="politician-name-link" href="representatives.html?bioguideId=${encodeURIComponent(
+          String(
+            item.primarySponsor.bioguideId || item.primarySponsor.bioguide_id
+          ).toUpperCase()
+        )}">${escapePolicyHtml(item.primarySponsor.name)}</a>`
+      : escapePolicyHtml(item.primarySponsor?.name || "Sponsor unavailable");
 
   card.innerHTML = `
-    <div class="policy-bill-card__header">
-      <div>
-        <div class="policy-bill-card__badges">
-          <span class="policy-bill-card__level">${escapePolicyHtml(item.level)}</span>
-          <span class="policy-bill-card__bill-number">${escapePolicyHtml(item.billNumber)}</span>
+    <div class="vote-feed-card__main">
+      <div class="vote-feed-card__body">
+        <div class="vote-feed-card__tags" aria-label="Bill tags">
+          ${tags
+            .map(
+              (tag) =>
+                `<span class="vote-feed-card__tag">${escapePolicyHtml(
+                  tag
+                )}</span>`
+            )
+            .join("")}
         </div>
-        <h2 class="policy-bill-card__title">${escapePolicyHtml(item.title)}</h2>
-        <p class="policy-bill-card__meta">
-          ${escapePolicyHtml(item.jurisdiction)} · Sponsor: ${
-            item.primarySponsor?.bioguideId || item.primarySponsor?.bioguide_id
-              ? `<a class="politician-name-link" href="representatives.html?bioguideId=${encodeURIComponent(
-                  String(
-                    item.primarySponsor.bioguideId ||
-                      item.primarySponsor.bioguide_id
-                  ).toUpperCase()
-                )}">${escapePolicyHtml(item.primarySponsor.name)}</a>`
-              : escapePolicyHtml(item.primarySponsor?.name || "Sponsor unavailable")
-          } · ${escapePolicyHtml(
-            item.primarySponsor?.title || ""
-          )} · Updated ${escapePolicyHtml(
-            formatRelativeDate(item.lastUpdated) || formatShortDate(item.lastUpdated)
-          )}
-        </p>
+        <h2 class="vote-feed-card__headline">${escapePolicyHtml(headline)}</h2>
+        ${
+          metaParts.length
+            ? `<p class="vote-feed-card__meta">${escapePolicyHtml(
+                metaParts.join(" · ")
+              )}</p>`
+            : ""
+        }
       </div>
-      <button class="refresh-btn policy-bill-card__follow" type="button">
-        ${followed ? "Following" : "Follow bill"}
-      </button>
     </div>
-    <section class="policy-bill-card__summary" aria-label="Summary">
-      <h3 class="policy-bill-card__summary-label">Summary</h3>
-      ${summaryHtml}
-      ${
-        showStatus
-          ? `<p class="policy-bill-card__status">${escapePolicyHtml(statusLabel)}</p>`
-          : ""
-      }
-    </section>
-    <div class="policy-bill-card__progress" role="list" aria-label="Bill status">
-      ${(item.allSteps || [])
-        .map((step) => {
-          const stepName = String(step.stepName || "")
-            .replace(/into law/i, "")
-            .trim() || "Step";
-          return `
+    <button
+      type="button"
+      class="vote-feed-card__toggle"
+      aria-expanded="false"
+      aria-controls="${detailsId}"
+    >
+      Tap for more
+    </button>
+    <div class="vote-feed-card__details" id="${detailsId}" hidden>
+      <div class="policy-bill-card__header">
+        <div>
+          <p class="vote-feed-card__official-title">${escapePolicyHtml(
+            item.title || "Legislation"
+          )}</p>
+          <p class="policy-bill-card__meta">
+            Sponsor: ${sponsorHtml}
+            ${
+              item.primarySponsor?.title
+                ? ` · ${escapePolicyHtml(item.primarySponsor.title)}`
+                : ""
+            }
+          </p>
+        </div>
+        <button class="refresh-btn policy-bill-card__follow" type="button">
+          ${followed ? "Following" : "Follow bill"}
+        </button>
+      </div>
+      <section class="policy-bill-card__summary" aria-label="Summary">
+        <p class="vote-feed-card__summary-text">${escapePolicyHtml(
+          pitch || "Summary unavailable."
+        )}</p>
+        ${
+          showStatus
+            ? `<p class="policy-bill-card__status">${escapePolicyHtml(
+                statusLabel
+              )}</p>`
+            : ""
+        }
+      </section>
+      <div class="policy-bill-card__progress" role="list" aria-label="Bill status">
+        ${(item.allSteps || [])
+          .map((step) => {
+            const stepName =
+              String(step.stepName || "")
+                .replace(/into law/i, "")
+                .trim() || "Step";
+            return `
             <div
-              class="policy-bill-card__step ${step.isCompleted ? "is-complete" : ""} ${
-                step.isCurrent ? "is-current" : ""
-              } ${!step.isCompleted && !step.isCurrent ? "is-upcoming" : ""}"
+              class="policy-bill-card__step ${
+                step.isCompleted ? "is-complete" : ""
+              } ${step.isCurrent ? "is-current" : ""} ${
+                !step.isCompleted && !step.isCurrent ? "is-upcoming" : ""
+              }"
               role="listitem"
             >
               <span class="policy-bill-card__node" aria-hidden="true"></span>
@@ -1137,38 +1182,57 @@ function renderBillCard(item) {
               )}</span>
             </div>
           `;
-        })
-        .join("")}
+          })
+          .join("")}
+      </div>
+      ${
+        hasDelta
+          ? `<section class="policy-bill-card__delta">
+        <h3>What changes?</h3>
+        ${renderDeltaGroup("Added", delta.added, "is-added")}
+        ${renderDeltaGroup("Changed", delta.changed, "is-changed")}
+        ${renderDeltaGroup("Removed", delta.removed, "is-removed")}
+      </section>`
+          : ""
+      }
+      ${
+        item.tags?.length
+          ? `<p class="policy-bill-card__tags">${item.tags
+              .map((tag) => `<span>${escapePolicyHtml(tag)}</span>`)
+              .join("")}</p>`
+          : ""
+      }
+      <a class="bill-card__link" href="${escapePolicyHtml(
+        item.officialUrl
+      )}" target="_blank" rel="noopener noreferrer">Open official source</a>
     </div>
-    ${
-      hasDelta
-        ? `<section class="policy-bill-card__delta">
-      <h3>What changes?</h3>
-      ${renderDeltaGroup("Added", delta.added, "is-added")}
-      ${renderDeltaGroup("Changed", delta.changed, "is-changed")}
-      ${renderDeltaGroup("Removed", delta.removed, "is-removed")}
-    </section>`
-        : ""
-    }
-    ${
-      item.tags?.length
-        ? `<p class="policy-bill-card__tags">${item.tags
-            .map((tag) => `<span>${escapePolicyHtml(tag)}</span>`)
-            .join("")}</p>`
-        : ""
-    }
-    <a class="bill-card__link" href="${escapePolicyHtml(item.officialUrl)}" target="_blank" rel="noopener noreferrer">Open official source</a>
   `;
+
+  const toggle = card.querySelector(".vote-feed-card__toggle");
+  const details = card.querySelector(".vote-feed-card__details");
+  const setExpanded = (open) => {
+    card.classList.toggle("is-expanded", open);
+    if (details) details.hidden = !open;
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.textContent = open ? "Show less" : "Tap for more";
+    }
+  };
+  toggle?.addEventListener("click", () => {
+    setExpanded(!card.classList.contains("is-expanded"));
+  });
+  card.querySelector(".vote-feed-card__main")?.addEventListener("click", () => {
+    if (!card.classList.contains("is-expanded")) setExpanded(true);
+  });
 
   card
     .querySelector(".policy-bill-card__follow")
-    .addEventListener("click", async () => {
+    ?.addEventListener("click", async () => {
       const btn = card.querySelector(".policy-bill-card__follow");
       const wasFollowed = isFollowedBill(item);
       if (btn) {
         btn.disabled = true;
         btn.classList.add("is-loading");
-        // Optimistic label swap
         btn.textContent = wasFollowed ? "Follow bill" : "Following";
         btn.classList.toggle("is-following", !wasFollowed);
       }
@@ -1205,7 +1269,14 @@ function renderBillCard(item) {
   }
 
   if (window.PolicyEngagement?.mount) {
-    window.PolicyEngagement.mount(card, item);
+    window.PolicyEngagement.mount(card, item, {
+      compact: true,
+      prompt: "",
+      showTakeAction: true,
+      showAskAi: true,
+      showWhoVoted: true,
+      showCommunity: true,
+    });
   }
 
   return card;
@@ -1308,7 +1379,8 @@ function voteCardTags(item, chamberLabel, motion) {
 
 function renderVoteCard(item) {
   const card = document.createElement("article");
-  card.className = "vote-feed-card vote-feed-card--compact policy-bill-card";
+  card.className =
+    "vote-feed-card vote-feed-card--compact compact-feed-card policy-bill-card";
 
   const title =
     String(item.title || "").trim() ||
