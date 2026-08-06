@@ -20,6 +20,131 @@
     "Education & Labor",
   ];
 
+  /**
+   * Map OpenSecrets-style industry labels → policy categories + keyword regexes
+   * so Top Industry clicks can filter Recent Votes / Action Match client-side
+   * (and align with industry_tags once the Supabase migration is applied).
+   */
+  const INDUSTRY_DRILLDOWN_RULES = [
+    {
+      match: /oil|gas|energy|petroleum|pipeline|coal|mining|utilities|electric/i,
+      categories: ["Energy & Environment"],
+      keywords:
+        /\b(oil|gas|petroleum|pipeline|fossil|drilling|epa|climate|emission|renewable|coal|mining|utility|electric)\b/i,
+    },
+    {
+      match: /real estate|construction|home builder|housing/i,
+      categories: ["Housing & Infrastructure"],
+      keywords:
+        /\b(housing|real estate|mortgage|rent|zoning|property|homeless|infra|transit|highway|bridge|construction)\b/i,
+    },
+    {
+      match: /health|pharma|hospital|insurance|medical/i,
+      categories: ["Healthcare"],
+      keywords:
+        /\b(health|medicare|medicaid|hospital|pharma|drug|vaccine|aca|insurance|medical)\b/i,
+    },
+    {
+      match: /defense|aerospace|arms|weapons/i,
+      categories: ["Foreign Policy & Defense"],
+      keywords:
+        /\b(defense|military|armed forces|veteran|nato|war|troop|sanction|aerospace|weapons)\b/i,
+    },
+    {
+      match: /edu|teacher|school|university|labor|union|public sector/i,
+      categories: ["Education & Labor"],
+      keywords:
+        /\b(school|educat|student|university|college|labor|union|wage|worker|osha|teacher)\b/i,
+    },
+    {
+      match: /immigra|border/i,
+      categories: ["Immigration & Border"],
+      keywords: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i,
+    },
+    {
+      match: /law|legal|lobbyist|gun|civil/i,
+      categories: ["Civil Rights & Justice"],
+      keywords:
+        /\b(civil rights|voting rights|discrim|police|prison|justice|gun|court|lawyer|legal)\b/i,
+    },
+    {
+      match: /securities|investment|bank|finance|insurance|accountant|tax|retail|business|agriculture|agri|food|telecom|tech|electronics|software|internet/i,
+      categories: ["Economy & Taxes"],
+      keywords:
+        /\b(tax|irs|tariff|budget|spend|deficit|debt|bank|securities|investment|finance|retail|agriculture|telecom|tech|software)\b/i,
+    },
+  ];
+
+  function industryDrilldownRule(industryName = "") {
+    const name = String(industryName || "").trim();
+    if (!name) return null;
+    for (const rule of INDUSTRY_DRILLDOWN_RULES) {
+      if (rule.match.test(name)) return { ...rule, industry: name };
+    }
+    // Fallback: treat the industry label itself as a keyword needle.
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return {
+      industry: name,
+      categories: [],
+      keywords: new RegExp(`\\b${escaped}\\b`, "i"),
+    };
+  }
+
+  function policyCategoryFromIndustry(industryName = "") {
+    return industryDrilldownRule(industryName)?.categories?.[0] || null;
+  }
+
+  function voteMatchesIndustry(vote = {}, industryName = "") {
+    const rule = industryDrilldownRule(industryName);
+    if (!rule) return true;
+
+    const tags = [
+      ...(Array.isArray(vote.industry_tags) ? vote.industry_tags : []),
+      ...(Array.isArray(vote.industryTags) ? vote.industryTags : []),
+      ...(Array.isArray(vote.tags) ? vote.tags : []),
+    ]
+      .map((tag) => String(tag || "").trim().toLowerCase())
+      .filter(Boolean);
+    const industryKey = String(industryName || "").trim().toLowerCase();
+    if (industryKey && tags.includes(industryKey)) return true;
+    if (
+      tags.some((tag) =>
+        rule.categories.some((cat) => tag === String(cat).toLowerCase())
+      )
+    ) {
+      return true;
+    }
+
+    const category = String(
+      vote.category || vote.primary_category || vote.primaryCategory || ""
+    ).trim();
+    if (
+      category &&
+      rule.categories.some(
+        (cat) => cat.toLowerCase() === category.toLowerCase()
+      )
+    ) {
+      return true;
+    }
+
+    const haystack = [
+      vote.title,
+      vote.rawTitle,
+      vote.billNumber,
+      vote.plainEnglishSummary,
+      vote.plain_summary,
+      vote.plainSummary,
+      vote.category,
+      vote.impacts?.wallet,
+      vote.impacts?.community,
+      vote.impacts?.rights,
+      ...(tags || []),
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return rule.keywords.test(haystack);
+  }
+
   const CATEGORY_RULES = [
     {
       key: "Immigration & Border",
@@ -1595,7 +1720,7 @@
     bindHeroActions();
   }
 
-  function renderMatch(section, bodyEl, ledeEl, profile, matchPayload) {
+  function renderMatch(section, bodyEl, ledeEl, profile, matchPayload, options = {}) {
     if (!section || !bodyEl) return;
     section.hidden = false;
     const chamberLabel =
@@ -1739,11 +1864,12 @@
       </div>
     `;
     bindMatchListInteractions(bodyEl);
-    bindMatchTopicFilters(bodyEl);
+    const industryTopic = policyCategoryFromIndustry(options.industryFilter || "");
+    bindMatchTopicFilters(bodyEl, industryTopic || "all");
     return summary;
   }
 
-  function bindMatchTopicFilters(root) {
+  function bindMatchTopicFilters(root, initialTopic = "all") {
     if (!root) return;
     const chips = [
       ...root.querySelectorAll("[data-match-topic-filter]"),
@@ -1779,6 +1905,15 @@
         applyFilter(chip.getAttribute("data-match-topic-filter") || "all");
       });
     });
+
+    const start =
+      initialTopic &&
+      chips.some(
+        (chip) => chip.getAttribute("data-match-topic-filter") === initialTopic
+      )
+        ? initialTopic
+        : "all";
+    applyFilter(start);
   }
 
   function openMatchBillDetail(payload) {
@@ -1852,13 +1987,14 @@
     }));
   }
 
-  function renderDonor(el, finance) {
+  function renderDonor(el, finance, options = {}) {
     if (!el) return;
     if (!finance) {
       el.innerHTML =
         '<p class="scorecard-empty">Campaign finance data is not available yet.</p>';
       return;
     }
+    const selectedIndustry = String(options.selectedIndustry || "").trim();
     const slices = normalizeFundingSlices([
       {
         key: "small",
@@ -1881,6 +2017,12 @@
       ? finance.topIndustries.slice(0, 5)
       : [];
     const top = industries[0];
+    const selectedMeta = selectedIndustry
+      ? industryDrilldownRule(selectedIndustry)
+      : null;
+    const relatedTopic = selectedIndustry
+      ? policyCategoryFromIndustry(selectedIndustry)
+      : null;
 
     el.innerHTML = `
       <p class="scorecard-card__eyebrow">Donor Alignment</p>
@@ -1915,32 +2057,86 @@
           .join("")}
       </ul>
       <h4 class="scorecard-subtitle">Top 5 industry contributors</h4>
+      <p class="scorecard-industries__hint">
+        Tap an industry to filter Action Match and Recent Votes.
+      </p>
       ${
         industries.length
-          ? `<ol class="scorecard-industries">
+          ? `<ol class="scorecard-industries" role="list">
               ${industries
-                .map(
-                  (item, index) => `<li>
-                    <span>${index + 1}. ${escapeHtml(item.name)}</span>
-                    <strong>${escapeHtml(formatUsd(item.amount))}</strong>
-                  </li>`
-                )
+                .map((item, index) => {
+                  const name = String(item.name || "").trim();
+                  const selected =
+                    selectedIndustry &&
+                    selectedIndustry.toLowerCase() === name.toLowerCase();
+                  return `<li>
+                    <button
+                      type="button"
+                      class="scorecard-industry${selected ? " is-selected" : ""}"
+                      data-industry="${escapeHtml(name)}"
+                      aria-pressed="${selected ? "true" : "false"}"
+                    >
+                      <span class="scorecard-industry__label">${
+                        index + 1
+                      }. ${escapeHtml(name)}</span>
+                      <strong class="scorecard-industry__amount">${escapeHtml(
+                        formatUsd(item.amount)
+                      )}</strong>
+                    </button>
+                  </li>`;
+                })
                 .join("")}
             </ol>`
           : `<p class="scorecard-empty">No industry contributor rows yet.</p>`
       }
       ${
-        top
-          ? `<aside class="scorecard-callout">
+        selectedIndustry
+          ? `<aside class="scorecard-callout scorecard-callout--filter" role="status">
+              <span class="scorecard-callout__badge">Industry filter</span>
+              <p><strong>${escapeHtml(selectedIndustry)}</strong>${
+                relatedTopic
+                  ? ` · related topic: ${escapeHtml(relatedTopic)}`
+                  : ""
+              }</p>
+              <p>Showing roll calls linked to this industry. Tap again or Clear Filter to reset.</p>
+              <button type="button" class="refresh-btn scorecard-industry-clear" data-clear-industry="1">
+                Clear Filter
+              </button>
+            </aside>`
+          : top
+            ? `<aside class="scorecard-callout">
               <span class="scorecard-callout__badge">Money vs. Vote</span>
               <p><strong>${escapeHtml(top.name)}</strong> · ${escapeHtml(
                 formatUsd(top.amount)
               )}</p>
               <p>Compare this industry’s funding with related roll-call votes in the feed.</p>
             </aside>`
-          : ""
+            : ""
       }
     `;
+
+    el.querySelectorAll("[data-industry]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const name = String(button.getAttribute("data-industry") || "").trim();
+        if (!name) return;
+        const next =
+          selectedIndustry &&
+          selectedIndustry.toLowerCase() === name.toLowerCase()
+            ? null
+            : name;
+        if (typeof options.onSelectIndustry === "function") {
+          options.onSelectIndustry(next);
+        }
+      });
+    });
+    el.querySelector("[data-clear-industry]")?.addEventListener("click", () => {
+      if (typeof options.onSelectIndustry === "function") {
+        options.onSelectIndustry(null);
+      }
+    });
+
+    // Keep selectedMeta referenced for future enrich hooks / lint calm.
+    void selectedMeta;
   }
 
   function renderAttendance(el, attendance) {
@@ -2483,11 +2679,17 @@
       options.scope ||
       el.dataset.voteScope ||
       "key";
+    const industryFilter = String(
+      options.industryFilter || el.dataset.industryFilter || ""
+    ).trim();
     const politicianName = String(
       options.politicianName || el.dataset.politicianName || ""
     ).trim();
     if (politicianName) el.dataset.politicianName = politicianName;
     el.dataset.voteScope = scope;
+    if (industryFilter) el.dataset.industryFilter = industryFilter;
+    else delete el.dataset.industryFilter;
+
     const sourceVotes = (votes || []).filter((vote) => {
       const title = String(vote.title || "");
       const number = String(vote.billNumber || "");
@@ -2497,11 +2699,17 @@
       if (/seeded placeholder|placeholder vote data/i.test(summary)) return false;
       return true;
     });
+    // When drilling into an industry, include all votes (not just key) so the
+    // Money vs. Vote filter has enough related roll calls to show.
+    const effectiveScope = industryFilter ? "all" : scope;
     const scopedVotes =
-      scope === "all"
+      effectiveScope === "all"
         ? sourceVotes
         : sourceVotes.filter((vote) => isDisplayedKeyVote(vote));
-    const filtered = scopedVotes.filter((vote) => {
+    const industryVotes = industryFilter
+      ? scopedVotes.filter((vote) => voteMatchesIndustry(vote, industryFilter))
+      : scopedVotes;
+    const filtered = industryVotes.filter((vote) => {
       if (!q) return true;
       const haystack = [
         vote.billNumber,
@@ -2537,6 +2745,10 @@
       rights: { icon: "⚖️", label: "Rights Impact", className: "is-rights" },
     };
 
+    const relatedTopic = industryFilter
+      ? policyCategoryFromIndustry(industryFilter)
+      : null;
+
     el.innerHTML = `
       <div class="scorecard-votes__header">
         <div class="scorecard-votes__heading">
@@ -2555,18 +2767,22 @@
           </button>
           <label class="scorecard-topic">
             <span>Votes</span>
-            <select id="scorecard-vote-scope" aria-label="Vote significance filter">
+            <select id="scorecard-vote-scope" aria-label="Vote significance filter" ${
+              industryFilter ? "disabled" : ""
+            }>
               <option value="key"${
-                scope === "key" ? " selected" : ""
+                scope === "key" && !industryFilter ? " selected" : ""
               }>Key Votes</option>
               <option value="all"${
-                scope === "all" ? " selected" : ""
+                scope === "all" || industryFilter ? " selected" : ""
               }>All Votes</option>
             </select>
           </label>
           <label class="scorecard-topic">
             <span>Topic</span>
-            <select id="scorecard-topic-filter">
+            <select id="scorecard-topic-filter" ${
+              industryFilter ? "disabled" : ""
+            }>
               <option value="all">All topics</option>
               ${topics
                 .map(
@@ -2580,6 +2796,26 @@
           </label>
         </div>
       </div>
+      ${
+        industryFilter
+          ? `<div class="scorecard-industry-filter-badge" role="status">
+              <span>
+                Filtered by industry:
+                <strong>${escapeHtml(industryFilter)}</strong>
+                ${
+                  relatedTopic
+                    ? `<span class="scorecard-industry-filter-badge__topic">· ${escapeHtml(
+                        relatedTopic
+                      )}</span>`
+                    : ""
+                }
+              </span>
+              <button type="button" class="refresh-btn" data-clear-industry-filter="1">
+                Clear Filter
+              </button>
+            </div>`
+          : ""
+      }
       ${
         filtered.length
           ? `<ul class="scorecard-vote-list">
@@ -2678,11 +2914,15 @@
             </ul>`
           : `<div class="scorecard-empty scorecard-empty--card" role="status">
               <p>${
-                sourceVotes.length
-                  ? scope === "key"
-                    ? "No key votes in this list yet. Switch to All Votes to see every roll call."
-                    : "No roll calls match this filter."
-                  : "No recent roll-call votes recorded for this representative."
+                industryFilter
+                  ? `No roll calls matched “${escapeHtml(
+                      industryFilter
+                    )}” yet. Try another industry or Clear Filter.`
+                  : sourceVotes.length
+                    ? scope === "key"
+                      ? "No key votes in this list yet. Switch to All Votes to see every roll call."
+                      : "No roll calls match this filter."
+                    : "No recent roll-call votes recorded for this representative."
               }</p>
             </div>`
       }
@@ -2695,7 +2935,10 @@
         options.bioguideId || el.dataset.bioguideId || ""
       ).toUpperCase(),
       chamber: String(options.chamber || el.dataset.chamber || ""),
+      industryFilter,
       onStanceChange: options.onStanceChange || el._scorecardVoteOptions?.onStanceChange || null,
+      onClearIndustry:
+        options.onClearIndustry || el._scorecardVoteOptions?.onClearIndustry || null,
     };
     if (el._scorecardVoteOptions.bioguideId) {
       el.dataset.bioguideId = el._scorecardVoteOptions.bioguideId;
@@ -2706,21 +2949,32 @@
 
     mountScorecardVoteEngagement(el, filtered, el._scorecardVoteOptions);
 
+    el.querySelector("[data-clear-industry-filter]")?.addEventListener(
+      "click",
+      () => {
+        if (typeof el._scorecardVoteOptions.onClearIndustry === "function") {
+          el._scorecardVoteOptions.onClearIndustry();
+        }
+      }
+    );
+
     const scopeSelect = $("scorecard-vote-scope");
-    if (scopeSelect) {
+    if (scopeSelect && !industryFilter) {
       scopeSelect.addEventListener("change", () => {
         renderVotes(el, sourceVotes, query, {
           scope: scopeSelect.value,
           politicianName,
           bioguideId: el._scorecardVoteOptions?.bioguideId,
           chamber: el._scorecardVoteOptions?.chamber,
+          industryFilter: el._scorecardVoteOptions?.industryFilter || "",
           onStanceChange: el._scorecardVoteOptions?.onStanceChange,
+          onClearIndustry: el._scorecardVoteOptions?.onClearIndustry,
         });
       });
     }
 
     const topicSelect = $("scorecard-topic-filter");
-    if (topicSelect) {
+    if (topicSelect && !industryFilter) {
       topicSelect.addEventListener("change", () => {
         const topic = topicSelect.value;
         const next =
@@ -2736,7 +2990,9 @@
           politicianName,
           bioguideId: el._scorecardVoteOptions?.bioguideId,
           chamber: el._scorecardVoteOptions?.chamber,
+          industryFilter: el._scorecardVoteOptions?.industryFilter || "",
           onStanceChange: el._scorecardVoteOptions?.onStanceChange,
+          onClearIndustry: el._scorecardVoteOptions?.onClearIndustry,
         });
       });
     }
@@ -2936,6 +3192,7 @@
       voteQuery: "",
       paintToken: 0,
       lastEnrich: null,
+      selectedIndustry: null,
     };
 
     async function maybeShowVoterPulseBanner() {
@@ -3006,7 +3263,8 @@
         $("scorecard-match-body"),
         $("scorecard-match-lede"),
         active.profile,
-        matchPayload
+        matchPayload,
+        { industryFilter: state.selectedIndustry }
       );
       renderHero(
         $("scorecard-hero"),
@@ -3014,6 +3272,52 @@
         state.lastEnrich,
         matchSummary
       );
+    }
+
+    function paintVotesAndDonor(active) {
+      if (!active) return;
+      const voteOpts = {
+        politicianName: active.profile?.name || "",
+        bioguideId: active.profile?.bioguideId || "",
+        chamber: active.profile?.chamber || "",
+        industryFilter: state.selectedIndustry || "",
+        onStanceChange: refreshActionMatchScore,
+        onClearIndustry: () => setSelectedIndustry(null),
+      };
+      renderDonor($("scorecard-donor"), active.campaignFinance, {
+        selectedIndustry: state.selectedIndustry,
+        onSelectIndustry: setSelectedIndustry,
+      });
+      if (hasUsableVotes(active.recentVotes)) {
+        renderVotes(
+          $("scorecard-votes"),
+          active.recentVotes,
+          state.voteQuery,
+          voteOpts
+        );
+      }
+    }
+
+    function setSelectedIndustry(industry) {
+      const next = String(industry || "").trim() || null;
+      state.selectedIndustry = next;
+      const reps = state.data?.representatives || [];
+      const active =
+        reps.find((rep) => rep.profile.id === state.activeId) || reps[0] || null;
+      if (!active) return;
+      paintVotesAndDonor(active);
+      // Keep Action Match topic chips in sync with the industry drill-down.
+      const matchBody = $("scorecard-match-body");
+      if (matchBody?.querySelector("[data-match-topic-filter]")) {
+        const topic = policyCategoryFromIndustry(next) || "all";
+        bindMatchTopicFilters(matchBody, topic);
+      }
+      if (next) {
+        $("scorecard-votes")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
     }
 
     bindMatchQuizModalChrome(() => {
@@ -3042,6 +3346,7 @@
       state.activeId = active.profile.id;
       renderTabs(tabs, reps, state.activeId, (id) => {
         state.activeId = id;
+        state.selectedIndustry = null;
         const url = new URL(global.location.href);
         url.searchParams.set("id", id);
         global.history.replaceState({}, "", url.toString());
@@ -3061,7 +3366,7 @@
         null,
         summarizeMatch(pendingMatch)
       );
-      renderDonor($("scorecard-donor"), active.campaignFinance);
+      paintVotesAndDonor(active);
       renderAttendance($("scorecard-attendance"), active.attendance);
       if (!hasUsableVotes(active.recentVotes)) {
         const votesEl = $("scorecard-votes");
@@ -3088,20 +3393,14 @@
               <p>Loading recent roll-call votes…</p>
             </div>`;
         }
-      } else {
-        renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
-          politicianName: active.profile?.name || "",
-          bioguideId: active.profile?.bioguideId || "",
-          chamber: active.profile?.chamber || "",
-          onStanceChange: refreshActionMatchScore,
-        });
       }
       renderMatch(
         $("scorecard-match"),
         $("scorecard-match-body"),
         $("scorecard-match-lede"),
         active.profile,
-        pendingMatch
+        pendingMatch,
+        { industryFilter: state.selectedIndustry }
       );
 
       const [enrich] = await Promise.all([loadEnrichment(active.profile)]);
@@ -3110,12 +3409,7 @@
       if (!hasUsableVotes(active.recentVotes)) {
         const liveVotes = mapProfileVotesToScorecard(enrich?.recentVotes);
         active.recentVotes = liveVotes;
-        renderVotes($("scorecard-votes"), liveVotes, state.voteQuery, {
-          politicianName: active.profile?.name || "",
-          bioguideId: active.profile?.bioguideId || "",
-          chamber: active.profile?.chamber || "",
-          onStanceChange: refreshActionMatchScore,
-        });
+        paintVotesAndDonor(active);
       }
 
       // Project existing user stances (often from Senate quiz) onto this
@@ -3144,7 +3438,8 @@
         $("scorecard-match-body"),
         $("scorecard-match-lede"),
         active.profile,
-        matchPayload
+        matchPayload,
+        { industryFilter: state.selectedIndustry }
       );
       await resolveFollowTargetId(activeRosterPerson);
       await loadNoteForPerson(activeRosterPerson, followUser);
@@ -3162,14 +3457,7 @@
         const reps = state.data?.representatives || [];
         const active =
           reps.find((rep) => rep.profile.id === state.activeId) || reps[0];
-        if (active) {
-          renderVotes($("scorecard-votes"), active.recentVotes, state.voteQuery, {
-            politicianName: active.profile?.name || "",
-            bioguideId: active.profile?.bioguideId || "",
-            chamber: active.profile?.chamber || "",
-            onStanceChange: refreshActionMatchScore,
-          });
-        }
+        if (active) paintVotesAndDonor(active);
       });
     }
 
