@@ -567,11 +567,23 @@ function renderAlignmentChart(payload) {
     .slice(0, 8)
     .map((row) => {
       const score = row.score == null ? "—" : `${row.score}%`;
-      return `<li><a class="politician-name-link" href="representatives.html?bioguideId=${encodeURIComponent(
-        String(row.bioguide_id || "").toUpperCase()
-      )}"><strong>${escapeProfileHtml(
-        row.politician_name || row.bioguide_id
-      )}</strong></a> <span>${escapeProfileHtml(String(score))} · ${escapeProfileHtml(
+      const bio = String(row.bioguide_id || "").toUpperCase();
+      const href =
+        bio && typeof politicianProfileHref === "function"
+          ? politicianProfileHref({
+              bioguide_id: bio,
+              name: row.politician_name || "",
+            })
+          : bio
+            ? `representatives.html?bioguideId=${encodeURIComponent(bio)}`
+            : "";
+      const name = row.politician_name || row.bioguide_id || "Member";
+      const nameHtml = href
+        ? `<a class="politician-name-link" href="${escapeProfileHtml(
+            href
+          )}"><strong>${escapeProfileHtml(name)}</strong></a>`
+        : `<strong>${escapeProfileHtml(name)}</strong>`;
+      return `<li>${nameHtml} <span>${escapeProfileHtml(String(score))} · ${escapeProfileHtml(
         String(row.matched_count || 0)
       )}/${escapeProfileHtml(String(row.compared || 0))} votes</span></li>`;
     })

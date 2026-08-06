@@ -378,6 +378,34 @@
     await loadMatchScores(client);
   }
 
+  function resolveMemberDisplayName(row = {}) {
+    const fromRow = String(row.name || "").trim();
+    if (fromRow) return fromRow;
+    const bio = String(row.bioguideId || row.bioguide_id || "")
+      .trim()
+      .toUpperCase();
+    if (!bio) return "Member";
+    const rep = (state.reps || []).find(
+      (person) =>
+        String(person.bioguide_id || person.bioguideId || "").toUpperCase() ===
+        bio
+    );
+    return (
+      String(rep?.full_name || rep?.name || "").trim() || bio
+    );
+  }
+
+  function memberScorecardHref(row = {}) {
+    const bio = String(row.bioguideId || row.bioguide_id || "")
+      .trim()
+      .toUpperCase();
+    if (!bio) return "";
+    if (typeof politicianProfileHref === "function") {
+      return politicianProfileHref({ bioguide_id: bio, name: row.name || "" });
+    }
+    return `representatives.html?bioguideId=${encodeURIComponent(bio)}`;
+  }
+
   function renderWhoVotedHtml(stance, payload) {
     if (!stance) {
       return `<p class="policy-engage__vote-empty">Tap Support or Oppose to compare with House roll call votes.</p>`;
@@ -398,11 +426,14 @@
             : row.matched === false
               ? "voted differently"
               : "no comparable vote";
-        return `<li><a class="politician-name-link" href="representatives.html?bioguideId=${encodeURIComponent(
-          String(row.bioguideId || "").toUpperCase()
-        )}"><strong>${escapeHtml(
-          row.name || row.bioguideId
-        )}</strong></a> voted <em>${escapeHtml(
+        const name = resolveMemberDisplayName(row);
+        const href = memberScorecardHref(row);
+        const nameHtml = href
+          ? `<a class="politician-name-link" href="${escapeHtml(
+              href
+            )}"><strong>${escapeHtml(name)}</strong></a>`
+          : `<strong>${escapeHtml(name)}</strong>`;
+        return `<li>${nameHtml} voted <em>${escapeHtml(
           row.voteCast
         )}</em> — ${escapeHtml(matchLabel)}</li>`;
       })
