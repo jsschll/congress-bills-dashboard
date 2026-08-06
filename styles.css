@@ -5774,12 +5774,14 @@ body.scorecard-match-detail-open {
   color: #dbeafe;
 }
 
-.bill-ask-ai__msg--assistant {
-  justify-self: start;
-  max-width: 100%;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(110, 231, 183, 0.22);
-  color: #e2e8f0;
+.bill-ask-ai__msg--assistant a {
+  color: #6ee7b7;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.bill-ask-ai__msg--assistant a:hover {
+  color: #a7f3d0;
 }
 
 .bill-ask-ai__msg--assistant.is-streaming::after {
