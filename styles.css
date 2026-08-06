@@ -3229,6 +3229,90 @@ body {
   margin-top: 0.85rem;
 }
 
+.politicians-hero__my-reps {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.85rem 0 0;
+  max-width: 42rem;
+}
+
+.politicians-hero__my-reps[hidden] {
+  display: none;
+}
+
+.politicians-hero__my-reps-btn {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  border-radius: 0.85rem;
+  padding: 0.95rem 1.25rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: #042f2e;
+  background: linear-gradient(135deg, #6ee7b7 0%, #2aa894 55%, #1f8a7a 100%);
+  cursor: pointer;
+  box-shadow: 0 14px 30px rgba(31, 138, 122, 0.35);
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.politicians-hero__my-reps-btn:hover,
+.politicians-hero__my-reps-btn:focus-visible {
+  outline: none;
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.politicians-hero__my-reps-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
+.politicians-hero__my-reps-status {
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(110, 231, 183, 0.4);
+  background: rgba(15, 23, 42, 0.55);
+  color: #a7f3d0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.politicians-hero__my-reps-status[hidden] {
+  display: none;
+}
+
+.politicians-hero__my-reps-fallback {
+  margin: 0.85rem 0 0;
+  max-width: 42rem;
+  color: rgba(226, 232, 240, 0.85);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.politicians-hero__my-reps-fallback[hidden] {
+  display: none;
+}
+
+.politicians-hero__my-reps-fallback a {
+  color: #6ee7b7;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.politicians-hero__my-reps-fallback a:hover {
+  color: #a7f3d0;
+}
+
+.politicians-hero__my-reps + .politicians-hero__form,
+.politicians-hero__my-reps-fallback + .politicians-hero__form {
+  margin-top: 0.85rem;
+}
+
 .politicians-hero__input {
   flex: 1 1 16rem;
   min-width: 0;
