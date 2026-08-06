@@ -1867,6 +1867,208 @@ function fillBillBreakdownModal(payload = {}, options = {}) {
     linkEl.href = payload.href || "bills-policies.html?tab=votes";
     linkEl.hidden = !linkEl.href;
   }
+
+  resetBillAskAi(prefix, payload);
+  bindBillAskAi(prefix);
+}
+
+function resetBillAskAi(prefix = "scorecard-match-detail", payload = null) {
+  if (typeof document === "undefined") return;
+  const modal = document.getElementById(`${prefix}-modal`);
+  const logEl = document.getElementById(`${prefix}-ask-log`);
+  const statusEl = document.getElementById(`${prefix}-ask-status`);
+  const inputEl = document.getElementById(`${prefix}-ask-input`);
+  if (modal) modal._askAiBillPayload = payload || null;
+  if (logEl) logEl.innerHTML = "";
+  if (statusEl) {
+    statusEl.hidden = true;
+    statusEl.textContent = "";
+    statusEl.className = "bill-ask-ai__status";
+  }
+  if (inputEl) inputEl.value = "";
+  if (modal?._askAiAbort) {
+    try {
+      modal._askAiAbort.abort();
+    } catch {
+      /* ignore */
+    }
+    modal._askAiAbort = null;
+  }
+}
+
+async function askAiAboutBill(prefix, question) {
+  const modal = document.getElementById(`${prefix}-modal`);
+  const logEl = document.getElementById(`${prefix}-ask-log`);
+  const statusEl = document.getElementById(`${prefix}-ask-status`);
+  const formEl = document.getElementById(`${prefix}-ask-form`);
+  const inputEl = document.getElementById(`${prefix}-ask-input`);
+  const chips = modal?.querySelectorAll("[data-ask-ai-chip]") || [];
+  const payload = modal?._askAiBillPayload || null;
+  const q = String(question || "").trim();
+  if (!modal || !logEl || !q || !payload) return;
+
+  if (modal._askAiAbort) {
+    try {
+      modal._askAiAbort.abort();
+    } catch {
+      /* ignore */
+    }
+  }
+  const controller = new AbortController();
+  modal._askAiAbort = controller;
+
+  const userMsg = document.createElement("p");
+  userMsg.className = "bill-ask-ai__msg bill-ask-ai__msg--user";
+  userMsg.textContent = q;
+  logEl.appendChild(userMsg);
+
+  const assistantMsg = document.createElement("p");
+  assistantMsg.className =
+    "bill-ask-ai__msg bill-ask-ai__msg--assistant is-streaming";
+  assistantMsg.textContent = "";
+  logEl.appendChild(assistantMsg);
+  logEl.scrollTop = logEl.scrollHeight;
+
+  if (statusEl) {
+    statusEl.hidden = false;
+    statusEl.className = "bill-ask-ai__status";
+    statusEl.textContent = "Thinking…";
+  }
+  if (inputEl) inputEl.value = "";
+  const submitBtn = formEl?.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+  chips.forEach((chip) => {
+    chip.disabled = true;
+  });
+
+  try {
+    const response = await fetch("/api/chat-bill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        question: q,
+        bill: {
+          title: payload.title || "",
+          rawTitle: payload.rawTitle || "",
+          number: payload.number || "",
+          takeaway: payload.takeaway || "",
+          summary: payload.summary || "",
+          cardSummary: payload.cardSummary || "",
+          keyPoints: payload.keyPoints || [],
+          proArgument: payload.proArgument || payload.yea || "",
+          conArgument: payload.conArgument || payload.nay || "",
+          resultLabel: payload.resultLabel || "",
+          rollMeta: payload.rollMeta || {},
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      let message = `Could not reach Ask AI (${response.status}).`;
+      try {
+        const errBody = await response.json();
+        if (errBody?.error) message = errBody.error;
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message);
+    }
+
+    const contentType = String(response.headers.get("content-type") || "");
+    if (!contentType.includes("text/event-stream") || !response.body) {
+      const data = await response.json().catch(() => ({}));
+      const text = String(data.answer || data.text || data.error || "").trim();
+      assistantMsg.textContent = text || "No answer returned.";
+      assistantMsg.classList.remove("is-streaming");
+      if (statusEl) statusEl.hidden = true;
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let full = "";
+    let eventName = "message";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n");
+      buffer = parts.pop() || "";
+      for (const line of parts) {
+        if (line.startsWith("event:")) {
+          eventName = line.slice(6).trim();
+          continue;
+        }
+        if (!line.startsWith("data:")) continue;
+        const raw = line.slice(5).trim();
+        if (!raw) continue;
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+        if (eventName === "token" && data.text) {
+          full += data.text;
+          assistantMsg.textContent = full;
+          logEl.scrollTop = logEl.scrollHeight;
+          if (statusEl) statusEl.textContent = "Writing…";
+        } else if (eventName === "error") {
+          throw new Error(data.error || "Ask AI failed.");
+        } else if (eventName === "done") {
+          eventName = "message";
+        }
+      }
+    }
+
+    if (!full.trim()) {
+      assistantMsg.textContent =
+        "I couldn’t find enough detail in this bill card to answer that.";
+    }
+    assistantMsg.classList.remove("is-streaming");
+    if (statusEl) statusEl.hidden = true;
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    assistantMsg.classList.remove("is-streaming");
+    if (!assistantMsg.textContent) {
+      assistantMsg.textContent =
+        error?.message || "Could not answer that question right now.";
+    }
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.className = "bill-ask-ai__status is-error";
+      statusEl.textContent = error?.message || "Ask AI failed.";
+    }
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+    chips.forEach((chip) => {
+      chip.disabled = false;
+    });
+    if (modal._askAiAbort === controller) modal._askAiAbort = null;
+  }
+}
+
+function bindBillAskAi(prefix = "scorecard-match-detail") {
+  if (typeof document === "undefined") return;
+  const modal = document.getElementById(`${prefix}-modal`);
+  const formEl = document.getElementById(`${prefix}-ask-form`);
+  if (!modal || !formEl || formEl.dataset.boundAskAi === "1") return;
+  formEl.dataset.boundAskAi = "1";
+
+  formEl.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const inputEl = document.getElementById(`${prefix}-ask-input`);
+    askAiAboutBill(prefix, inputEl?.value || "");
+  });
+
+  modal.querySelectorAll("[data-ask-ai-chip]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      askAiAboutBill(prefix, chip.textContent || "");
+    });
+  });
 }
 
 /**
