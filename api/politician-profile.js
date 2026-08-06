@@ -42,6 +42,26 @@ async function fetchJson(url) {
   return response.json();
 }
 
+/** House list endpoint omits voteQuestion; detail includes the motion text. */
+async function fetchHouseVoteQuestion(apiKey, congress, session, roll) {
+  if (!apiKey || !congress || !roll) return { voteQuestion: "", result: "" };
+  try {
+    const url = `${CONGRESS_API}/house-vote/${congress}/${session || 1}/${roll}?format=json&api_key=${encodeURIComponent(
+      apiKey
+    )}`;
+    const data = await fetchJson(url);
+    const vote = data.houseRollCallVote || {};
+    return {
+      voteQuestion: String(vote.voteQuestion || vote.question || "").trim(),
+      result: String(vote.result || "").trim(),
+      legislationTitle: String(vote.legislationTitle || "").trim(),
+    };
+  } catch (error) {
+    console.warn("house vote detail failed:", error.message || error);
+    return { voteQuestion: "", result: "", legislationTitle: "" };
+  }
+}
+
 function ordinal(n) {
   const num = Number(n);
   if (!Number.isFinite(num)) return String(n || "");
@@ -413,16 +433,19 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
   for (let i = 0; i < ranked.length && found.length < limit; i += chunkSize) {
     const chunk = ranked.slice(i, i + chunkSize);
     const results = await Promise.all(
-      chunk.map(async ({ raw: vote, voteKind }) => {
+      chunk.map(async ({ raw: vote, voteKind: listedKind }) => {
         const congress = vote.congress || CONGRESS;
         const session = vote.sessionNumber || 1;
         const roll = vote.rollCallNumber;
         if (!roll) return null;
         try {
-          const url = `${CONGRESS_API}/house-vote/${congress}/${session}/${roll}/members?format=json&api_key=${encodeURIComponent(
+          const membersUrl = `${CONGRESS_API}/house-vote/${congress}/${session}/${roll}/members?format=json&api_key=${encodeURIComponent(
             apiKey
           )}`;
-          const data = await fetchJson(url);
+          const [data, detail] = await Promise.all([
+            fetchJson(membersUrl),
+            fetchHouseVoteQuestion(apiKey, congress, session, roll),
+          ]);
           const members =
             data.houseRollCallVoteMemberVotes?.results || [];
           const row = members.find(
@@ -430,6 +453,10 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
               String(entry.bioguideID || "").toUpperCase() === bio
           );
           if (!row) return null;
+          const voteQuestion =
+            detail.voteQuestion ||
+            String(vote.voteQuestion || vote.question || "").trim();
+          const result = detail.result || vote.result || "";
           const type = String(vote.legislationType || "")
             .toLowerCase()
             .replace(/\./g, "");
@@ -438,13 +465,34 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             type && number
               ? `${String(vote.legislationType || type).toUpperCase().replace(/\./g, "")} ${number}`
               : `Roll Call ${roll}`;
+          const voteKind = classifyVoteKind(voteQuestion, result, {
+            legislationType: type,
+            billNumber,
+            title:
+              detail.legislationTitle ||
+              vote.legislationTitle ||
+              voteQuestion ||
+              "",
+          });
+          if (
+            !billNumber.startsWith("Roll Call") &&
+            voteKind === "procedural" &&
+            /adjourn|approve the journal|quorum call|election of speaker/i.test(
+              voteQuestion
+            )
+          ) {
+            return null;
+          }
+          const effectiveKind =
+            voteKind && voteKind !== "other" ? voteKind : listedKind;
           const billId =
-            type && number && voteKind === "final_passage"
+            type && number && effectiveKind === "final_passage"
               ? `federal-${congress}-${type}-${number}`.toLowerCase()
               : `house-vote-${congress}-${session}-${roll}`;
           const title =
             vote.legislationTitle ||
-            vote.voteQuestion ||
+            detail.legislationTitle ||
+            voteQuestion ||
             `House Roll Call ${roll}`;
           const base = {
             id: billId,
@@ -456,17 +504,17 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             congress,
             sessionNumber: session,
             rollCallNumber: roll,
-            voteQuestion: vote.voteQuestion || "",
-            voteKind,
+            voteQuestion,
+            voteKind: effectiveKind || voteKind || listedKind || null,
             voteCast: normalizeVoteCast(row.voteCast),
-            result: vote.result || "",
+            result,
             date: displayDate(vote.startDate || vote.date || null),
             lastUpdated:
               toIsoDate(vote.startDate || vote.date) || new Date().toISOString(),
             policyArea: null,
             subjectCategory: "Other",
             tags: [],
-            shortPitch: title || vote.voteQuestion || "",
+            shortPitch: title || voteQuestion || "",
             officialSummary: "",
             yeaMeans: "",
             nayMeans: "",
@@ -486,7 +534,7 @@ async function fetchRecentVotesForMember(apiKey, bioguideId, limit = 16) {
             legislationNumber: number,
             kind: "vote",
             primarySponsor: { name: "U.S. House", title: "Roll-call vote" },
-            statusLabel: vote.result || vote.voteQuestion || "House vote",
+            statusLabel: result || voteQuestion || "House vote",
             allSteps: [],
             status: null,
             deltaSummary: { added: [], changed: [], removed: [] },
