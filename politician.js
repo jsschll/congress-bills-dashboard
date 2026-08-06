@@ -1071,12 +1071,21 @@ function setActivityTab(tab) {
 }
 
 function voteKindLabel(kind, item = {}) {
-  if (kind === "final_passage") return "Final passage";
-  if (kind === "amendment") return "Amendment";
+  if (typeof formatVoteMotionLabel === "function") {
+    return formatVoteMotionLabel({
+      voteKind: kind || item.voteKind || item.vote_kind,
+      voteQuestion: item.voteQuestion || item.vote_question,
+      motionLabel: item.motionLabel,
+      result: item.result,
+    });
+  }
+  if (kind === "final_passage") return "Final Passage";
+  if (kind === "amendment") return "On Agreeing to the Amendment";
+  if (kind === "procedural") return "Procedural Vote";
   const chamber = String(item.chamber || item.jurisdiction || "").toLowerCase();
-  if (chamber.includes("senate")) return "Senate vote";
-  if (chamber.includes("house")) return "House vote";
-  return "Floor vote";
+  if (chamber.includes("senate")) return "Senate Floor Vote";
+  if (chamber.includes("house")) return "House Floor Vote";
+  return "Floor Vote";
 }
 
 function formatVoteMeta(item) {
@@ -1137,6 +1146,10 @@ function renderVotesList(target, votes, emptyMessage, person) {
     const cast = item.voteCast || "—";
     const subject = item.subjectCategory || item.policyArea || "";
     const kind = voteKindLabel(item.voteKind, item);
+    const motion =
+      typeof describeVoteMotion === "function"
+        ? describeVoteMotion(item)
+        : { label: kind, detail: kind, isProcedural: false };
     const copy = voteCardCopy(item);
     const titleFallback =
       String(item.jurisdiction || item.chamber || "")
@@ -1170,7 +1183,12 @@ function renderVotesList(target, votes, emptyMessage, person) {
         )}’s recorded vote">${escapeHtml(cast)}</span>
         <div class="politician-vote-card__heading">
           <div class="politician-vote-card__badges">
-            <span class="politician-vote-card__kind">${escapeHtml(kind)}</span>
+            <span
+              class="politician-vote-card__kind${
+                motion.isProcedural ? " is-procedural" : ""
+              }"
+              title="${escapeHtml(motion.detail || kind)}"
+            >${escapeHtml(motion.label || kind)}</span>
             <span class="politician-vote-card__bill">${escapeHtml(
               item.billNumber || `Roll Call ${item.rollCallNumber || ""}`
             )}</span>
@@ -1185,6 +1203,13 @@ function renderVotesList(target, votes, emptyMessage, person) {
           <h3 class="politician-vote-card__title">${escapeHtml(
             displayTitle
           )}</h3>
+          ${
+            motion.isProcedural
+              ? `<p class="politician-vote-card__motion-note">${escapeHtml(
+                  motion.detail || kind
+                )}</p>`
+              : ""
+          }
           ${
             codeBadge
               ? `<p class="politician-vote-card__code">${escapeHtml(

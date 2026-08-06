@@ -196,6 +196,114 @@ function formatShortDate(value) {
   });
 }
 
+/**
+ * Human-readable motion / vote-type label for roll-call cards.
+ * Prefer official vote_question; fall back to vote_kind / Floor Vote.
+ */
+function formatVoteMotionLabel(input = {}) {
+  const voteQuestion = String(
+    input.voteQuestion ||
+      input.vote_question ||
+      input.question ||
+      input.motionLabel ||
+      ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const voteKind = String(input.voteKind || input.vote_kind || "")
+    .toLowerCase()
+    .trim();
+
+  function titleCaseMotion(text) {
+    const small = new Set([
+      "a",
+      "an",
+      "and",
+      "as",
+      "at",
+      "by",
+      "for",
+      "in",
+      "of",
+      "on",
+      "or",
+      "the",
+      "to",
+    ]);
+    return String(text || "")
+      .split(" ")
+      .map((word, index) => {
+        const lower = word.toLowerCase();
+        if (index > 0 && small.has(lower)) return lower;
+        if (/^[A-Z0-9.]+$/.test(word) && word.length <= 6) return word;
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      })
+      .join(" ");
+  }
+
+  if (voteQuestion) {
+    const lower = voteQuestion.toLowerCase();
+    if (/\bon passage\b|\bfinal passage\b/.test(lower)) return "Final Passage";
+    if (/\bmotion to recommit\b/.test(lower)) return "On Motion to Recommit";
+    if (/\bmotion to table\b/.test(lower)) return "On Motion to Table";
+    if (/\bmotion to reconsider\b/.test(lower)) {
+      return "On Motion to Reconsider";
+    }
+    if (/\bmotion to proceed\b/.test(lower)) return "On Motion to Proceed";
+    if (/\bprevious question\b/.test(lower)) {
+      return "On Ordering the Previous Question";
+    }
+    if (/\bsuspend(?:ing)? the rules\b/.test(lower)) {
+      return "On Motion to Suspend the Rules";
+    }
+    if (
+      /\bagreeing to the amendment\b|\bon agreeing to the amendment\b/.test(
+        lower
+      )
+    ) {
+      return "On Agreeing to the Amendment";
+    }
+    if (/\bamendment\b|\bamdt\.?\b/.test(lower) && voteQuestion.length <= 90) {
+      return titleCaseMotion(voteQuestion.replace(/^on\s+/i, "On "));
+    }
+    if (voteQuestion.length <= 72) {
+      const withOn = /^on\s+/i.test(voteQuestion)
+        ? voteQuestion
+        : `On ${voteQuestion}`;
+      return titleCaseMotion(withOn.replace(/^On On\s+/i, "On "));
+    }
+  }
+
+  if (input.motionLabel) return String(input.motionLabel).trim();
+  if (voteKind === "final_passage") return "Final Passage";
+  if (voteKind === "amendment") return "On Agreeing to the Amendment";
+  if (voteKind === "procedural") return "Procedural Vote";
+  if (voteKind === "bill") return "Passage Vote";
+  return "Floor Vote";
+}
+
+function describeVoteMotion(input = {}) {
+  const voteQuestion = String(
+    input.voteQuestion || input.vote_question || input.question || ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const voteKind = String(input.voteKind || input.vote_kind || "")
+    .toLowerCase()
+    .trim();
+  const label = formatVoteMotionLabel(input);
+  const isProcedural =
+    voteKind === "procedural" ||
+    /motion to (adjourn|table|reconsider|recommit)|previous question|suspend the rules|approve the journal|quorum call/.test(
+      voteQuestion.toLowerCase()
+    );
+  const detail =
+    isProcedural && !/^procedural/i.test(label)
+      ? `Procedural Vote: ${label}`
+      : label;
+  return { label, detail, isProcedural, voteQuestion, voteKind };
+}
+
 const VOTE_CARD_DEFAULT_YEA_LABEL = "Support Measure";
 const VOTE_CARD_DEFAULT_NAY_LABEL = "Oppose Measure";
 

@@ -3032,6 +3032,24 @@
                   const billNumber = normalizeBillNumber(vote.billNumber);
                   const displayTitle = formatVoteTitle(vote);
                   const codeBadge = formatVoteCodeBadge(vote);
+                  const motion =
+                    typeof describeVoteMotion === "function"
+                      ? describeVoteMotion(vote)
+                      : {
+                          label:
+                            vote.motionLabel ||
+                            (typeof formatVoteMotionLabel === "function"
+                              ? formatVoteMotionLabel(vote)
+                              : "Floor Vote"),
+                          detail: vote.motionDetail || vote.motionLabel || "",
+                          isProcedural: Boolean(vote.isProceduralMotion),
+                        };
+                  const motionLabel = String(
+                    motion.label || vote.motionLabel || "Floor Vote"
+                  ).trim();
+                  const motionDetail = String(
+                    motion.detail || motionLabel
+                  ).trim();
                   const summary = buildPlainEnglishSummary(vote);
                   const impacts = [
                     ["wallet", vote.impacts?.wallet],
@@ -3041,21 +3059,36 @@
                   return `<li class="scorecard-vote">
                     <div class="scorecard-vote__top">
                       <div class="scorecard-vote__meta">
-                        ${
-                          billNumber
-                            ? `<span class="scorecard-bill">${escapeHtml(
-                                billNumber
-                              )}</span>`
-                            : ""
-                        }
-                        ${
-                          vote.category
-                            ? `<span class="scorecard-vote__category">${escapeHtml(
-                                vote.category
-                              )}</span>`
-                            : ""
-                        }
+                        <div class="scorecard-vote__badges">
+                          ${
+                            billNumber
+                              ? `<span class="scorecard-bill">${escapeHtml(
+                                  billNumber
+                                )}</span>`
+                              : ""
+                          }
+                          <span
+                            class="scorecard-vote__motion${
+                              motion.isProcedural ? " is-procedural" : ""
+                            }"
+                            title="${escapeHtml(motionDetail)}"
+                          >${escapeHtml(motionLabel)}</span>
+                          ${
+                            vote.category
+                              ? `<span class="scorecard-vote__category">${escapeHtml(
+                                  vote.category
+                                )}</span>`
+                              : ""
+                          }
+                        </div>
                         <h4>${escapeHtml(displayTitle)}</h4>
+                        ${
+                          motion.isProcedural
+                            ? `<p class="scorecard-vote__motion-note">${escapeHtml(
+                                motionDetail
+                              )}</p>`
+                            : ""
+                        }
                         ${
                           codeBadge
                             ? `<span class="scorecard-vote__code">${escapeHtml(
@@ -3066,7 +3099,9 @@
                       </div>
                       <span class="scorecard-vote-pill is-${tone}" aria-label="Voted ${escapeHtml(
                         positionLabel
-                      )}">${escapeHtml(positionLabel)}</span>
+                      )} on ${escapeHtml(motionLabel)}">${escapeHtml(
+                    positionLabel
+                  )}</span>
                     </div>
                     ${
                       impacts.length
