@@ -401,6 +401,9 @@ async function renderAppNav(activePage = "home") {
   }
 
   if (!user) {
+    if (typeof clearSharedLocationStorage === "function") {
+      clearSharedLocationStorage();
+    }
     syncHeaderAuth(null);
     buildLoggedOutActions(actions, activePage);
     if (!isSupabaseConfigured()) {

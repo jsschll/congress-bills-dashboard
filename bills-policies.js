@@ -319,8 +319,12 @@ function populateStateOptions() {
 function readStoredFilters() {
   try {
     filterState.stateCode = String(localStorage.getItem(STORAGE_KEYS.state) || "").toUpperCase();
-    filterState.locationOn = localStorage.getItem(STORAGE_KEYS.locationOn) === "1";
-    filterState.addressQuery = String(localStorage.getItem(STORAGE_KEYS.address) || "");
+    // Location toggle + address are account-scoped — never restore a prior
+    // visitor's home address for signed-out or newly signed-up users.
+    filterState.locationOn = false;
+    filterState.addressQuery = "";
+    localStorage.removeItem(STORAGE_KEYS.address);
+    localStorage.removeItem(STORAGE_KEYS.locationOn);
   } catch {
     // Ignore storage failures (private mode, etc.).
   }
@@ -329,8 +333,9 @@ function readStoredFilters() {
 function persistFilters() {
   try {
     localStorage.setItem(STORAGE_KEYS.state, filterState.stateCode || "");
-    localStorage.setItem(STORAGE_KEYS.locationOn, filterState.locationOn ? "1" : "0");
-    localStorage.setItem(STORAGE_KEYS.address, filterState.addressQuery || "");
+    // Do not persist address/locationOn — those belong on the signed-in profile.
+    localStorage.removeItem(STORAGE_KEYS.address);
+    localStorage.removeItem(STORAGE_KEYS.locationOn);
   } catch {
     // Ignore storage failures.
   }
@@ -2077,9 +2082,14 @@ locationForm?.addEventListener("submit", async (event) => {
   readStoredFilters();
 
   try {
+    // Only the signed-in account's saved home_address may prefill location.
     const saved = await loadSavedHomeAddress();
-    if (saved && !filterState.addressQuery) {
+    if (saved) {
       filterState.addressQuery = saved;
+      filterState.locationOn = true;
+    } else {
+      filterState.addressQuery = "";
+      filterState.locationOn = false;
     }
   } catch (error) {
     console.warn(error);

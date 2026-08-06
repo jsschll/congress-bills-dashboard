@@ -237,6 +237,9 @@ async function requireRegisteredProfile(user) {
     }
   }
 
+  if (typeof clearSharedLocationStorage === "function") {
+    clearSharedLocationStorage();
+  }
   await client.auth.signOut();
   throw new Error(
     "No account found for that email. Create an account first, then sign in."

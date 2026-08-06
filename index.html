@@ -19,7 +19,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260805toast" />
+    <link rel="stylesheet" href="styles.css?v=20260806nolocleak" />
   </head>
   <body class="page-home">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -51,10 +51,13 @@
             <input
               id="home-address-input"
               class="home-hero__input zip-lookup-hero__input"
-              type="search"
-              name="address"
+              type="text"
+              name="q"
               placeholder="Enter your ZIP code to audit your representatives..."
-              autocomplete="postal-code"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
               inputmode="text"
               aria-describedby="home-address-hint"
               required
@@ -178,8 +181,8 @@
     </main>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260805toast"></script>
-    <script src="nav.js?v=20260804a1"></script>
+    <script src="shared.js?v=20260806nolocleak"></script>
+    <script src="nav.js?v=20260806nolocleak"></script>
     <script src="zip-lookup-hero.js?v=20260804seed"></script>
     <script>
       bootNav("home");

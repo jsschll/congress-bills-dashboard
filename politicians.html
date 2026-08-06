@@ -79,10 +79,13 @@
           <input
             id="address-input"
             class="politicians-hero__input"
-            type="search"
-            name="address"
+            type="text"
+            name="q"
             placeholder="Street address or ZIP code"
-            autocomplete="street-address"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
           />
           <button class="politicians-hero__submit" type="submit">
             Find my representatives
@@ -149,8 +152,8 @@
     </main>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260806myreps"></script>
-    <script src="nav.js?v=20260804a1"></script>
+    <script src="shared.js?v=20260806nolocleak"></script>
+    <script src="nav.js?v=20260806nolocleak"></script>
     <script src="engagement.js?v=20260806myreps"></script>
     <script src="politicians-shared.js?v=20260805toast"></script>
     <script src="politicians.js?v=20260806myreps" defer></script>

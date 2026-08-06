@@ -51,9 +51,23 @@ async function requireUser(redirectTo = "auth.html") {
   return user;
 }
 
+/** Clear device-local location so one account's address never seeds another. */
+function clearSharedLocationStorage() {
+  const keys = [
+    "policyFeed.locationAddress",
+    "policyFeed.locationOn",
+  ];
+  try {
+    for (const key of keys) localStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures (private mode, etc.).
+  }
+}
+
 async function signOut() {
   const client = getSupabase();
   if (!client) return;
+  clearSharedLocationStorage();
   await client.auth.signOut();
   window.location.href = "index.html";
 }
