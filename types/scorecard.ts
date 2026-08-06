@@ -18,6 +18,13 @@ export interface DonorIndustry {
   name: string;
   /** Amount in USD. */
   amount: number;
+  /** Stable sector id for Follow the Money vote filtering. */
+  industry_slug?: string;
+  industrySlug?: string;
+  /** Human-readable sector label (e.g. Telecommunications). */
+  industry?: string;
+  /** Related scorecard policy category (e.g. Economy & Taxes). */
+  category?: string;
 }
 
 /**
