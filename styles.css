@@ -9032,7 +9032,8 @@ body.scorecard-match-modal-open {
 @media (prefers-reduced-motion: reduce) {
   .voter-pulse__card.is-enter,
   .voter-pulse-banner,
-  .voter-pulse__progress-fill {
+  .voter-pulse__progress-fill,
+  .bill-ask-ai__msg--assistant.is-streaming::after {
     animation: none;
     transition: none;
   }
