@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260805toast" />
+    <link rel="stylesheet" href="styles.css?v=20260806myreps" />
   </head>
   <body class="page-app page-politicians">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
@@ -47,6 +47,27 @@
           </button>
         </form>
         <p class="politicians-hero__or" aria-hidden="true">or</p>
+
+        <div id="my-reps-wrap" class="politicians-hero__my-reps" hidden>
+          <button
+            type="button"
+            id="my-reps-btn"
+            class="politicians-hero__my-reps-btn"
+          >
+            <span aria-hidden="true">📍</span> Show My Representatives
+          </button>
+          <p
+            id="my-reps-status"
+            class="politicians-hero__my-reps-status"
+            hidden
+            role="status"
+          ></p>
+        </div>
+        <p id="my-reps-fallback" class="politicians-hero__my-reps-fallback" hidden>
+          <a href="profile.html#location">Add address in Profile</a>
+          to quick-load your representatives.
+        </p>
+
         <form
           id="address-form"
           class="politicians-hero__form"
@@ -128,10 +149,10 @@
     </main>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260805toast"></script>
+    <script src="shared.js?v=20260806myreps"></script>
     <script src="nav.js?v=20260804a1"></script>
-    <script src="engagement.js?v=20260729t"></script>
+    <script src="engagement.js?v=20260806myreps"></script>
     <script src="politicians-shared.js?v=20260805toast"></script>
-    <script src="politicians.js?v=20260805toast" defer></script>
+    <script src="politicians.js?v=20260806myreps" defer></script>
   </body>
 </html>

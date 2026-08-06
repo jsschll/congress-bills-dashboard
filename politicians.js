@@ -289,6 +289,63 @@ nameSearchForm?.addEventListener("submit", (event) => {
   applyNameSearch(nameSearchInput?.value || "");
 });
 
+async function resolveSavedHomeAddress() {
+  const fromEngagement = String(
+    window.PolicyEngagement?.getState?.()?.homeAddress || ""
+  ).trim();
+  if (fromEngagement) return fromEngagement;
+
+  const client = typeof getSupabase === "function" ? getSupabase() : null;
+  const user = typeof getUser === "function" ? await getUser() : null;
+  if (!client || !user) return "";
+  const { data, error } = await client
+    .from("profiles")
+    .select("home_address")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (error) {
+    console.warn(error);
+    return "";
+  }
+  return String(data?.home_address || "").trim();
+}
+
+function setupMyRepresentativesQuickLoad({ addressInput, addressForm, user }) {
+  const wrap = document.getElementById("my-reps-wrap");
+  const btn = document.getElementById("my-reps-btn");
+  const statusEl = document.getElementById("my-reps-status");
+  const fallback = document.getElementById("my-reps-fallback");
+  if (!wrap || !btn || !addressInput || !addressForm) return;
+
+  return (async () => {
+    const savedAddress = await resolveSavedHomeAddress();
+    if (savedAddress) {
+      wrap.hidden = false;
+      if (fallback) fallback.hidden = true;
+      btn.addEventListener("click", () => {
+        addressInput.value = savedAddress;
+        if (statusEl) {
+          statusEl.hidden = false;
+          statusEl.textContent = "Showing reps for your saved address…";
+        }
+        btn.disabled = true;
+        addressForm.requestSubmit();
+      });
+      return;
+    }
+
+    wrap.hidden = true;
+    if (fallback) {
+      // Signed-in users without an address get a Profile nudge; otherwise hide.
+      fallback.hidden = !user;
+      if (user) {
+        fallback.innerHTML =
+          '<a href="profile.html#location">Add address in Profile</a> to quick-load your representatives.';
+      }
+    }
+  })();
+}
+
 (async function initPoliticiansPage() {
   fillStateFilter();
   await bootNav("politicians");
@@ -330,6 +387,12 @@ nameSearchForm?.addEventListener("submit", (event) => {
   }
 
   currentUser = (await getUser().catch(() => null)) || null;
+  await setupMyRepresentativesQuickLoad({
+    addressInput,
+    addressForm,
+    user: currentUser,
+  });
+
   if (currentUser) {
     followedIds = await loadFollowedPoliticianIds(currentUser.id);
   }
