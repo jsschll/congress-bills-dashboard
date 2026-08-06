@@ -4,15 +4,19 @@ const forgotForm = document.getElementById("forgot-form");
 const resetForm = document.getElementById("reset-form");
 const otpRequestForm = document.getElementById("otp-request-form");
 const otpVerifyForm = document.getElementById("otp-verify-form");
+const checkEmailPanel = document.getElementById("check-email-panel");
 const otpResendBtn = document.getElementById("otp-resend-btn");
 const authStatus = document.getElementById("auth-status");
+const authModeTabs = document.getElementById("auth-mode-tabs");
 
 let pendingOtpEmail = "";
+let pendingSignupEmail = "";
 let recoveryMode = false;
 
 function setAuthStatus(message, type = "loading") {
+  if (!authStatus) return;
   authStatus.hidden = !message;
-  authStatus.textContent = message;
+  authStatus.textContent = message || "";
   authStatus.dataset.type = type;
 }
 
@@ -26,6 +30,8 @@ function getNextPath() {
 
 function authRedirectUrl(extraParams = {}) {
   const url = new URL("auth.html", window.location.href);
+  const next = getNextPath();
+  if (next) url.searchParams.set("next", next);
   for (const [key, value] of Object.entries(extraParams)) {
     if (value == null || value === "") continue;
     url.searchParams.set(key, value);
@@ -41,8 +47,24 @@ function hideAllAuthForms() {
     resetForm,
     otpRequestForm,
     otpVerifyForm,
-  ].forEach((form) => {
-    if (form) form.hidden = true;
+    checkEmailPanel,
+  ].forEach((el) => {
+    if (el) el.hidden = true;
+  });
+}
+
+function setModeTabsVisible(visible) {
+  if (!authModeTabs) return;
+  authModeTabs.hidden = !visible;
+}
+
+function setActiveTab(view) {
+  if (!authModeTabs) return;
+  const tab = view === "signup" ? "signup" : "signin";
+  authModeTabs.querySelectorAll("[data-auth-tab]").forEach((btn) => {
+    const active = btn.getAttribute("data-auth-tab") === tab;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
   });
 }
 
@@ -50,21 +72,41 @@ function showAuthView(view) {
   hideAllAuthForms();
   const title = document.getElementById("auth-title");
   const subtitle = document.getElementById("auth-subtitle");
+  const primaryViews = view === "signin" || view === "signup";
+  setModeTabsVisible(primaryViews);
+  if (primaryViews) setActiveTab(view);
 
   if (view === "signup") {
     document.title = "Create account · Article 1";
-    title.textContent = "Create account";
+    title.textContent = "Create your account";
     subtitle.textContent =
-      "Choose a username and password. We’ll email you a link to verify your account.";
+      "Pick a username, email, and password. Takes less than a minute.";
     signupForm.hidden = false;
+    return;
+  }
+
+  if (view === "check-email") {
+    document.title = "Check your email · Article 1";
+    title.textContent = "Check your email";
+    subtitle.textContent = "One more step to finish creating your account.";
+    setModeTabsVisible(false);
+    if (checkEmailPanel) {
+      checkEmailPanel.hidden = false;
+      const copy = document.getElementById("check-email-copy");
+      if (copy) {
+        copy.textContent = pendingSignupEmail
+          ? `We sent a verification link to ${pendingSignupEmail}. Open it, then sign in here.`
+          : "We sent a verification link. Open it, then sign in here.";
+      }
+    }
     return;
   }
 
   if (view === "forgot") {
     document.title = "Forgot password · Article 1";
-    title.textContent = "Forgot password";
-    subtitle.textContent =
-      "Enter your email or username and we’ll send a reset link.";
+    title.textContent = "Reset your password";
+    subtitle.textContent = "Enter the email or username on your account.";
+    setModeTabsVisible(false);
     forgotForm.hidden = false;
     return;
   }
@@ -72,26 +114,26 @@ function showAuthView(view) {
   if (view === "reset") {
     document.title = "Choose a new password · Article 1";
     title.textContent = "Choose a new password";
-    subtitle.textContent =
-      "Pick a new password for your account. You’ll stay signed in after saving.";
+    subtitle.textContent = "Save a new password to finish resetting your account.";
+    setModeTabsVisible(false);
     resetForm.hidden = false;
     return;
   }
 
   if (view === "otp") {
-    document.title = "Sign in with email code · Article 1";
-    title.textContent = "Sign in with email code";
-    subtitle.textContent =
-      "We’ll email a one-time code. No password needed for this sign-in.";
+    document.title = "Email code · Article 1";
+    title.textContent = "Sign in with an email code";
+    subtitle.textContent = "We’ll send a one-time code to your inbox.";
+    setModeTabsVisible(false);
     otpRequestForm.hidden = false;
     return;
   }
 
   if (view === "otp-verify") {
     document.title = "Enter email code · Article 1";
-    title.textContent = "Enter your email code";
-    subtitle.textContent =
-      "Type the code from your inbox to finish signing in.";
+    title.textContent = "Enter your code";
+    subtitle.textContent = "Type the code from your email to finish signing in.";
+    setModeTabsVisible(false);
     otpVerifyForm.hidden = false;
     const sentTo = document.getElementById("otp-sent-to");
     if (sentTo) {
@@ -104,10 +146,38 @@ function showAuthView(view) {
   }
 
   document.title = "Sign in · Article 1";
-  title.textContent = "Sign in";
+  title.textContent = "Welcome back";
   subtitle.textContent =
-    "Sign in with your email or username and password, or request a one-time code by email.";
+    "Sign in to follow politicians, save votes, and track your Action Match.";
   signinForm.hidden = false;
+}
+
+function friendlyAuthError(error, fallback = "Something went wrong.") {
+  const raw = String(error?.message || error || "").trim();
+  const lower = raw.toLowerCase();
+  if (!raw) return fallback;
+  if (/user already registered|already been registered|already exists/i.test(raw)) {
+    return "An account with that email already exists. Sign in instead, or reset your password.";
+  }
+  if (/email rate limit|over_email_send_rate_limit/i.test(raw)) {
+    return "Too many emails sent. Wait a minute and try again.";
+  }
+  if (/password.*at least|password.*characters|weak password/i.test(raw)) {
+    return "Password must be at least 6 characters.";
+  }
+  if (/invalid login credentials|invalid email or password/i.test(raw)) {
+    return "That email/username and password combination didn’t match.";
+  }
+  if (/confirm|verified|validat/i.test(raw)) {
+    return "Please verify your email first. Check your inbox for the confirmation link.";
+  }
+  if (/redirect_uri|redirect url|not allowed/i.test(raw)) {
+    return "Account could not be created because of a site configuration issue. Try again in a moment.";
+  }
+  if (/duplicate key|unique constraint|username/i.test(lower) && /username|profiles/i.test(lower)) {
+    return "That username is already taken. Try another.";
+  }
+  return raw || fallback;
 }
 
 async function finishLogin(user) {
@@ -150,6 +220,25 @@ async function requireRegisteredProfile(user) {
 
   if (profile?.username) return profile;
 
+  // Recover username from auth metadata when the trigger lagged.
+  const metaUsername = String(
+    user.user_metadata?.username || ""
+  )
+    .trim()
+    .toLowerCase();
+  if (/^[a-z0-9_]{3,30}$/.test(metaUsername)) {
+    const { error: updateError } = await client
+      .from("profiles")
+      .update({
+        username: metaUsername,
+        email: user.email || profile?.email || null,
+      })
+      .eq("id", user.id);
+    if (!updateError) {
+      return { username: metaUsername, email: user.email || null };
+    }
+  }
+
   await client.auth.signOut();
   throw new Error(
     "No account found for that email. Create an account first, then sign in."
@@ -157,7 +246,8 @@ async function requireRegisteredProfile(user) {
 }
 
 async function resolveEmail(identifier) {
-  const value = identifier.trim();
+  const value = String(identifier || "").trim();
+  if (!value) throw new Error("Enter your email or username.");
   if (value.includes("@")) return value.toLowerCase();
 
   const client = getSupabase();
@@ -177,17 +267,56 @@ async function resolveEmail(identifier) {
   return data;
 }
 
+async function usernameTaken(username) {
+  const client = getSupabase();
+  if (!client) return false;
+  const { data, error } = await client.rpc("get_email_for_username", {
+    uname: username,
+  });
+  if (error) {
+    console.warn("username check failed:", error);
+    return false;
+  }
+  return Boolean(data);
+}
+
+async function ensureProfileUsername(user, username, email) {
+  const client = getSupabase();
+  if (!client || !user?.id || !username) return;
+  const { error } = await client
+    .from("profiles")
+    .update({
+      username: String(username).toLowerCase(),
+      email: email || user.email || null,
+    })
+    .eq("id", user.id);
+  if (error) console.warn("Could not sync profile username:", error);
+}
+
 function requireSupabaseClient() {
   const client = getSupabase();
   if (!client) {
     setAuthStatus(
-      "Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to config.js.",
+      "Sign-in is temporarily unavailable. Please try again soon.",
       "error"
     );
     return null;
   }
   return client;
 }
+
+document.querySelectorAll("[data-auth-tab]").forEach((btn) => {
+  btn.addEventListener("click", (event) => {
+    event.preventDefault();
+    const view = btn.getAttribute("data-auth-tab") || "signin";
+    setAuthStatus("");
+    showAuthView(view === "signup" ? "signup" : "signin");
+    const url = new URL(window.location.href);
+    if (view === "signup") url.searchParams.set("mode", "signup");
+    else url.searchParams.delete("mode");
+    window.history.replaceState({}, "", url.toString());
+  });
+});
 
 signinForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -208,10 +337,7 @@ signinForm?.addEventListener("submit", async (event) => {
 
     if (error) {
       console.error(error);
-      const message = /confirm|verified|validat/i.test(error.message || "")
-        ? "Please verify your email first. Check your inbox for the confirmation link."
-        : error.message || "Could not sign in.";
-      setAuthStatus(message, "error");
+      setAuthStatus(friendlyAuthError(error, "Could not sign in."), "error");
       return;
     }
 
@@ -221,11 +347,12 @@ signinForm?.addEventListener("submit", async (event) => {
       return;
     }
 
+    await requireRegisteredProfile(user);
     setAuthStatus("Signed in. Redirecting…", "loading");
     await finishLogin(user);
   } catch (error) {
     console.error(error);
-    setAuthStatus(error.message || "Could not sign in.", "error");
+    setAuthStatus(friendlyAuthError(error, "Could not sign in."), "error");
   }
 });
 
@@ -238,7 +365,7 @@ signupForm?.addEventListener("submit", async (event) => {
     .getElementById("signup-username")
     .value.trim()
     .toLowerCase();
-  const email = document.getElementById("signup-email").value.trim();
+  const email = document.getElementById("signup-email").value.trim().toLowerCase();
   const password = document.getElementById("signup-password").value;
 
   if (!/^[a-z0-9_]{3,30}$/.test(username)) {
@@ -247,6 +374,24 @@ signupForm?.addEventListener("submit", async (event) => {
       "error"
     );
     return;
+  }
+  if (!email.includes("@")) {
+    setAuthStatus("Enter a valid email address.", "error");
+    return;
+  }
+  if (password.length < 6) {
+    setAuthStatus("Password must be at least 6 characters.", "error");
+    return;
+  }
+
+  setAuthStatus("Checking username…", "loading");
+  try {
+    if (await usernameTaken(username)) {
+      setAuthStatus("That username is already taken. Try another.", "error");
+      return;
+    }
+  } catch (error) {
+    console.warn(error);
   }
 
   setAuthStatus("Creating your account…", "loading");
@@ -262,22 +407,32 @@ signupForm?.addEventListener("submit", async (event) => {
 
   if (error) {
     console.error(error);
-    setAuthStatus(error.message || "Could not create account.", "error");
+    setAuthStatus(friendlyAuthError(error, "Could not create account."), "error");
     return;
   }
 
-  if (!data.session) {
+  // Supabase returns an empty identities array when the email is already registered.
+  const identities = data?.user?.identities;
+  if (Array.isArray(identities) && identities.length === 0) {
     setAuthStatus(
-      `Account created. Check ${email} for a verification link, then come back to sign in.`,
-      "success"
+      "An account with that email already exists. Sign in instead, or reset your password.",
+      "error"
     );
     showAuthView("signin");
-    document.getElementById("auth-title").textContent = "Verify your email";
-    document.getElementById("auth-subtitle").textContent =
-      "Click the link we sent you, then sign in with your username or email and password.";
+    const emailInput = document.getElementById("signin-identifier");
+    if (emailInput) emailInput.value = email;
     return;
   }
 
+  pendingSignupEmail = email;
+
+  if (!data.session) {
+    setAuthStatus("");
+    showAuthView("check-email");
+    return;
+  }
+
+  await ensureProfileUsername(data.user, username, email);
   setAuthStatus("Account created. Redirecting…", "loading");
   await finishLogin(data.user);
 });
@@ -293,8 +448,6 @@ forgotForm?.addEventListener("submit", async (event) => {
   try {
     const email = await resolveEmail(identifier);
 
-    // Confirm a real signup exists before sending any reset mail/link.
-    // admin.generateLink(recovery) can otherwise create an empty Auth user.
     try {
       await postAuthCode({ identifier: email, purpose: "check" });
     } catch (checkError) {
@@ -303,14 +456,11 @@ forgotForm?.addEventListener("submit", async (event) => {
         /no account found/i.test(checkError?.message || "")
       ) {
         setAuthStatus(
-          checkError.message ||
-            "No account found for that email. Create an account first.",
+          "No account found for that email. Create an account first.",
           "error"
         );
         return;
       }
-      // If the check API is unavailable, still avoid inventing accounts:
-      // username lookups already proved existence; bare emails continue below.
       if (!String(identifier || "").includes("@")) {
         // username resolved → account exists
       } else {
@@ -318,7 +468,6 @@ forgotForm?.addEventListener("submit", async (event) => {
       }
     }
 
-    // 1) Always request Supabase recovery (works with the browser anon key).
     const { error: recoverError } = await client.auth.resetPasswordForEmail(
       email,
       { redirectTo: authRedirectUrl({ reset: "1" }) }
@@ -326,14 +475,12 @@ forgotForm?.addEventListener("submit", async (event) => {
     if (recoverError) {
       console.error(recoverError);
       setAuthStatus(
-        recoverError.message || "Could not start password reset.",
+        friendlyAuthError(recoverError, "Could not start password reset."),
         "error"
       );
       return;
     }
 
-    // 2) Also try Resend-delivered code when Vercel env vars are configured.
-    let resendNote = "";
     try {
       const payload = await postAuthCode({
         identifier: email,
@@ -344,9 +491,9 @@ forgotForm?.addEventListener("submit", async (event) => {
       showAuthView("otp-verify");
       document.getElementById("auth-title").textContent = "Enter reset code";
       document.getElementById("auth-subtitle").textContent =
-        "Enter the code from your email, then choose a new password. You can also use the reset link in the email.";
+        "Enter the code from your email, then choose a new password.";
       setAuthStatus(
-        `Reset email sent to ${payload.email}. Check inbox and spam for a code or link.`,
+        `Reset email sent to ${payload.email}. Check inbox and spam.`,
         "success"
       );
       document.getElementById("otp-code")?.focus();
@@ -357,24 +504,24 @@ forgotForm?.addEventListener("submit", async (event) => {
         /no account found/i.test(serverError?.message || "")
       ) {
         setAuthStatus(
-          serverError.message ||
-            "No account found for that email. Create an account first.",
+          "No account found for that email. Create an account first.",
           "error"
         );
         return;
       }
       console.warn("Resend recovery unavailable:", serverError);
-      resendNote =
-        " If you do not see a code email, open the password reset link from Supabase instead (same inbox/spam).";
     }
 
     setAuthStatus(
-      `Password reset email sent to ${email}. Check inbox and spam, then open the link to choose a new password.${resendNote}`,
+      `Password reset email sent to ${email}. Check inbox and spam, then open the link.`,
       "success"
     );
   } catch (error) {
     console.error(error);
-    setAuthStatus(error.message || "Could not send reset email.", "error");
+    setAuthStatus(
+      friendlyAuthError(error, "Could not send reset email."),
+      "error"
+    );
   }
 });
 
@@ -398,7 +545,10 @@ resetForm?.addEventListener("submit", async (event) => {
   const { data, error } = await client.auth.updateUser({ password });
   if (error) {
     console.error(error);
-    setAuthStatus(error.message || "Could not update password.", "error");
+    setAuthStatus(
+      friendlyAuthError(error, "Could not update password."),
+      "error"
+    );
     return;
   }
 
@@ -442,7 +592,6 @@ async function postAuthCode({ identifier, purpose }) {
       );
       err.status = response.status;
       lastError = err;
-      // Don't fall through hosts on explicit client errors.
       if (response.status >= 400 && response.status < 500) break;
     } catch (error) {
       lastError = error;
@@ -452,8 +601,6 @@ async function postAuthCode({ identifier, purpose }) {
 }
 
 async function sendSignInCode(identifier) {
-  // Prefer server-sent codes via Resend so users get a visible OTP
-  // (Supabase's default template is a magic link, and built-in mail is unreliable).
   try {
     const payload = await postAuthCode({
       identifier,
@@ -462,8 +609,6 @@ async function sendSignInCode(identifier) {
     pendingOtpEmail = payload.email;
     return true;
   } catch (serverError) {
-    // 404 = no registered account. Do not fall back — generateLink/OTP
-    // must never create a user for an unknown email.
     if (
       serverError?.status === 404 ||
       /no account found/i.test(serverError?.message || "")
@@ -491,7 +636,9 @@ async function sendSignInCode(identifier) {
     )
       ? " No account found for that email — create an account first."
       : "";
-    throw new Error((error.message || "Could not send sign-in code.") + hint);
+    throw new Error(
+      friendlyAuthError(error, "Could not send sign-in code.") + hint
+    );
   }
   pendingOtpEmail = email;
   return true;
@@ -505,13 +652,16 @@ otpRequestForm?.addEventListener("submit", async (event) => {
     await sendSignInCode(identifier);
     showAuthView("otp-verify");
     setAuthStatus(
-      `Code sent to ${pendingOtpEmail}. Check inbox and spam, then enter it below.`,
+      `Code sent to ${pendingOtpEmail}. Check inbox and spam.`,
       "success"
     );
     document.getElementById("otp-code")?.focus();
   } catch (error) {
     console.error(error);
-    setAuthStatus(error.message || "Could not send sign-in code.", "error");
+    setAuthStatus(
+      friendlyAuthError(error, "Could not send sign-in code."),
+      "error"
+    );
   }
 });
 
@@ -558,7 +708,7 @@ otpVerifyForm?.addEventListener("submit", async (event) => {
   if (!data) {
     console.error(lastVerifyError);
     setAuthStatus(
-      lastVerifyError?.message || "That code is invalid or expired.",
+      friendlyAuthError(lastVerifyError, "That code is invalid or expired."),
       "error"
     );
     return;
@@ -583,8 +733,10 @@ otpVerifyForm?.addEventListener("submit", async (event) => {
   } catch (profileError) {
     console.error(profileError);
     setAuthStatus(
-      profileError.message ||
-        "No account found for that email. Create an account first.",
+      friendlyAuthError(
+        profileError,
+        "No account found for that email. Create an account first."
+      ),
       "error"
     );
     showAuthView("signup");
@@ -606,7 +758,10 @@ otpResendBtn?.addEventListener("click", async () => {
     setAuthStatus(`New code sent to ${pendingOtpEmail}.`, "success");
   } catch (error) {
     console.error(error);
-    setAuthStatus(error.message || "Could not resend code.", "error");
+    setAuthStatus(
+      friendlyAuthError(error, "Could not resend code."),
+      "error"
+    );
   }
 });
 
@@ -633,14 +788,14 @@ function hashParams() {
   if (justVerified) {
     showAuthView("signin");
     setAuthStatus(
-      "Email verified. Sign in with your username or email and password.",
+      "Email verified. Sign in with your email or username and password.",
       "success"
     );
   }
 
   if (!isSupabaseConfigured()) {
     setAuthStatus(
-      "Supabase is not configured. Add SUPABASE_URL and SUPABASE_ANON_KEY to config.js.",
+      "Sign-in is temporarily unavailable. Please try again soon.",
       "error"
     );
     return;
@@ -653,7 +808,10 @@ function hashParams() {
     if (event === "PASSWORD_RECOVERY") {
       recoveryMode = true;
       showAuthView("reset");
-      setAuthStatus("Choose a new password to finish resetting your account.", "success");
+      setAuthStatus(
+        "Choose a new password to finish resetting your account.",
+        "success"
+      );
       return;
     }
     if (
@@ -665,11 +823,13 @@ function hashParams() {
     }
   });
 
-  // Recovery / magic-link tokens arrive in the URL hash.
   if (hashType === "recovery" || resetFlag) {
     recoveryMode = true;
     showAuthView("reset");
-    setAuthStatus("Choose a new password to finish resetting your account.", "success");
+    setAuthStatus(
+      "Choose a new password to finish resetting your account.",
+      "success"
+    );
   }
 
   const { data } = await client.auth.getSession();
@@ -684,15 +844,15 @@ function hashParams() {
       return;
     }
     try {
-      // Magic-link / OTP for unknown emails used to auto-create empty profiles.
-      // Sign those out instead of treating them as logged-in accounts.
       await requireRegisteredProfile(data.session.user);
     } catch (profileError) {
       console.error(profileError);
       showAuthView("signup");
       setAuthStatus(
-        profileError.message ||
-          "No account found for that email. Create an account first.",
+        friendlyAuthError(
+          profileError,
+          "No account found for that email. Create an account first."
+        ),
         "error"
       );
       return;

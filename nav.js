@@ -9,8 +9,9 @@ const NAV_LOGO_SVG = `
   </span>
 `.trim();
 
-function buildLoggedOutActions(actions) {
+function buildLoggedOutActions(actions, activePage = "") {
   actions.replaceChildren();
+  if (activePage === "auth") return;
 
   const signIn = document.createElement("a");
   signIn.className = "app-nav__button app-nav__button--ghost";
@@ -97,7 +98,7 @@ function createNavShell(activePage = "home") {
   `;
 
   const actions = nav.querySelector("#app-nav-actions");
-  buildLoggedOutActions(actions);
+  buildLoggedOutActions(actions, activePage);
   return { nav, actions };
 }
 
@@ -378,7 +379,7 @@ async function renderAppNav(activePage = "home") {
 
   if (!user) {
     syncHeaderAuth(null);
-    buildLoggedOutActions(actions);
+    buildLoggedOutActions(actions, activePage);
     if (!isSupabaseConfigured()) {
       const hint = document.createElement("span");
       hint.className = "app-nav__hint";

@@ -10,229 +10,245 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260805toast" />
+    <link rel="stylesheet" href="styles.css?v=20260806authfix" />
   </head>
   <body class="page-app page-auth">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
     <main class="page page--narrow">
-      <header class="header">
+      <header class="header auth-header">
         <div>
-          <p class="eyebrow">Account</p>
-          <h1 id="auth-title">Sign in</h1>
+          <h1 id="auth-title">Welcome back</h1>
           <p id="auth-subtitle" class="subtitle">
-            Sign in with your email or username and password, or request a
-            one-time code by email.
+            Sign in to follow politicians, save votes, and track your Action Match.
           </p>
         </div>
       </header>
 
-      <p id="auth-status" class="status" hidden></p>
-
-      <form id="signin-form" class="auth-card">
-        <label class="search-bar__label" for="signin-identifier"
-          >Email or username</label
+      <div class="auth-shell">
+        <div
+          id="auth-mode-tabs"
+          class="auth-tabs"
+          role="tablist"
+          aria-label="Account options"
         >
-        <input
-          id="signin-identifier"
-          class="search-bar__input"
-          type="text"
-          required
-          autocomplete="username"
-          placeholder="you@example.com or username"
-        />
-        <label class="search-bar__label" for="signin-password">Password</label>
-        <input
-          id="signin-password"
-          class="search-bar__input"
-          type="password"
-          required
-          autocomplete="current-password"
-          placeholder="Your password"
-          minlength="6"
-        />
-        <button class="refresh-btn auth-card__submit" type="submit">
-          Sign in
-        </button>
-        <p class="auth-card__links">
-          <a href="auth.html?mode=forgot">Forgot password?</a>
-          <a href="auth.html?mode=otp">Sign in with email code</a>
-        </p>
-        <p class="auth-card__note">
-          New here?
-          <a href="auth.html?mode=signup">Create an account</a>
-        </p>
-      </form>
-
-      <form id="signup-form" class="auth-card" hidden>
-        <label class="search-bar__label" for="signup-username">Username</label>
-        <input
-          id="signup-username"
-          class="search-bar__input"
-          type="text"
-          required
-          autocomplete="username"
-          placeholder="choose a username"
-          minlength="3"
-          maxlength="30"
-          pattern="[A-Za-z0-9_]+"
-          title="Letters, numbers, and underscores only"
-        />
-        <label class="search-bar__label" for="signup-email">Email</label>
-        <input
-          id="signup-email"
-          class="search-bar__input"
-          type="email"
-          required
-          autocomplete="email"
-          placeholder="you@example.com"
-        />
-        <label class="search-bar__label" for="signup-password">Password</label>
-        <input
-          id="signup-password"
-          class="search-bar__input"
-          type="password"
-          required
-          autocomplete="new-password"
-          placeholder="Create a password"
-          minlength="6"
-        />
-        <button class="refresh-btn auth-card__submit" type="submit">
-          Create account
-        </button>
-        <p class="auth-card__note">
-          We’ll email you a verification link. After you click it, you can sign
-          in.
-        </p>
-        <p class="auth-card__note">
-          Already verified?
-          <a href="auth.html">Sign in</a>
-        </p>
-      </form>
-
-      <form id="forgot-form" class="auth-card" hidden>
-        <label class="search-bar__label" for="forgot-identifier"
-          >Email or username</label
-        >
-        <input
-          id="forgot-identifier"
-          class="search-bar__input"
-          type="text"
-          required
-          autocomplete="username"
-          placeholder="you@example.com or username"
-        />
-        <button class="refresh-btn auth-card__submit" type="submit">
-          Send reset link
-        </button>
-        <p class="auth-card__note">
-          We’ll email a reset link (and a code when server email is configured).
-          Check inbox and spam. After you open the link, you’ll choose a new
-          password here.
-        </p>
-        <p class="auth-card__note">
-          Still stuck? In Supabase → Authentication → Users, open your user and
-          use <strong>Send password recovery</strong>, or set a new password
-          there.
-        </p>
-        <p class="auth-card__note">
-          <a href="auth.html">Back to sign in</a>
-          ·
-          <a href="auth.html?mode=otp">Sign in with email code</a>
-        </p>
-      </form>
-
-      <form id="reset-form" class="auth-card" hidden>
-        <label class="search-bar__label" for="reset-password"
-          >New password</label
-        >
-        <input
-          id="reset-password"
-          class="search-bar__input"
-          type="password"
-          required
-          autocomplete="new-password"
-          placeholder="Choose a new password"
-          minlength="6"
-        />
-        <label class="search-bar__label" for="reset-password-confirm"
-          >Confirm new password</label
-        >
-        <input
-          id="reset-password-confirm"
-          class="search-bar__input"
-          type="password"
-          required
-          autocomplete="new-password"
-          placeholder="Type it again"
-          minlength="6"
-        />
-        <button class="refresh-btn auth-card__submit" type="submit">
-          Update password
-        </button>
-        <p class="auth-card__note">
-          After you save, you’ll be signed in with your new password.
-        </p>
-      </form>
-
-      <form id="otp-request-form" class="auth-card" hidden>
-        <label class="search-bar__label" for="otp-identifier"
-          >Email or username</label
-        >
-        <input
-          id="otp-identifier"
-          class="search-bar__input"
-          type="text"
-          required
-          autocomplete="username"
-          placeholder="you@example.com or username"
-        />
-        <button class="refresh-btn auth-card__submit" type="submit">
-          Send sign-in code
-        </button>
-        <p class="auth-card__note">
-          We’ll email a one-time code (check spam too). Enter it on the next
-          step to sign in without your password.
-        </p>
-        <p class="auth-card__note">
-          <a href="auth.html">Back to password sign in</a>
-          ·
-          <a href="auth.html?mode=forgot">Forgot password?</a>
-        </p>
-      </form>
-
-      <form id="otp-verify-form" class="auth-card" hidden>
-        <p class="auth-card__note" id="otp-sent-to" hidden></p>
-        <label class="search-bar__label" for="otp-code">Email code</label>
-        <input
-          id="otp-code"
-          class="search-bar__input"
-          type="text"
-          inputmode="numeric"
-          required
-          autocomplete="one-time-code"
-          placeholder="Enter the code from your email"
-          minlength="6"
-          maxlength="12"
-        />
-        <button class="refresh-btn auth-card__submit" type="submit">
-          Verify code &amp; sign in
-        </button>
-        <p class="auth-card__links">
-          <button id="otp-resend-btn" class="auth-text-btn" type="button">
-            Resend code
+          <button
+            type="button"
+            class="auth-tabs__btn is-active"
+            role="tab"
+            id="auth-tab-signin"
+            aria-selected="true"
+            data-auth-tab="signin"
+          >
+            Sign in
           </button>
-          <a href="auth.html?mode=otp">Use a different email</a>
-        </p>
-        <p class="auth-card__note">
-          <a href="auth.html">Back to password sign in</a>
-        </p>
-      </form>
+          <button
+            type="button"
+            class="auth-tabs__btn"
+            role="tab"
+            id="auth-tab-signup"
+            aria-selected="false"
+            data-auth-tab="signup"
+          >
+            Create account
+          </button>
+        </div>
+
+        <p id="auth-status" class="status" hidden></p>
+
+        <form id="signin-form" class="auth-card" data-auth-panel="signin">
+          <label class="search-bar__label" for="signin-identifier"
+            >Email or username</label
+          >
+          <input
+            id="signin-identifier"
+            class="search-bar__input"
+            type="text"
+            required
+            autocomplete="username"
+            placeholder="you@example.com"
+          />
+          <label class="search-bar__label" for="signin-password">Password</label>
+          <input
+            id="signin-password"
+            class="search-bar__input"
+            type="password"
+            required
+            autocomplete="current-password"
+            placeholder="Your password"
+            minlength="6"
+          />
+          <button class="refresh-btn auth-card__submit" type="submit">
+            Sign in
+          </button>
+          <p class="auth-card__links">
+            <a href="auth.html?mode=forgot">Forgot password?</a>
+            <a href="auth.html?mode=otp">Email me a code instead</a>
+          </p>
+        </form>
+
+        <form id="signup-form" class="auth-card" data-auth-panel="signup" hidden>
+          <label class="search-bar__label" for="signup-username">Username</label>
+          <input
+            id="signup-username"
+            class="search-bar__input"
+            type="text"
+            required
+            autocomplete="username"
+            placeholder="choose a username"
+            minlength="3"
+            maxlength="30"
+            pattern="[A-Za-z0-9_]+"
+            title="Letters, numbers, and underscores only"
+          />
+          <label class="search-bar__label" for="signup-email">Email</label>
+          <input
+            id="signup-email"
+            class="search-bar__input"
+            type="email"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+          />
+          <label class="search-bar__label" for="signup-password">Password</label>
+          <input
+            id="signup-password"
+            class="search-bar__input"
+            type="password"
+            required
+            autocomplete="new-password"
+            placeholder="At least 6 characters"
+            minlength="6"
+          />
+          <button class="refresh-btn auth-card__submit" type="submit">
+            Create account
+          </button>
+          <p class="auth-card__note">
+            By creating an account, you agree we’ll email a verification link when
+            required. You can sign in after that.
+          </p>
+        </form>
+
+        <section id="check-email-panel" class="auth-card" hidden>
+          <p class="auth-card__note" id="check-email-copy">
+            Check your inbox for a verification link, then come back to sign in.
+          </p>
+          <button
+            type="button"
+            class="refresh-btn auth-card__submit"
+            data-auth-tab="signin"
+          >
+            Back to sign in
+          </button>
+        </section>
+
+        <form id="forgot-form" class="auth-card" hidden>
+          <label class="search-bar__label" for="forgot-identifier"
+            >Email or username</label
+          >
+          <input
+            id="forgot-identifier"
+            class="search-bar__input"
+            type="text"
+            required
+            autocomplete="username"
+            placeholder="you@example.com"
+          />
+          <button class="refresh-btn auth-card__submit" type="submit">
+            Send reset link
+          </button>
+          <p class="auth-card__note">
+            We’ll email a reset link. Check inbox and spam, then choose a new
+            password.
+          </p>
+          <p class="auth-card__links">
+            <a href="auth.html">Back to sign in</a>
+          </p>
+        </form>
+
+        <form id="reset-form" class="auth-card" hidden>
+          <label class="search-bar__label" for="reset-password"
+            >New password</label
+          >
+          <input
+            id="reset-password"
+            class="search-bar__input"
+            type="password"
+            required
+            autocomplete="new-password"
+            placeholder="Choose a new password"
+            minlength="6"
+          />
+          <label class="search-bar__label" for="reset-password-confirm"
+            >Confirm new password</label
+          >
+          <input
+            id="reset-password-confirm"
+            class="search-bar__input"
+            type="password"
+            required
+            autocomplete="new-password"
+            placeholder="Type it again"
+            minlength="6"
+          />
+          <button class="refresh-btn auth-card__submit" type="submit">
+            Update password
+          </button>
+        </form>
+
+        <form id="otp-request-form" class="auth-card" hidden>
+          <label class="search-bar__label" for="otp-identifier"
+            >Email or username</label
+          >
+          <input
+            id="otp-identifier"
+            class="search-bar__input"
+            type="text"
+            required
+            autocomplete="username"
+            placeholder="you@example.com"
+          />
+          <button class="refresh-btn auth-card__submit" type="submit">
+            Send sign-in code
+          </button>
+          <p class="auth-card__note">
+            We’ll email a one-time code so you can sign in without your password.
+          </p>
+          <p class="auth-card__links">
+            <a href="auth.html">Back to password sign in</a>
+          </p>
+        </form>
+
+        <form id="otp-verify-form" class="auth-card" hidden>
+          <p class="auth-card__note" id="otp-sent-to" hidden></p>
+          <label class="search-bar__label" for="otp-code">Email code</label>
+          <input
+            id="otp-code"
+            class="search-bar__input"
+            type="text"
+            inputmode="numeric"
+            required
+            autocomplete="one-time-code"
+            placeholder="6-digit code"
+            minlength="6"
+            maxlength="12"
+          />
+          <button class="refresh-btn auth-card__submit" type="submit">
+            Verify &amp; sign in
+          </button>
+          <p class="auth-card__links">
+            <button id="otp-resend-btn" class="auth-text-btn" type="button">
+              Resend code
+            </button>
+            <a href="auth.html?mode=otp">Use a different email</a>
+          </p>
+        </form>
+      </div>
     </main>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260805pulse"></script>
-    <script src="nav.js?v=20260804a1"></script>
-    <script src="auth.js?v=20260729g" defer></script>
+    <script src="shared.js?v=20260806authfix"></script>
+    <script src="nav.js?v=20260806authfix"></script>
+    <script src="auth.js?v=20260806authfix" defer></script>
   </body>
 </html>
