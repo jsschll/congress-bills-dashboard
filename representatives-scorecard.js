@@ -873,10 +873,39 @@
             vote.voteQuestion ||
             ""
         ).trim();
+        const voteQuestion = String(
+          vote.voteQuestion || vote.vote_question || vote.question || ""
+        ).trim();
+        const voteKind = String(
+          vote.voteKind || vote.vote_kind || ""
+        ).trim();
+        const motion =
+          typeof describeVoteMotion === "function"
+            ? describeVoteMotion({
+                voteQuestion,
+                voteKind,
+                result: vote.result,
+                motionLabel: vote.motionLabel,
+              })
+            : {
+                label:
+                  vote.motionLabel ||
+                  (typeof formatVoteMotionLabel === "function"
+                    ? formatVoteMotionLabel({ voteQuestion, voteKind })
+                    : voteQuestion || "Floor Vote"),
+                detail: vote.motionDetail || voteQuestion || "",
+                isProcedural: Boolean(vote.isProceduralMotion),
+              };
         return {
           votePosition,
           billId: String(vote.billId || vote.id || vote.rollCallId || title),
           rollCallId: String(vote.rollCallId || vote.billId || vote.id || ""),
+          rollCallNumber:
+            vote.rollCallNumber != null
+              ? Number(vote.rollCallNumber)
+              : vote.roll_call_number != null
+                ? Number(vote.roll_call_number)
+                : null,
           billNumber: normalizedNumber,
           title,
           rawTitle,
@@ -901,6 +930,12 @@
                 : null,
           category: vote.subjectCategory || vote.policyArea || categorizeBill(vote),
           voteDate: vote.date || (vote.lastUpdated || "").slice(0, 10) || null,
+          voteQuestion: voteQuestion || null,
+          voteKind: voteKind || null,
+          result: vote.result || null,
+          motionLabel: motion.label || null,
+          motionDetail: motion.detail || null,
+          isProceduralMotion: Boolean(motion.isProcedural),
           impacts: {
             wallet: null,
             community: null,
@@ -3082,13 +3117,15 @@
                           }
                         </div>
                         <h4>${escapeHtml(displayTitle)}</h4>
-                        ${
-                          motion.isProcedural
-                            ? `<p class="scorecard-vote__motion-note">${escapeHtml(
-                                motionDetail
-                              )}</p>`
-                            : ""
-                        }
+                        <p class="scorecard-vote__motion-line">
+                          ${escapeHtml(motionLabel)}${
+                            vote.rollCallNumber
+                              ? ` · Roll Call ${escapeHtml(
+                                  String(vote.rollCallNumber)
+                                )}`
+                              : ""
+                          }
+                        </p>
                         ${
                           codeBadge
                             ? `<span class="scorecard-vote__code">${escapeHtml(
