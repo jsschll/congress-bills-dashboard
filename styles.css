@@ -4429,6 +4429,42 @@ body {
   color: #ecfdf5 !important;
 }
 
+.policy-engage__follow {
+  font-size: 0.82rem !important;
+  padding: 0.35rem 0.75rem !important;
+}
+
+.policy-engage__follow.is-following {
+  border-color: rgba(110, 231, 183, 0.55) !important;
+  color: #a7f3d0 !important;
+  background: rgba(31, 138, 122, 0.16) !important;
+}
+
+.policy-engage--compact {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  gap: 0.45rem;
+}
+
+.policy-engage--compact .policy-engage__actions {
+  gap: 0.4rem;
+}
+
+.policy-engage--compact .policy-engage__stance {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.scorecard-vote__actions .policy-engage {
+  width: 100%;
+}
+
+.scorecard-vote__actions .policy-engage__ask-ai {
+  font-size: 0.82rem !important;
+  padding: 0.35rem 0.75rem !important;
+}
+
 .policy-engage__stances {
   display: inline-flex;
   gap: 0.4rem;
