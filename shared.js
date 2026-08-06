@@ -860,7 +860,7 @@ function collapseMatchWs(value) {
     .trim();
 }
 
-function firstMatchSentence(text, maxChars = 220) {
+function firstMatchSentence(text, maxChars = 320) {
   const cleaned = collapseMatchWs(text);
   if (!cleaned) return "";
   // Avoid splitting on common abbreviations (U.S., F.Y., No., Amdt.).
@@ -873,8 +873,12 @@ function firstMatchSentence(text, maxChars = 220) {
   const match = protectedText.match(/[^.!?]+[.!?]+|[^.!?]+$/);
   let sentence = collapseMatchWs(match ? match[0] : protectedText);
   sentence = sentence.replace(/\bUS\b/g, "U.S.");
-  if (sentence.length > maxChars) {
-    sentence = `${sentence.slice(0, maxChars - 1).replace(/\s+\S*$/, "")}…`;
+  // Never ellipsize mid-sentence (avoids "convicted of sexual…").
+  // Prefer the full grammatical sentence even when slightly over maxChars.
+  if (sentence.length > maxChars && !/[.!?]$/.test(sentence)) {
+    // Incomplete fragment: keep whole fragment and close it — do not chop words.
+    sentence = `${sentence.replace(/[,:;–—-]+$/, "")}.`;
+    return sentence;
   }
   if (sentence && !/[.!?]$/.test(sentence)) sentence = `${sentence}.`;
   return sentence;
@@ -896,15 +900,18 @@ function splitMatchSentences(text = "") {
   );
 }
 
-/** Enforce ≤2 sentences / ~35 words for Action Match card summaries. */
-function clampPunchySummary(text = "", { maxSentences = 2, maxWords = 35 } = {}) {
+/** Enforce ≤2 complete sentences for Action Match card summaries. */
+function clampPunchySummary(text = "", { maxSentences = 2, maxWords = 55 } = {}) {
   const sentences = splitMatchSentences(text).slice(0, maxSentences);
   if (!sentences.length) return "";
   let out = sentences.join(" ");
   const words = out.split(/\s+/).filter(Boolean);
   if (words.length > maxWords) {
-    out = words.slice(0, maxWords).join(" ").replace(/[,:;–—-]+$/, "");
-    if (!/[.!?]$/.test(out)) out = `${out}.`;
+    // Prefer one full sentence over chopping mid-phrase ("sexual assault" → "sexual").
+    const first = sentences[0] || "";
+    out = /[.!?]$/.test(first)
+      ? first
+      : `${first.replace(/[,:;–—-]+$/, "")}.`;
   } else if (!/[.!?]$/.test(out)) {
     out = `${out}.`;
   }
@@ -915,7 +922,7 @@ function clampPunchySummary(text = "", { maxSentences = 2, maxWords = 35 } = {})
  * Turn a raw yea/nay impact into a one-line clause (≤14 words).
  * Strips "Votes to…", "A Yea vote means…", etc.
  */
-function punchyImpactClause(text = "", { maxWords = 14 } = {}) {
+function punchyImpactClause(text = "", { maxWords = 28 } = {}) {
   let out = collapseMatchWs(text);
   if (!out) return "";
   out = out
@@ -927,7 +934,15 @@ function punchyImpactClause(text = "", { maxWords = 14 } = {}) {
   let words = collapseMatchWs(first.replace(/[.!?]+$/, ""))
     .split(/\s+/)
     .filter(Boolean);
-  if (words.length > maxWords) words = words.slice(0, maxWords);
+  if (words.length > maxWords) {
+    // Walk back so we do not end on a dangling preposition/article/adjective stub.
+    const weak = /^(of|the|a|an|and|or|for|to|with|by|in|on|at|from|into|that|which|who|their|its|or)$/i;
+    let end = maxWords;
+    while (end > Math.floor(maxWords * 0.65) && weak.test(words[end - 1] || "")) {
+      end -= 1;
+    }
+    words = words.slice(0, end);
+  }
   return words.join(" ");
 }
 

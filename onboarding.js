@@ -61,32 +61,101 @@
     return "representatives.html?pulse=1";
   }
 
+  /** Display label like "HR 134" / "SJRes 37" for natural quiz copy. */
+  function formatPulseBillLabel(billNumber, title) {
+    const raw = String(billNumber || "").trim();
+    if (raw) {
+      const match = raw.match(
+        /^(H\.?\s*J\.?\s*Res\.?|S\.?\s*J\.?\s*Res\.?|H\.?\s*Con\.?\s*Res\.?|S\.?\s*Con\.?\s*Res\.?|H\.?\s*R\.?|S\.?)\s*(\d+)\b/i
+      );
+      if (match) {
+        const typeKey = match[1]
+          .replace(/\./g, "")
+          .replace(/\s+/g, "")
+          .toUpperCase();
+        const typeMap = {
+          HR: "HR",
+          S: "S",
+          HJRES: "HJRes",
+          SJRES: "SJRes",
+          HCONRES: "HConRes",
+          SCONRES: "SConRes",
+        };
+        const type = typeMap[typeKey] || typeKey;
+        return `${type} ${match[2]}`;
+      }
+      return raw.replace(/\./g, "").replace(/\s+/g, " ").trim();
+    }
+    const fallback = String(title || "").trim();
+    return fallback || "this measure";
+  }
+
+  /**
+   * First complete sentence only — never ellipsize mid-phrase.
+   * (Avoids artifacts like "convicted of sexual?")
+   */
+  function completePulseSentence(text) {
+    const cleaned = String(text || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) return "";
+    if (typeof firstMatchSentence === "function") {
+      // Large cap: keep a full sentence rather than chopping at ~200 chars.
+      return firstMatchSentence(cleaned, 480);
+    }
+    const match = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/);
+    let sentence = (match ? match[0] : cleaned).trim();
+    if (sentence && !/[.!?]$/.test(sentence)) sentence = `${sentence}.`;
+    return sentence;
+  }
+
+  /** Turn a summary sentence into a "which …" relative clause. */
+  function toWhichClause(sentence) {
+    let clause = String(sentence || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/[.!?]+$/, "");
+    if (!clause) return "";
+    clause = clause
+      .replace(
+        /^(this (bill|measure|resolution|vote|amendment)|the (bill|measure|resolution)|it)\s+/i,
+        ""
+      )
+      .replace(/^(would|will|does|did)\s+/i, "")
+      .replace(/^(which|that)\s+/i, "")
+      .trim();
+    if (!clause) return "";
+    clause = clause.charAt(0).toLowerCase() + clause.slice(1);
+    return `which ${clause}`;
+  }
+
+  /**
+   * Natural quiz question, e.g.
+   * "Do you support HR 134, which requires mandatory detention…?"
+   */
   function buildQuestionText(row) {
+    const billLabel = formatPulseBillLabel(
+      row.bill_number,
+      row.short_title || row.title
+    );
+    // Prefer full card/plain summaries over short yea_impact clauses that may
+    // have been word-capped upstream.
     const impact = String(
-      row.yea_impact ||
-        row.card_summary ||
+      row.card_summary ||
         row.plain_summary ||
-        row.takeaway ||
         row.what_it_does ||
+        row.takeaway ||
         row.summary ||
+        row.yea_impact ||
         ""
     ).trim();
-    const sentence =
-      typeof firstMatchSentence === "function"
-        ? firstMatchSentence(impact, 200)
-        : impact;
+    const sentence = completePulseSentence(impact);
     if (sentence) {
       if (/\?$/.test(sentence)) return sentence;
-      const clause = sentence.replace(/\.$/, "");
-      // Avoid "a vote that This bill…" — prefer statement + Support/Oppose.
-      if (/^(this|the|it|congress|the house|the senate)\b/i.test(clause)) {
-        return clause.endsWith(".") ? clause : `${clause}.`;
-      }
-      return `Would you support a vote that ${clause
-        .replace(/^[A-Z]/, (m) => m.toLowerCase())}?`;
+      const which = toWhichClause(sentence);
+      if (which) return `Do you support ${billLabel}, ${which}?`;
     }
-    const title = String(row.short_title || row.title || "this measure").trim();
-    return `Do you support ${title}?`;
+    return `Do you support ${billLabel}?`;
   }
 
   function rowToQuestion(row) {
