@@ -2071,6 +2071,208 @@ function bindBillAskAi(prefix = "scorecard-match-detail") {
   });
 }
 
+/** Normalize a feed / vote card item into Ask AI bill context. */
+function billAskAiPayloadFromItem(item = {}) {
+  const keyPoints = Array.isArray(item.keyPoints)
+    ? item.keyPoints
+    : Array.isArray(item.key_points)
+      ? item.key_points
+      : [];
+  const summary = String(
+    item.cardSummary ||
+      item.card_summary ||
+      item.plain_summary ||
+      item.plainSummary ||
+      item.shortPitch ||
+      item.summary ||
+      ""
+  ).trim();
+  return {
+    title: String(item.title || item.voteQuestion || "Untitled measure").trim(),
+    rawTitle: String(item.rawTitle || item.title || "").trim(),
+    number: String(
+      item.billNumber ||
+        item.bill_number ||
+        (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "") ||
+        ""
+    ).trim(),
+    takeaway: String(
+      item.takeaway || item.short_title || item.shortTitle || ""
+    ).trim(),
+    summary,
+    cardSummary: summary,
+    keyPoints,
+    proArgument: String(
+      item.proArgument ||
+        item.pro_argument ||
+        item.yeaMeans ||
+        item.yea_means ||
+        item.yea ||
+        ""
+    ).trim(),
+    conArgument: String(
+      item.conArgument ||
+        item.con_argument ||
+        item.nayMeans ||
+        item.nay_means ||
+        item.nay ||
+        ""
+    ).trim(),
+    resultLabel: String(item.result || item.resultLabel || "").trim(),
+    rollMeta: {
+      result: item.result || item.rollMeta?.result || "",
+      chamber: item.chamber || item.rollMeta?.chamber || "",
+      rollCallNumber:
+        item.rollCallNumber ||
+        item.roll_call_number ||
+        item.rollMeta?.rollCallNumber ||
+        null,
+      date: item.date || item.vote_date || item.rollMeta?.date || "",
+      yeaCount: item.yeaCount ?? item.rollMeta?.yeaCount ?? null,
+      nayCount: item.nayCount ?? item.rollMeta?.nayCount ?? null,
+    },
+  };
+}
+
+/**
+ * Standalone Ask AI modal for Feed / Search cards (and any page without the
+ * embedded Tier 3 breakdown panel).
+ */
+function ensureStandaloneBillAskAiModal() {
+  if (typeof document === "undefined") return null;
+  const prefix = "feed-ask";
+  let modal = document.getElementById(`${prefix}-modal`);
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = `${prefix}-modal`;
+  modal.className = "scorecard-match-detail";
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="scorecard-match-detail__backdrop" data-close-feed-ask="1"></div>
+    <div
+      class="scorecard-match-detail__panel scorecard-match-detail__panel--breakdown"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="feed-ask-title"
+    >
+      <header class="scorecard-match-detail__header">
+        <div>
+          <p class="scorecard-match-detail__eyebrow">Ask AI</p>
+          <p id="feed-ask-bill" class="scorecard-match-detail__bill"></p>
+          <h2 id="feed-ask-title">Ask AI about this bill</h2>
+        </div>
+        <button
+          type="button"
+          class="scorecard-match-detail__close"
+          data-close-feed-ask="1"
+          aria-label="Close Ask AI"
+        >✕</button>
+      </header>
+      <p id="feed-ask-summary" class="scorecard-match-detail__summary"></p>
+
+      <section class="bill-ask-ai" aria-labelledby="feed-ask-ask-label">
+        <h3 id="feed-ask-ask-label" class="bill-breakdown__label">
+          Ask AI about this bill
+        </h3>
+        <div class="bill-ask-ai__chips" role="group" aria-label="Suggested questions">
+          <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
+            How is this measure funded?
+          </button>
+          <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
+            Who is most impacted by this?
+          </button>
+          <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
+            What is the implementation timeline?
+          </button>
+        </div>
+        <div id="feed-ask-ask-log" class="bill-ask-ai__log" aria-live="polite"></div>
+        <form id="feed-ask-ask-form" class="bill-ask-ai__form">
+          <label class="visually-hidden" for="feed-ask-ask-input"
+            >Ask a specific question about this bill</label
+          >
+          <input
+            id="feed-ask-ask-input"
+            class="bill-ask-ai__input"
+            type="text"
+            maxlength="280"
+            autocomplete="off"
+            placeholder="Ask a specific question about this bill..."
+          />
+          <button type="submit" class="refresh-btn bill-ask-ai__submit">Ask</button>
+        </form>
+        <p id="feed-ask-ask-status" class="bill-ask-ai__status" hidden></p>
+      </section>
+
+      <footer class="scorecard-match-detail__footer">
+        <button
+          type="button"
+          class="scorecard-match-detail__secondary"
+          data-close-feed-ask="1"
+        >Close</button>
+      </footer>
+    </div>
+  `;
+  document.body.append(modal);
+
+  modal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-feed-ask]")) {
+      closeBillAskAiModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.hidden) closeBillAskAiModal();
+  });
+
+  return modal;
+}
+
+function closeBillAskAiModal() {
+  const modal = document.getElementById("feed-ask-modal");
+  if (!modal) return;
+  if (modal._askAiAbort) {
+    try {
+      modal._askAiAbort.abort();
+    } catch {
+      /* ignore */
+    }
+    modal._askAiAbort = null;
+  }
+  modal.hidden = true;
+  document.body.classList.remove("scorecard-match-detail-open");
+}
+
+function openBillAskAiModal(itemOrPayload = {}) {
+  const modal = ensureStandaloneBillAskAiModal();
+  if (!modal) return;
+  // Always normalize so feed cards and breakdown payloads both work.
+  const payload = billAskAiPayloadFromItem(itemOrPayload);
+
+  const billEl = document.getElementById("feed-ask-bill");
+  const titleEl = document.getElementById("feed-ask-title");
+  const summaryEl = document.getElementById("feed-ask-summary");
+  if (billEl) {
+    billEl.textContent = payload.number || "";
+    billEl.hidden = !billEl.textContent;
+  }
+  if (titleEl) {
+    titleEl.textContent = payload.title || "Ask AI about this bill";
+  }
+  if (summaryEl) {
+    summaryEl.textContent =
+      payload.takeaway ||
+      payload.cardSummary ||
+      payload.summary ||
+      "Ask a question about this measure.";
+  }
+
+  resetBillAskAi("feed-ask", payload);
+  bindBillAskAi("feed-ask");
+  modal.hidden = false;
+  document.body.classList.add("scorecard-match-detail-open");
+  document.getElementById("feed-ask-ask-input")?.focus();
+}
+
 /**
  * Bind Tier 1 accordion toggles + Tier 3 deep-link buttons inside a match list.
  */

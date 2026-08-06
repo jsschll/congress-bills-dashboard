@@ -4332,6 +4332,19 @@ body {
   align-items: center;
 }
 
+.policy-engage__ask-ai {
+  border-color: rgba(110, 231, 183, 0.4) !important;
+  color: #a7f3d0 !important;
+  background: rgba(31, 138, 122, 0.12) !important;
+}
+
+.policy-engage__ask-ai:hover,
+.policy-engage__ask-ai:focus-visible {
+  border-color: rgba(110, 231, 183, 0.7) !important;
+  background: rgba(31, 138, 122, 0.22) !important;
+  color: #ecfdf5 !important;
+}
+
 .policy-engage__stances {
   display: inline-flex;
   gap: 0.4rem;
