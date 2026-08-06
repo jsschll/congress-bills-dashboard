@@ -1,5 +1,5 @@
 /**
- * Policy card engagement: Support/Oppose, community split, Take Action modal.
+ * Policy card engagement: Support/Oppose, Ask AI, community split, Take Action.
  * Depends on shared.js (getSupabase/getUser) and config.js.
  * Optional: profiles.home_address + /api/lookup-representatives for geo/reps.
  */
@@ -879,6 +879,7 @@ Sincerely,
     const opposeLabel = options.opposeLabel || "Oppose 👎";
     const prompt = options.prompt || "";
     const showTakeAction = options.showTakeAction !== false;
+    const showAskAi = options.showAskAi !== false;
     const showCommunity = options.showCommunity !== false;
     const whoVotedHint =
       options.whoVotedHint ||
@@ -905,6 +906,11 @@ Sincerely,
           )}</button>
         </div>
         <div class="policy-engage__logged-panel" hidden></div>
+        ${
+          showAskAi
+            ? `<button type="button" class="refresh-btn policy-engage__ask-ai">Ask AI</button>`
+            : ""
+        }
         ${
           showTakeAction
             ? `<button type="button" class="refresh-btn policy-engage__take-action">Take Action</button>`
@@ -977,6 +983,15 @@ Sincerely,
         roots.opposeBtn.disabled = false;
       }
     });
+    wrap
+      .querySelector(".policy-engage__ask-ai")
+      ?.addEventListener("click", () => {
+        if (typeof openBillAskAiModal === "function") {
+          openBillAskAiModal(item);
+          return;
+        }
+        alert("Ask AI is not available on this page yet.");
+      });
     wrap
       .querySelector(".policy-engage__take-action")
       ?.addEventListener("click", () => {
@@ -1077,6 +1092,9 @@ Sincerely,
     mountVote,
     renderHeaderScore,
     openTakeAction,
+    openAskAi: (item) => {
+      if (typeof openBillAskAiModal === "function") openBillAskAiModal(item);
+    },
     getState: () => state,
     getMatchScoreForBioguide(bioguideId) {
       const id = String(bioguideId || "").toUpperCase();
