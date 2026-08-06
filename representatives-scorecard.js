@@ -2743,7 +2743,7 @@
   }
 
   function mountScorecardVoteEngagement(el, votes, options = {}) {
-    if (!el || !window.PolicyEngagement?.mount) return;
+    if (!el) return;
     const politicianName = String(options.politicianName || "").trim();
     const bioguideId = String(options.bioguideId || "").toUpperCase();
     const profile = {
@@ -2761,43 +2761,55 @@
       const index = Number(container.getAttribute("data-vote-engage"));
       const vote = votes?.[index];
       if (!vote) return;
-      const item = quizBillItemFromVote(vote, profile);
-      if (!item?.id) return;
 
-      window.PolicyEngagement.mount(container, item, {
-        compact: true,
-        supportLabel: "Support",
-        opposeLabel: "Oppose",
-        prompt: "",
-        showFollow: true,
-        showAskAi: true,
-        showTakeAction: false,
-        showCommunity: false,
-        showWhoVoted: false,
-        showAlignment: false,
-        compareBioguides: bioguideId ? [bioguideId] : [],
-        voteCast: vote.votePosition || vote.voteCast || null,
-        onAskAi: () => {
-          if (typeof openVoteAskAiDrawer === "function") {
-            openVoteAskAiDrawer(vote, politicianName);
-          } else if (typeof openAskAiDrawer === "function") {
-            openAskAiDrawer({
-              context: {
-                type: "vote",
-                politicianName,
-                ...vote,
-              },
-            });
-          } else {
-            alert("Ask AI is not available on this page yet.");
-          }
-        },
-        onStanceChange: async (payload) => {
-          if (typeof options.onStanceChange === "function") {
-            await options.onStanceChange(payload);
-          }
-        },
-      });
+      const openAskAi = () => {
+        if (typeof openVoteAskAiDrawer === "function") {
+          openVoteAskAiDrawer(vote, politicianName);
+        } else if (typeof openAskAiDrawer === "function") {
+          openAskAiDrawer({
+            context: {
+              type: "vote",
+              politicianName,
+              ...vote,
+            },
+          });
+        } else {
+          alert("Ask AI is not available on this page yet.");
+        }
+      };
+
+      const item = quizBillItemFromVote(vote, profile);
+      if (item?.id && window.PolicyEngagement?.mount) {
+        window.PolicyEngagement.mount(container, item, {
+          compact: true,
+          supportLabel: "Support",
+          opposeLabel: "Oppose",
+          prompt: "",
+          showFollow: true,
+          showAskAi: true,
+          showTakeAction: false,
+          showCommunity: false,
+          showWhoVoted: false,
+          showAlignment: false,
+          compareBioguides: bioguideId ? [bioguideId] : [],
+          voteCast: vote.votePosition || vote.voteCast || null,
+          onAskAi: openAskAi,
+          onStanceChange: async (payload) => {
+            if (typeof options.onStanceChange === "function") {
+              await options.onStanceChange(payload);
+            }
+          },
+        });
+        return;
+      }
+
+      // Fallback: keep Ask AI visible even if engagement cannot mount.
+      container.innerHTML = `
+        <button type="button" class="refresh-btn policy-engage__ask-ai scorecard-vote__ask-ai">
+          Ask AI
+        </button>
+      `;
+      container.querySelector("button")?.addEventListener("click", openAskAi);
     });
   }
 
