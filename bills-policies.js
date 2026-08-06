@@ -1217,10 +1217,19 @@ function setVotesFeedStatus(message, type = "loading") {
   votesFeedStatus.dataset.type = type;
 }
 
-function voteKindLabel(kind) {
-  if (kind === "final_passage") return "Final passage";
-  if (kind === "amendment") return "Amendment";
-  return "House vote";
+function voteKindLabel(kind, item = {}) {
+  if (typeof formatVoteMotionLabel === "function") {
+    return formatVoteMotionLabel({
+      voteKind: kind || item.voteKind || item.vote_kind,
+      voteQuestion: item.voteQuestion || item.vote_question,
+      motionLabel: item.motionLabel,
+      result: item.result,
+    });
+  }
+  if (kind === "final_passage") return "Final Passage";
+  if (kind === "amendment") return "On Agreeing to the Amendment";
+  if (kind === "procedural") return "Procedural Vote";
+  return "Floor Vote";
 }
 
 function formatVoteResultMeta(item) {
@@ -1286,6 +1295,14 @@ function renderVoteCard(item) {
       .includes("senate")
       ? "Senate"
       : "House";
+  const motion =
+    typeof describeVoteMotion === "function"
+      ? describeVoteMotion(item)
+      : {
+          label: voteKindLabel(item.voteKind, item),
+          detail: voteKindLabel(item.voteKind, item),
+          isProcedural: false,
+        };
 
   card.innerHTML = `
     <div class="policy-bill-card__header">
@@ -1301,8 +1318,21 @@ function renderVoteCard(item) {
                 )}</span>`
               : ""
           }
+          <span
+            class="policy-bill-card__motion${
+              motion.isProcedural ? " is-procedural" : ""
+            }"
+            title="${escapePolicyHtml(motion.detail || motion.label)}"
+          >${escapePolicyHtml(motion.label)}</span>
         </div>
         <h2 class="policy-bill-card__title">${escapePolicyHtml(title)}</h2>
+        ${
+          motion.isProcedural
+            ? `<p class="policy-bill-card__motion-note">${escapePolicyHtml(
+                motion.detail || motion.label
+              )}</p>`
+            : ""
+        }
         ${
           dateLabel
             ? `<p class="policy-bill-card__meta vote-feed-card__date"><time datetime="${escapePolicyHtml(

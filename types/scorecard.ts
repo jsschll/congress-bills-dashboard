@@ -93,7 +93,7 @@ export interface AttendanceVotingActivity {
 
 /**
  * Bill Roll Call Vote ("Truth in Voting") card.
- * Maps to `scorecard_bills`.
+ * Maps to `scorecard_bills` (and live Congress.gov / Senate overlays).
  */
 export interface BillRollCallVote {
   id: string;
@@ -102,6 +102,17 @@ export interface BillRollCallVote {
   plainEnglishSummary: string | null;
   category: string | null;
   voteDate: string | null;
+  /** Official Clerk / Senate vote question (e.g. On Motion to Recommit). */
+  voteQuestion?: string | null;
+  /** Classified kind: final_passage | amendment | procedural | other | bill. */
+  voteKind?: string | null;
+  /** Human-readable motion badge label. */
+  motionLabel?: string | null;
+  /** Tooltip / subheader, e.g. Procedural Vote: On Motion to Recommit. */
+  motionDetail?: string | null;
+  isProceduralMotion?: boolean;
+  rollCallNumber?: number | null;
+  result?: string | null;
   /** Plain-English household / wallet impact. */
   walletImpact: string | null;
   /** Plain-English community / local impact. */

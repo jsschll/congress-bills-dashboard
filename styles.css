@@ -194,7 +194,8 @@
 }
 
 .policy-bill-card__level,
-.policy-bill-card__bill-number {
+.policy-bill-card__bill-number,
+.policy-bill-card__motion {
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
   font-size: 0.78rem;
@@ -208,6 +209,25 @@
   background: rgba(148, 163, 184, 0.12);
   color: #cbd5e1;
   border-color: rgba(148, 163, 184, 0.22);
+}
+
+.policy-bill-card__motion {
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+  border-color: rgba(56, 189, 248, 0.28);
+  max-width: 100%;
+}
+
+.policy-bill-card__motion.is-procedural {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.policy-bill-card__motion-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
 }
 
 .policy-bill-card__title {
@@ -6272,6 +6292,25 @@ body.scorecard-match-detail-open {
   background: rgba(30, 41, 59, 0.85);
 }
 
+.politician-vote-card__kind {
+  color: #7dd3fc;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+  max-width: 100%;
+}
+
+.politician-vote-card__kind.is-procedural {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.politician-vote-card__motion-note {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
 .politician-vote-card__bill {
   color: #6ee7b7;
   border-color: rgba(52, 211, 153, 0.35);
@@ -8312,9 +8351,17 @@ body.scorecard-match-modal-open {
   padding-right: 0.25rem;
 }
 
+.scorecard-vote__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
 .scorecard-bill {
   display: inline-flex;
-  margin: 0 0.4rem 0.3rem 0;
+  margin: 0;
   border-radius: 0.4rem;
   padding: 0.15rem 0.45rem;
   background: #e2e8f0;
@@ -8323,9 +8370,34 @@ body.scorecard-match-modal-open {
   font-weight: 700;
 }
 
+.scorecard-vote__motion {
+  display: inline-flex;
+  max-width: 100%;
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.45rem;
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.scorecard-vote__motion.is-procedural {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.scorecard-vote__motion-note {
+  margin: 0.25rem 0 0.15rem;
+  font-size: 0.75rem;
+  color: var(--score-muted, #94a3b8);
+}
+
 .scorecard-vote__category {
   display: inline-flex;
-  margin-bottom: 0.3rem;
+  margin: 0;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.06em;

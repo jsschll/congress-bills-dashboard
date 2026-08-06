@@ -64,6 +64,13 @@ export interface ScorecardRecentVote {
   plainEnglishSummary: string | null;
   category: string | null;
   voteDate: string | null;
+  voteQuestion?: string | null;
+  voteKind?: string | null;
+  motionLabel?: string | null;
+  motionDetail?: string | null;
+  isProceduralMotion?: boolean;
+  rollCallNumber?: number | null;
+  result?: string | null;
   impacts: {
     wallet: string | null;
     community: string | null;
