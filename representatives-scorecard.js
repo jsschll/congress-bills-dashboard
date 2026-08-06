@@ -21,82 +21,245 @@
   ];
 
   /**
-   * Map OpenSecrets-style industry labels → policy categories + keyword regexes
-   * so Top Industry clicks can filter Recent Votes / Action Match client-side
-   * (and align with industry_tags once the Supabase migration is applied).
+   * Map FEC employers / OpenSecrets-style labels → policy industry sectors.
+   * Keep in sync with lib/services/industryTaxonomy.js.
    */
-  const INDUSTRY_DRILLDOWN_RULES = [
+  const INDUSTRY_SECTORS = [
     {
-      match: /oil|gas|energy|petroleum|pipeline|coal|mining|utilities|electric/i,
-      categories: ["Energy & Environment"],
+      slug: "energy-environment",
+      label: "Energy & Environment",
+      policyCategory: "Energy & Environment",
+      match:
+        /\b(oil|gas|petroleum|pipeline|coal|mining|utilities|electric|energy|kraken|exxon|chevron|conocophillips|occidental|halliburton|schlumberger|pioneer|devon|eog|cheniere|enbridge|tc energy|nextera|duke energy|southern company|epa|renewable|solar|wind)\b/i,
       keywords:
-        /\b(oil|gas|petroleum|pipeline|fossil|drilling|epa|climate|emission|renewable|coal|mining|utility|electric)\b/i,
+        /\b(oil|gas|petroleum|pipeline|fossil|drilling|epa|climate|emission|renewable|coal|mining|utility|electric|energy|environment)\b/i,
+      tagAliases: [
+        "Oil & Gas",
+        "Energy & Environment",
+        "Mining",
+        "Electric Utilities",
+      ],
     },
     {
-      match: /real estate|construction|home builder|housing/i,
-      categories: ["Housing & Infrastructure"],
+      slug: "telecommunications",
+      label: "Telecommunications",
+      policyCategory: "Economy & Taxes",
+      match:
+        /\b(at&t|att\b|verizon|t-?mobile|comcast|charter communications|cox communications|dish network|lumen|centurylink|sprint|telecom|broadband|cable|wireless|fcc)\b/i,
+      keywords:
+        /\b(telecom|telecommunications|broadband|spectrum|fcc|wireless|cable|5g|internet service|net neutrality)\b/i,
+      tagAliases: [
+        "Telecom Services",
+        "Telephone Utilities",
+        "TV / Movies / Music",
+        "Telecommunications",
+      ],
+    },
+    {
+      slug: "finance-investment",
+      label: "Finance & Investment",
+      policyCategory: "Economy & Taxes",
+      match:
+        /\b(bank|securities|investment|capital|fidelity|blackstone|blackrock|apollo|kkr|goldman|morgan stanley|jpmorgan|jp morgan|citigroup|wells fargo|vanguard|bridgewater|fortress|andreessen|a16z|hedge|broker|brokerage|private equity|asset management|schwab|raymond james|bny|mellon)\b/i,
+      keywords:
+        /\b(bank|securities|investment|finance|capital markets|hedge|broker|wall street|federal reserve|sec\b|dodd-?frank)\b/i,
+      tagAliases: [
+        "Securities & Investment",
+        "Commercial Banks",
+        "Finance / Credit Companies",
+        "Finance & Investment",
+      ],
+    },
+    {
+      slug: "real-estate",
+      label: "Real Estate",
+      policyCategory: "Housing & Infrastructure",
+      match:
+        /\b(real estate|realtor|realtors|home builder|construction|housing|property management|cbre|jones lang|coldwell|keller williams)\b/i,
       keywords:
         /\b(housing|real estate|mortgage|rent|zoning|property|homeless|infra|transit|highway|bridge|construction)\b/i,
+      tagAliases: ["Real Estate", "Home Builders", "Construction Services"],
     },
     {
-      match: /health|pharma|hospital|insurance|medical/i,
-      categories: ["Healthcare"],
+      slug: "healthcare",
+      label: "Healthcare",
+      policyCategory: "Healthcare",
+      match:
+        /\b(health|pharma|hospital|medical|pfizer|moderna|johnson & johnson|unitedhealth|cvs|cigna|humana|anthem|abbvie|merck|bristol|novartis|insurance)\b/i,
       keywords:
         /\b(health|medicare|medicaid|hospital|pharma|drug|vaccine|aca|insurance|medical)\b/i,
+      tagAliases: [
+        "Health Professionals",
+        "Hospitals / Nursing Homes",
+        "Pharmaceuticals / Health Products",
+        "Healthcare",
+      ],
     },
     {
-      match: /defense|aerospace|arms|weapons/i,
-      categories: ["Foreign Policy & Defense"],
+      slug: "defense-aerospace",
+      label: "Defense & Aerospace",
+      policyCategory: "Foreign Policy & Defense",
+      match:
+        /\b(defense|aerospace|lockheed|boeing|raytheon|northrop|general dynamics|l3harris|palantir|arms|weapons|military)\b/i,
       keywords:
         /\b(defense|military|armed forces|veteran|nato|war|troop|sanction|aerospace|weapons)\b/i,
+      tagAliases: [
+        "Defense Aerospace",
+        "Defense Electronics",
+        "Foreign Policy & Defense",
+      ],
     },
     {
-      match: /edu|teacher|school|university|labor|union|public sector/i,
-      categories: ["Education & Labor"],
+      slug: "education-labor",
+      label: "Education & Labor",
+      policyCategory: "Education & Labor",
+      match:
+        /\b(edu|teacher|school|university|college|labor|union|public sector|afl-?cio)\b/i,
       keywords:
         /\b(school|educat|student|university|college|labor|union|wage|worker|osha|teacher)\b/i,
+      tagAliases: ["Public Sector Unions", "Education", "Education & Labor"],
     },
     {
-      match: /immigra|border/i,
-      categories: ["Immigration & Border"],
+      slug: "immigration-border",
+      label: "Immigration & Border",
+      policyCategory: "Immigration & Border",
+      match: /\b(immigra|border|customs|ice\b|cbp\b)\b/i,
       keywords: /\b(immigra|border|asylum|visa|deport|refugee|customs)\b/i,
+      tagAliases: ["Immigration & Border"],
     },
     {
-      match: /law|legal|lobbyist|gun|civil/i,
-      categories: ["Civil Rights & Justice"],
+      slug: "civil-rights-justice",
+      label: "Civil Rights & Justice",
+      policyCategory: "Civil Rights & Justice",
+      match: /\b(civil rights|voting rights|gun|firearm|nra\b|justice|aclu)\b/i,
       keywords:
-        /\b(civil rights|voting rights|discrim|police|prison|justice|gun|court|lawyer|legal)\b/i,
+        /\b(civil rights|voting rights|discrim|police|prison|justice|gun|court)\b/i,
+      tagAliases: ["Gun Rights", "Civil Rights & Justice"],
     },
     {
-      match: /securities|investment|bank|finance|insurance|accountant|tax|retail|business|agriculture|agri|food|telecom|tech|electronics|software|internet/i,
-      categories: ["Economy & Taxes"],
+      slug: "law-lobbying",
+      label: "Law & Lobbying",
+      policyCategory: "Civil Rights & Justice",
+      match:
+        /\b(law firm|lawyer|legal|lobby|lobbyist|bgr group|aking|covington|skadden|sullivan & cromwell|kirkland)\b/i,
+      keywords: /\b(lawyer|legal|lobby|court|litigation|attorney)\b/i,
+      tagAliases: [
+        "Lawyers / Law Firms",
+        "Lawyers & Lobbyists",
+        "Lobbyists",
+      ],
+    },
+    {
+      slug: "tech-software",
+      label: "Technology",
+      policyCategory: "Economy & Taxes",
+      match:
+        /\b(google|alphabet|microsoft|amazon|apple|meta\b|facebook|nvidia|intel|oracle|salesforce|software|cyber|tech\b|electronics|silicon)\b/i,
       keywords:
-        /\b(tax|irs|tariff|budget|spend|deficit|debt|bank|securities|investment|finance|retail|agriculture|telecom|tech|software)\b/i,
+        /\b(tech|software|internet|cyber|ai\b|artificial intelligence|data privacy|big tech)\b/i,
+      tagAliases: [
+        "Electronics Mfg & Equip",
+        "Internet",
+        "Computer Software",
+        "Technology",
+      ],
+    },
+    {
+      slug: "agriculture-food",
+      label: "Agriculture & Food",
+      policyCategory: "Economy & Taxes",
+      match:
+        /\b(agri|agriculture|farm|food|crop|livestock|tyson|cargill|monsanto|bayer crop)\b/i,
+      keywords: /\b(agriculture|farm|food|crop|usda|livestock|nutrition)\b/i,
+      tagAliases: [
+        "Crop Production & Basic Processing",
+        "Agricultural Services / Products",
+        "Food Processing & Sales",
+      ],
+    },
+    {
+      slug: "economy-taxes",
+      label: "Economy & Taxes",
+      policyCategory: "Economy & Taxes",
+      match:
+        /\b(retail|business|entrepreneur|accountant|tax|walmart|home depot|costco|target|commerce)\b/i,
+      keywords:
+        /\b(tax|irs|tariff|budget|spend|deficit|debt|bank|securities|investment|finance|retail|economy)\b/i,
+      tagAliases: ["Misc Business", "Retail Sales", "Economy & Taxes"],
     },
   ];
 
-  function industryDrilldownRule(industryName = "") {
-    const name = String(industryName || "").trim();
-    if (!name) return null;
-    for (const rule of INDUSTRY_DRILLDOWN_RULES) {
-      if (rule.match.test(name)) return { ...rule, industry: name };
+  const INDUSTRY_SECTOR_BY_SLUG = new Map(
+    INDUSTRY_SECTORS.map((sector) => [sector.slug, sector])
+  );
+
+  function classifyDonorSource(raw = "") {
+    const name = String(raw || "").trim();
+    if (!name) return INDUSTRY_SECTOR_BY_SLUG.get("economy-taxes");
+    const lower = name.toLowerCase();
+    for (const sector of INDUSTRY_SECTORS) {
+      if (sector.label.toLowerCase() === lower) return sector;
+      if (
+        (sector.tagAliases || []).some((alias) => alias.toLowerCase() === lower)
+      ) {
+        return sector;
+      }
     }
-    // Fallback: treat the industry label itself as a keyword needle.
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (const sector of INDUSTRY_SECTORS) {
+      if (sector.match.test(name)) return sector;
+    }
+    return INDUSTRY_SECTOR_BY_SLUG.get("economy-taxes");
+  }
+
+  function resolveIndustrySector(slugOrLabel = "") {
+    const raw = String(slugOrLabel || "").trim();
+    if (!raw) return null;
+    if (INDUSTRY_SECTOR_BY_SLUG.has(raw)) {
+      return INDUSTRY_SECTOR_BY_SLUG.get(raw);
+    }
+    return classifyDonorSource(raw);
+  }
+
+  function enrichDonorSourceClient(item = {}) {
+    const name = String(item.name || "").trim();
+    const slug = String(item.industry_slug || item.industrySlug || "").trim();
+    const sector =
+      (slug && INDUSTRY_SECTOR_BY_SLUG.get(slug)) || classifyDonorSource(name);
     return {
-      industry: name,
-      categories: [],
-      keywords: new RegExp(`\\b${escaped}\\b`, "i"),
+      name,
+      amount: Number(item.amount) || 0,
+      industry_slug: sector.slug,
+      industry: sector.label,
+      category: sector.policyCategory,
     };
   }
 
-  function policyCategoryFromIndustry(industryName = "") {
-    return industryDrilldownRule(industryName)?.categories?.[0] || null;
+  function industryLabelFromFilter(filter = "") {
+    return resolveIndustrySector(filter)?.label || String(filter || "").trim();
   }
 
-  function voteMatchesIndustry(vote = {}, industryName = "") {
-    const rule = industryDrilldownRule(industryName);
-    if (!rule) return true;
+  function policyCategoryFromIndustry(slugOrLabel = "") {
+    return resolveIndustrySector(slugOrLabel)?.policyCategory || null;
+  }
+
+  function topicSlugFromCategory(category = "") {
+    const value = String(category || "").trim().toLowerCase();
+    if (!value) return "";
+    for (const sector of INDUSTRY_SECTORS) {
+      if (sector.policyCategory.toLowerCase() === value) return sector.slug;
+      if (sector.label.toLowerCase() === value) return sector.slug;
+      if (
+        (sector.tagAliases || []).some((alias) => alias.toLowerCase() === value)
+      ) {
+        return sector.slug;
+      }
+    }
+    return value.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  }
+
+  function voteMatchesIndustry(vote = {}, industryFilter = "") {
+    const sector = resolveIndustrySector(industryFilter);
+    if (!sector) return true;
 
     const tags = [
       ...(Array.isArray(vote.industry_tags) ? vote.industry_tags : []),
@@ -105,26 +268,43 @@
     ]
       .map((tag) => String(tag || "").trim().toLowerCase())
       .filter(Boolean);
-    const industryKey = String(industryName || "").trim().toLowerCase();
-    if (industryKey && tags.includes(industryKey)) return true;
-    if (
-      tags.some((tag) =>
-        rule.categories.some((cat) => tag === String(cat).toLowerCase())
-      )
-    ) {
-      return true;
-    }
+
+    const aliasNeedles = new Set(
+      [
+        sector.slug,
+        sector.label,
+        sector.policyCategory,
+        ...(sector.tagAliases || []),
+      ]
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
+
+    if (tags.some((tag) => aliasNeedles.has(tag))) return true;
 
     const category = String(
       vote.category || vote.primary_category || vote.primaryCategory || ""
     ).trim();
-    if (
-      category &&
-      rule.categories.some(
-        (cat) => cat.toLowerCase() === category.toLowerCase()
-      )
-    ) {
-      return true;
+    const voteTopicSlug =
+      String(vote.topic_slug || vote.topicSlug || "").trim() ||
+      (category ? topicSlugFromCategory(category) : "");
+    if (voteTopicSlug && voteTopicSlug === sector.slug) return true;
+
+    if (category) {
+      const categoryLower = category.toLowerCase();
+      if (categoryLower === sector.label.toLowerCase()) return true;
+      // Only treat policy category as sufficient when this sector uniquely owns it
+      // (e.g. Healthcare). Shared buckets like Economy & Taxes need keywords.
+      const uniqueOwner =
+        INDUSTRY_SECTORS.filter(
+          (row) => row.policyCategory === sector.policyCategory
+        ).length === 1;
+      if (
+        uniqueOwner &&
+        categoryLower === sector.policyCategory.toLowerCase()
+      ) {
+        return true;
+      }
     }
 
     const haystack = [
@@ -138,11 +318,12 @@
       vote.impacts?.wallet,
       vote.impacts?.community,
       vote.impacts?.rights,
-      ...(tags || []),
+      ...tags,
     ]
       .filter(Boolean)
       .join(" ");
-    return rule.keywords.test(haystack);
+
+    return sector.keywords.test(haystack);
   }
 
   const CATEGORY_RULES = [
@@ -1998,7 +2179,15 @@
         </p>`;
       return;
     }
-    const selectedIndustry = String(options.selectedIndustry || "").trim();
+    const selectedIndustrySlug = String(
+      options.selectedIndustry || ""
+    ).trim();
+    const selectedSourceName = String(options.selectedSourceName || "").trim();
+    const selectedSector = selectedIndustrySlug
+      ? resolveIndustrySector(selectedIndustrySlug)
+      : null;
+    const selectedIndustryLabel = selectedSector?.label || "";
+    const relatedTopic = selectedSector?.policyCategory || null;
     const slices = normalizeFundingSlices([
       {
         key: "small",
@@ -2017,16 +2206,12 @@
         pct: Number(finance.selfFundingPct) || 0,
       },
     ]);
-    const industries = Array.isArray(finance.topIndustries)
-      ? finance.topIndustries.slice(0, 5)
-      : [];
+    const industries = (
+      Array.isArray(finance.topIndustries) ? finance.topIndustries : []
+    )
+      .map((item) => enrichDonorSourceClient(item))
+      .slice(0, 5);
     const top = industries[0];
-    const selectedMeta = selectedIndustry
-      ? industryDrilldownRule(selectedIndustry)
-      : null;
-    const relatedTopic = selectedIndustry
-      ? policyCategoryFromIndustry(selectedIndustry)
-      : null;
 
     el.innerHTML = `
       <p class="scorecard-card__eyebrow">Donor Alignment</p>
@@ -2066,7 +2251,7 @@
           finance.cycle
             ? ` · cycle ${escapeHtml(String(finance.cycle))}`
             : ""
-        }. Tap a source to filter Action Match and Recent Votes.
+        }. Tap a source to filter Action Match and Recent Votes by industry.
       </p>
       ${
         industries.length
@@ -2074,19 +2259,29 @@
               ${industries
                 .map((item, index) => {
                   const name = String(item.name || "").trim();
+                  const slug = String(item.industry_slug || "").trim();
+                  const industryLabel = String(item.industry || "").trim();
                   const selected =
-                    selectedIndustry &&
-                    selectedIndustry.toLowerCase() === name.toLowerCase();
+                    selectedIndustrySlug &&
+                    ((selectedSourceName &&
+                      selectedSourceName.toLowerCase() === name.toLowerCase()) ||
+                      (!selectedSourceName &&
+                        selectedIndustrySlug === slug));
                   return `<li>
                     <button
                       type="button"
                       class="scorecard-industry${selected ? " is-selected" : ""}"
-                      data-industry="${escapeHtml(name)}"
+                      data-industry-slug="${escapeHtml(slug)}"
+                      data-industry-label="${escapeHtml(industryLabel)}"
+                      data-source-name="${escapeHtml(name)}"
                       aria-pressed="${selected ? "true" : "false"}"
                     >
                       <span class="scorecard-industry__label">${
                         index + 1
                       }. ${escapeHtml(name)}</span>
+                      <span class="scorecard-industry__sector">${escapeHtml(
+                        industryLabel
+                      )}</span>
                       <strong class="scorecard-industry__amount">${escapeHtml(
                         formatUsd(item.amount)
                       )}</strong>
@@ -2098,15 +2293,19 @@
           : `<p class="scorecard-empty">No itemized employer totals for this FEC cycle yet.</p>`
       }
       ${
-        selectedIndustry
+        selectedIndustryLabel
           ? `<aside class="scorecard-callout scorecard-callout--filter" role="status">
               <span class="scorecard-callout__badge">Industry filter</span>
-              <p><strong>${escapeHtml(selectedIndustry)}</strong>${
-                relatedTopic
+              <p><strong>${escapeHtml(selectedIndustryLabel)}</strong>${
+                relatedTopic && relatedTopic !== selectedIndustryLabel
                   ? ` · related topic: ${escapeHtml(relatedTopic)}`
                   : ""
               }</p>
-              <p>Showing roll calls linked to this industry. Tap again or Clear Filter to reset.</p>
+              <p>Showing roll calls linked to this industry${
+                selectedSourceName
+                  ? ` (from ${escapeHtml(selectedSourceName)})`
+                  : ""
+              }. Tap again or Clear Filter to reset.</p>
               <button type="button" class="refresh-btn scorecard-industry-clear" data-clear-industry="1">
                 Clear Filter
               </button>
@@ -2117,23 +2316,30 @@
               <p><strong>${escapeHtml(top.name)}</strong> · ${escapeHtml(
                 formatUsd(top.amount)
               )}</p>
-              <p>Compare this industry’s funding with related roll-call votes in the feed.</p>
+              <p>Compare this source’s industry (${escapeHtml(
+                top.industry || "Economy & Taxes"
+              )}) with related roll-call votes in the feed.</p>
             </aside>`
             : ""
       }
     `;
 
-    el.querySelectorAll("[data-industry]").forEach((button) => {
+    el.querySelectorAll("[data-industry-slug]").forEach((button) => {
       button.addEventListener("click", () => {
-        const name = String(button.getAttribute("data-industry") || "").trim();
-        if (!name) return;
-        const next =
-          selectedIndustry &&
-          selectedIndustry.toLowerCase() === name.toLowerCase()
-            ? null
-            : name;
+        const slug = String(
+          button.getAttribute("data-industry-slug") || ""
+        ).trim();
+        const sourceName = String(
+          button.getAttribute("data-source-name") || ""
+        ).trim();
+        if (!slug) return;
+        const sameSource =
+          selectedIndustrySlug === slug &&
+          selectedSourceName.toLowerCase() === sourceName.toLowerCase();
         if (typeof options.onSelectIndustry === "function") {
-          options.onSelectIndustry(next);
+          options.onSelectIndustry(
+            sameSource ? null : { slug, sourceName }
+          );
         }
       });
     });
@@ -2142,9 +2348,6 @@
         options.onSelectIndustry(null);
       }
     });
-
-    // Keep selectedMeta referenced for future enrich hooks / lint calm.
-    void selectedMeta;
   }
 
   function renderAttendance(el, attendance) {
@@ -2753,9 +2956,9 @@
       rights: { icon: "⚖️", label: "Rights Impact", className: "is-rights" },
     };
 
-    const relatedTopic = industryFilter
-      ? policyCategoryFromIndustry(industryFilter)
-      : null;
+    const selectedIndustryLabel = industryFilter
+      ? industryLabelFromFilter(industryFilter)
+      : "";
 
     el.innerHTML = `
       <div class="scorecard-votes__header">
@@ -2809,14 +3012,7 @@
           ? `<div class="scorecard-industry-filter-badge" role="status">
               <span>
                 Filtered by industry:
-                <strong>${escapeHtml(industryFilter)}</strong>
-                ${
-                  relatedTopic
-                    ? `<span class="scorecard-industry-filter-badge__topic">· ${escapeHtml(
-                        relatedTopic
-                      )}</span>`
-                    : ""
-                }
+                <strong>${escapeHtml(selectedIndustryLabel)}</strong>
               </span>
               <button type="button" class="refresh-btn" data-clear-industry-filter="1">
                 Clear Filter
@@ -2924,7 +3120,7 @@
               <p>${
                 industryFilter
                   ? `No roll calls matched “${escapeHtml(
-                      industryFilter
+                      selectedIndustryLabel
                     )}” yet. Try another industry or Clear Filter.`
                   : sourceVotes.length
                     ? scope === "key"
@@ -3201,6 +3397,7 @@
       paintToken: 0,
       lastEnrich: null,
       selectedIndustry: null,
+      selectedSourceName: null,
     };
 
     async function maybeShowVoterPulseBanner() {
@@ -3294,6 +3491,7 @@
       };
       renderDonor($("scorecard-donor"), active.campaignFinance, {
         selectedIndustry: state.selectedIndustry,
+        selectedSourceName: state.selectedSourceName,
         onSelectIndustry: setSelectedIndustry,
       });
       if (hasUsableVotes(active.recentVotes)) {
@@ -3306,9 +3504,20 @@
       }
     }
 
-    function setSelectedIndustry(industry) {
-      const next = String(industry || "").trim() || null;
-      state.selectedIndustry = next;
+    function setSelectedIndustry(selection) {
+      let nextSlug = null;
+      let nextSource = null;
+      if (selection && typeof selection === "object") {
+        nextSlug = String(selection.slug || "").trim() || null;
+        nextSource = String(selection.sourceName || "").trim() || null;
+      } else if (selection) {
+        // Backward-compatible: raw string may be a slug or employer/label.
+        const sector = resolveIndustrySector(selection);
+        nextSlug = sector?.slug || String(selection).trim() || null;
+        nextSource = null;
+      }
+      state.selectedIndustry = nextSlug;
+      state.selectedSourceName = nextSlug ? nextSource : null;
       const reps = state.data?.representatives || [];
       const active =
         reps.find((rep) => rep.profile.id === state.activeId) || reps[0] || null;
@@ -3317,10 +3526,10 @@
       // Keep Action Match topic chips in sync with the industry drill-down.
       const matchBody = $("scorecard-match-body");
       if (matchBody?.querySelector("[data-match-topic-filter]")) {
-        const topic = policyCategoryFromIndustry(next) || "all";
+        const topic = policyCategoryFromIndustry(nextSlug) || "all";
         bindMatchTopicFilters(matchBody, topic);
       }
-      if (next) {
+      if (nextSlug) {
         $("scorecard-votes")?.scrollIntoView({
           behavior: "smooth",
           block: "start",
@@ -3355,6 +3564,7 @@
       renderTabs(tabs, reps, state.activeId, (id) => {
         state.activeId = id;
         state.selectedIndustry = null;
+        state.selectedSourceName = null;
         const url = new URL(global.location.href);
         url.searchParams.set("id", id);
         global.history.replaceState({}, "", url.toString());
