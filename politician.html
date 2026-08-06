@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260805toast" />
+    <link rel="stylesheet" href="styles.css?v=20260806askai" />
   </head>
   <body class="page-app page-politicians page-politician-profile">
     <script>
@@ -272,6 +272,57 @@
           <p id="politician-match-detail-roll" class="bill-breakdown__roll"></p>
         </section>
 
+        <section
+          class="bill-ask-ai"
+          aria-labelledby="politician-match-detail-ask-label"
+          data-bill-ask-ai="1"
+        >
+          <h3 id="politician-match-detail-ask-label" class="bill-breakdown__label">
+            Ask AI about this bill
+          </h3>
+          <div
+            class="bill-ask-ai__chips"
+            role="group"
+            aria-label="Suggested questions"
+          >
+            <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
+              How is this measure funded?
+            </button>
+            <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
+              Who is most impacted by this?
+            </button>
+            <button type="button" class="bill-ask-ai__chip" data-ask-ai-chip>
+              What is the implementation timeline?
+            </button>
+          </div>
+          <div
+            id="politician-match-detail-ask-log"
+            class="bill-ask-ai__log"
+            aria-live="polite"
+          ></div>
+          <form id="politician-match-detail-ask-form" class="bill-ask-ai__form">
+            <label class="visually-hidden" for="politician-match-detail-ask-input"
+              >Ask a specific question about this bill</label
+            >
+            <input
+              id="politician-match-detail-ask-input"
+              class="bill-ask-ai__input"
+              type="text"
+              maxlength="280"
+              autocomplete="off"
+              placeholder="Ask a specific question about this bill..."
+            />
+            <button type="submit" class="refresh-btn bill-ask-ai__submit">
+              Ask
+            </button>
+          </form>
+          <p
+            id="politician-match-detail-ask-status"
+            class="bill-ask-ai__status"
+            hidden
+          ></p>
+        </section>
+
         <footer class="scorecard-match-detail__footer">
           <a
             id="politician-match-detail-link"
@@ -293,7 +344,7 @@
     </div>
 
     <script src="config.js"></script>
-    <script src="shared.js?v=20260805toast"></script>
+    <script src="shared.js?v=20260806askai"></script>
     <script src="nav.js?v=20260804a1"></script>
     <script src="engagement.js?v=20260803fc"></script>
     <script src="politicians-shared.js?v=20260805toast"></script>

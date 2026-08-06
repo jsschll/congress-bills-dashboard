@@ -1,105 +1,45 @@
-const {
-  formatBillSummary,
-  buildPrompt,
-  heuristicFormat,
-} = require("../lib/format-bill-summary");
+/**
+ * Hobby-plan consolidation: one serverless function for AI helpers.
+ * Public URLs via vercel.json rewrites:
+ *   /api/format-bill-summary → ?route=format-bill-summary (default)
+ *   /api/chat-bill           → ?route=chat-bill
+ */
+const formatBillSummary = require("../lib/api-handlers/format-bill-summary");
+const chatBill = require("../lib/api-handlers/chat-bill");
 
-function json(res, status, body) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.end(JSON.stringify(body));
-}
+const ROUTES = {
+  "format-bill-summary": formatBillSummary,
+  "chat-bill": chatBill,
+};
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    if (req.body && typeof req.body === "object") {
-      resolve(req.body);
-      return;
+function resolveRoute(req) {
+  const fromQuery = String(req.query?.route || "").trim().toLowerCase();
+  if (ROUTES[fromQuery]) return fromQuery;
+
+  const url = String(req.url || "");
+  const pathOnly = url.split("?")[0];
+  for (const name of Object.keys(ROUTES)) {
+    if (pathOnly.endsWith(`/api/${name}`) || pathOnly.endsWith(`/${name}`)) {
+      return name;
     }
-    if (typeof req.body === "string" && req.body.trim()) {
-      try {
-        resolve(JSON.parse(req.body));
-      } catch (error) {
-        reject(error);
-      }
-      return;
-    }
-    let raw = "";
-    req.on("data", (chunk) => {
-      raw += chunk;
-      if (raw.length > 200_000) {
-        reject(new Error("Body too large"));
-        req.destroy();
-      }
-    });
-    req.on("end", () => {
-      if (!raw) {
-        resolve({});
-        return;
-      }
-      try {
-        resolve(JSON.parse(raw));
-      } catch (error) {
-        reject(error);
-      }
-    });
-    req.on("error", reject);
-  });
+  }
+  // Direct hits on this entry file default to the legacy summary formatter.
+  return "format-bill-summary";
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method === "OPTIONS") return json(res, 204, {});
-
-  try {
-    let rawSummary = "";
-    let billTitle = "";
-    let forceHeuristic = false;
-
-    if (req.method === "GET") {
-      rawSummary = String(req.query.rawSummary || req.query.summary || "");
-      billTitle = String(req.query.billTitle || req.query.title || "");
-      forceHeuristic =
-        String(req.query.heuristic || "") === "1" ||
-        String(req.query.heuristic || "").toLowerCase() === "true";
-    } else if (req.method === "POST") {
-      const body = await readBody(req);
-      rawSummary = String(body.rawSummary || body.summary || "");
-      billTitle = String(body.billTitle || body.title || "");
-      forceHeuristic = Boolean(body.forceHeuristic || body.heuristic);
-    } else {
-      return json(res, 405, { error: "Method not allowed" });
-    }
-
-    if (!rawSummary.trim() && !billTitle.trim()) {
-      return json(res, 400, {
-        error: "Provide rawSummary and/or billTitle.",
-      });
-    }
-
-    const card = await formatBillSummary(rawSummary, billTitle, {
-      forceHeuristic,
-    });
-    const prompt = buildPrompt(rawSummary, billTitle);
-
-    return json(res, 200, {
-      ...card,
-      billTitle: billTitle || null,
-      prompt: {
-        system: prompt.system,
-        user: prompt.user,
-      },
-      fallbackExample: heuristicFormat(
-        "This bill directs the Department of Transportation to update rail safety inspection rules and report compliance to Congress.",
-        "Rail Safety Improvement Act"
-      ),
-    });
-  } catch (error) {
-    console.error(error);
-    return json(res, 500, {
-      error: error.message || "Could not format bill summary.",
-    });
+  const route = resolveRoute(req);
+  const next = ROUTES[route];
+  if (!next) {
+    res.statusCode = 404;
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({
+        error: "Unknown AI route.",
+        routes: Object.keys(ROUTES),
+      })
+    );
+    return;
   }
+  return next(req, res);
 };

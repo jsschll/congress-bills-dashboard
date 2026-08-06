@@ -6,6 +6,9 @@
     },
     "api/jobs.js": {
       "maxDuration": 60
+    },
+    "api/format-bill-summary.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
@@ -20,6 +23,10 @@
     {
       "source": "/api/bill-vote-match",
       "destination": "/api/votes?route=bill-vote-match"
+    },
+    {
+      "source": "/api/chat-bill",
+      "destination": "/api/format-bill-summary?route=chat-bill"
     },
     {
       "source": "/api/watch-bills",
