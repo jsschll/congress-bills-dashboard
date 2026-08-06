@@ -257,7 +257,11 @@
     return value.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   }
 
-  function voteMatchesIndustry(vote = {}, industryFilter = "") {
+  function voteMatchesIndustry(
+    vote = {},
+    industryFilter = "",
+    { allowRelatedCategory = false } = {}
+  ) {
     const sector = resolveIndustrySector(industryFilter);
     if (!sector) return true;
 
@@ -285,27 +289,29 @@
     const category = String(
       vote.category || vote.primary_category || vote.primaryCategory || ""
     ).trim();
+    const categoryLower = category.toLowerCase();
     const voteTopicSlug =
       String(vote.topic_slug || vote.topicSlug || "").trim() ||
       (category ? topicSlugFromCategory(category) : "");
     if (voteTopicSlug && voteTopicSlug === sector.slug) return true;
 
     if (category) {
-      const categoryLower = category.toLowerCase();
       if (categoryLower === sector.label.toLowerCase()) return true;
-      // Only treat policy category as sufficient when this sector uniquely owns it
-      // (e.g. Healthcare). Shared buckets like Economy & Taxes need keywords.
+      // Unique owners (e.g. Healthcare) can match on policy category directly.
+      // Shared buckets (Economy & Taxes) only via related fallback or keywords.
       const uniqueOwner =
         INDUSTRY_SECTORS.filter(
           (row) => row.policyCategory === sector.policyCategory
         ).length === 1;
       if (
-        uniqueOwner &&
+        (uniqueOwner || allowRelatedCategory) &&
         categoryLower === sector.policyCategory.toLowerCase()
       ) {
         return true;
       }
     }
+
+    if (allowRelatedCategory) return false;
 
     const haystack = [
       vote.title,
@@ -431,10 +437,30 @@
   }
 
   function authNextHref() {
-    const next = encodeURIComponent(
-      `${global.location.pathname}${global.location.search}`
+    const next = `${global.location.pathname}${global.location.search}`.replace(
+      /^\//,
+      ""
     );
-    return `auth.html?next=${next}`;
+    return typeof authHrefForNext === "function"
+      ? authHrefForNext(next)
+      : `auth.html?next=${encodeURIComponent(next)}`;
+  }
+
+  function promptScorecardAuth(copy = {}) {
+    if (typeof promptAuthGate === "function") {
+      promptAuthGate({
+        next: `${global.location.pathname}${global.location.search}`.replace(
+          /^\//,
+          ""
+        ),
+        title: copy.title || "Create a free account",
+        body:
+          copy.body ||
+          "Create a free account to track topics, receive personalized alerts, and contact your representatives directly.",
+      });
+      return;
+    }
+    global.location.href = authNextHref();
   }
 
   function readQuery() {
@@ -1326,7 +1352,10 @@
         name: person.name || null,
         createdAt: Date.now(),
       });
-      global.location.href = authNextHref();
+      promptScorecardAuth({
+        title: "Follow officials with a free account",
+        body: "Create a free account to follow representatives, save votes, and get alerts when they act.",
+      });
       return { redirected: true };
     }
 
@@ -1646,7 +1675,10 @@
     const client = typeof getSupabase === "function" ? getSupabase() : null;
     const user = typeof getUser === "function" ? await getUser() : null;
     if (!client || !user) {
-      global.location.href = authNextHref();
+      promptScorecardAuth({
+        title: "Save notes with a free account",
+        body: "Create a free account to keep private notes on meetings and follow-ups with your representatives.",
+      });
       return;
     }
     const bodyInput = $("scorecard-note-body");
@@ -2720,7 +2752,10 @@
     const client = typeof getSupabase === "function" ? getSupabase() : null;
     const user = typeof getUser === "function" ? await getUser() : null;
     if (!client || !user) {
-      global.location.href = authNextHref();
+      promptScorecardAuth({
+        title: "Match My Votes needs an account",
+        body: "Create a free account to save your positions, build Action Match, and compare with your representatives.",
+      });
       return null;
     }
     await upsertQuizBillItem(client, item);
@@ -2952,9 +2987,26 @@
       effectiveScope === "all"
         ? sourceVotes
         : sourceVotes.filter((vote) => isDisplayedKeyVote(vote));
-    const industryVotes = industryFilter
+    const industrySector = industryFilter
+      ? resolveIndustrySector(industryFilter)
+      : null;
+    let industryMatchMode = "direct";
+    let industryVotes = industryFilter
       ? scopedVotes.filter((vote) => voteMatchesIndustry(vote, industryFilter))
       : scopedVotes;
+    if (industryFilter && !industryVotes.length) {
+      const related = scopedVotes.filter((vote) =>
+        voteMatchesIndustry(vote, industryFilter, {
+          allowRelatedCategory: true,
+        })
+      );
+      if (related.length) {
+        industryVotes = related;
+        industryMatchMode = "related";
+      } else {
+        industryMatchMode = "empty";
+      }
+    }
     const filtered = industryVotes.filter((vote) => {
       if (!q) return true;
       const haystack = [
@@ -3046,8 +3098,17 @@
         industryFilter
           ? `<div class="scorecard-industry-filter-badge" role="status">
               <span>
-                Filtered by industry:
-                <strong>${escapeHtml(selectedIndustryLabel)}</strong>
+                ${
+                  industryMatchMode === "related"
+                    ? `No direct “${escapeHtml(
+                        selectedIndustryLabel
+                      )}” roll calls — showing related
+                        <strong>${escapeHtml(
+                          industrySector?.policyCategory || "topic"
+                        )}</strong> votes`
+                    : `Filtered by industry:
+                        <strong>${escapeHtml(selectedIndustryLabel)}</strong>`
+                }
               </span>
               <button type="button" class="refresh-btn" data-clear-industry-filter="1">
                 Clear Filter
@@ -3189,17 +3250,59 @@
                 .join("")}
             </ul>`
           : `<div class="scorecard-empty scorecard-empty--card" role="status">
-              <p>${
+              ${
                 industryFilter
-                  ? `No roll calls matched “${escapeHtml(
-                      selectedIndustryLabel
-                    )}” yet. Try another industry or Clear Filter.`
-                  : sourceVotes.length
-                    ? scope === "key"
-                      ? "No key votes in this list yet. Switch to All Votes to see every roll call."
-                      : "No roll calls match this filter."
-                    : "No recent roll-call votes recorded for this representative."
-              }</p>
+                  ? (() => {
+                      const relatedCategory =
+                        industrySector?.policyCategory || "related topic";
+                      const subjectParam = (() => {
+                        const cat = String(relatedCategory).toLowerCase();
+                        if (cat.includes("economy") || cat.includes("tax"))
+                          return "economy";
+                        if (cat.includes("health")) return "healthcare";
+                        if (cat.includes("defense") || cat.includes("foreign"))
+                          return "defense";
+                        if (cat.includes("energy") || cat.includes("environment"))
+                          return "energy";
+                        if (cat.includes("civil") || cat.includes("justice"))
+                          return "civil_rights";
+                        if (cat.includes("immigra") || cat.includes("border"))
+                          return "immigration";
+                        if (cat.includes("tech") || cat.includes("telecom"))
+                          return "tech";
+                        return "";
+                      })();
+                      const billsHref = subjectParam
+                        ? `bills-policies.html?tab=votes&subject=${encodeURIComponent(
+                            subjectParam
+                          )}`
+                        : "bills-policies.html?tab=votes";
+                      return `<p>No direct roll-call votes flagged for “${escapeHtml(
+                        selectedIndustryLabel
+                      )}” in the current cycle.</p>
+                    <p class="scorecard-empty__hint">
+                      Donor industries don’t always map to a same-cycle floor vote.
+                      Browse broader
+                      <strong>${escapeHtml(relatedCategory)}</strong>
+                      votes, or clear the filter to see every roll call.
+                    </p>
+                    <div class="scorecard-empty__actions">
+                      <a class="refresh-btn" href="${billsHref}">
+                        View general ${escapeHtml(relatedCategory)} bills
+                      </a>
+                      <button type="button" class="refresh-btn" data-clear-industry-filter="1">
+                        Clear Filter
+                      </button>
+                    </div>`;
+                    })()
+                  : `<p>${
+                      sourceVotes.length
+                        ? scope === "key"
+                          ? "No key votes in this list yet. Switch to All Votes to see every roll call."
+                          : "No roll calls match this filter."
+                        : "No recent roll-call votes recorded for this representative."
+                    }</p>`
+              }
             </div>`
       }
     `;
@@ -3225,14 +3328,13 @@
 
     mountScorecardVoteEngagement(el, filtered, el._scorecardVoteOptions);
 
-    el.querySelector("[data-clear-industry-filter]")?.addEventListener(
-      "click",
-      () => {
+    el.querySelectorAll("[data-clear-industry-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
         if (typeof el._scorecardVoteOptions.onClearIndustry === "function") {
           el._scorecardVoteOptions.onClearIndustry();
         }
-      }
-    );
+      });
+    });
 
     const scopeSelect = $("scorecard-vote-scope");
     if (scopeSelect && !industryFilter) {
@@ -3773,12 +3875,21 @@
         );
         // Deep links (Politicians search → Hawley) must not reuse the session
         // ZIP/address, or the API returns your district set and picks Cornyn.
+        const guestLocation =
+          typeof readGuestLocationContext === "function"
+            ? readGuestLocationContext()
+            : null;
         const zipCode = isDeepLink
           ? query.zipCode || null
-          : query.zipCode || session?.query?.zipCode || null;
+          : query.zipCode ||
+            session?.query?.zipCode ||
+            guestLocation?.zipCode ||
+            null;
         const address = isDeepLink
           ? query.address || null
-          : query.address || session?.query?.address || null;
+          : query.address ||
+            session?.query?.address ||
+            (!zipCode ? guestLocation?.address || null : null);
         const id = deepLinkId;
         const bioguideId = deepLinkBioguide;
         const politicianId = deepLinkPoliticianId;
@@ -3875,20 +3986,31 @@
             },
           });
         } else {
+          const nextQuery = {
+            zipCode: zipCode || session?.query?.zipCode || null,
+            address: address || session?.query?.address || null,
+            // Don't persist deep-link bioguide into the "my reps" session.
+            bioguideId: isDeepLink ? null : bioguideId,
+            politicianId: isDeepLink ? null : politicianId,
+            lastViewedBioguideId: isDeepLink
+              ? bioguideId || politicianId || null
+              : null,
+          };
           writeSession({
             ...payload,
             activeId: state.activeId,
-            query: {
-              zipCode: zipCode || session?.query?.zipCode || null,
-              address: address || session?.query?.address || null,
-              // Don't persist deep-link bioguide into the "my reps" session.
-              bioguideId: isDeepLink ? null : bioguideId,
-              politicianId: isDeepLink ? null : politicianId,
-              lastViewedBioguideId: isDeepLink
-                ? bioguideId || politicianId || null
-                : null,
-            },
+            query: nextQuery,
           });
+          if (
+            typeof saveGuestLocationContext === "function" &&
+            (nextQuery.zipCode || nextQuery.address)
+          ) {
+            saveGuestLocationContext({
+              zipCode: nextQuery.zipCode,
+              address: nextQuery.address,
+              query: nextQuery.zipCode || nextQuery.address,
+            });
+          }
         }
 
         if (heading) {

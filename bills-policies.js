@@ -982,10 +982,13 @@ async function toggleFollowBill(item) {
   const client = getSupabase();
   const user = await getUser();
   if (!client || !user) {
-    const next = encodeURIComponent(
-      `${window.location.pathname}${window.location.search}`
-    );
-    window.location.href = `auth.html?next=${next}`;
+    if (typeof promptAuthGate === "function") {
+      promptAuthGate({
+        next: currentPageNextPath?.() || "bills-policies.html",
+        title: "Follow bills with a free account",
+        body: "Create a free account to follow legislation and get alerts when it moves.",
+      });
+    }
     return;
   }
 
@@ -1909,8 +1912,16 @@ function renderActiveTab() {
 async function requireSignedInForTab(tabName) {
   const user = await getUser();
   if (user) return true;
-  const next = encodeURIComponent(`bills-policies.html?tab=${tabName}`);
-  window.location.href = `auth.html?next=${next}`;
+  const next = `bills-policies.html?tab=${tabName}`;
+  if (typeof promptAuthGate === "function") {
+    promptAuthGate({
+      next,
+      title: tabName === "foryou" ? "Personalize your feed" : "Save your feed",
+      body: "Create a free account to track topics, receive personalized alerts, and contact your representatives directly.",
+    });
+  } else {
+    window.location.href = `auth.html?next=${encodeURIComponent(next)}`;
+  }
   return false;
 }
 

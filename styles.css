@@ -1627,8 +1627,13 @@ body {
 
 .politician-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 0.9rem;
+  align-items: stretch;
+}
+
+.politician-grid--flat {
+  grid-auto-rows: 1fr;
 }
 
 .politician-results-toolbar {
@@ -1932,20 +1937,26 @@ body {
 
 .politician-card {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 0.75rem 0.85rem;
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 0.65rem 0.75rem;
+  align-items: start;
+  padding: 0.85rem;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
   box-shadow: none;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .politician-card__media {
   width: 72px;
   height: 72px;
   flex-shrink: 0;
+  grid-row: 1;
+  grid-column: 1;
 }
 
 .politician-card__media img,
@@ -1973,6 +1984,9 @@ body {
   display: grid;
   gap: 0.2rem;
   min-width: 0;
+  grid-row: 1;
+  grid-column: 2;
+  align-content: start;
 }
 
 .politician-card__extras {
@@ -1991,12 +2005,42 @@ body {
   margin: 0;
   font-size: 0.98rem;
   line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.politician-card__name a {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .politician-card__meta {
   margin: 0;
   color: var(--muted);
   font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.politician-card__badges {
+  min-width: 0;
+}
+
+.politician-card__badges .politician-badge,
+.politician-card__party,
+.politician-card__selection {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .politician-card__party {
@@ -2037,15 +2081,21 @@ body {
 
 .politician-card__actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 0.35rem;
-  align-items: stretch;
+  align-items: center;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .politician-card__actions .refresh-btn,
 .politician-card__actions .bill-card__link {
   white-space: nowrap;
   text-align: center;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .politician-card__follow {
@@ -2060,6 +2110,14 @@ body {
 
   .politician-card {
     grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .politician-card__media,
+  .politician-card__media img,
+  .politician-card__photo,
+  .politician-card__avatar {
+    width: 48px;
+    height: 48px;
   }
 
   .politician-card__actions {
@@ -4870,6 +4928,145 @@ body {
 
 .policy-engage__bar-oppose {
   background: #f87171;
+}
+
+body.auth-gate-modal-open {
+  overflow: hidden;
+}
+
+.auth-gate-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.auth-gate-modal[hidden] {
+  display: none !important;
+}
+
+.auth-gate-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.auth-gate-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #1e293b;
+  border-radius: 1.1rem;
+  padding: 1.35rem 1.3rem 1.2rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 0.65rem;
+  color: #e8eef7;
+}
+
+.auth-gate-modal__close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.75rem;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.auth-gate-modal__eyebrow {
+  margin: 0;
+  font-family: var(--home-font-display, "Fraunces", serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+.auth-gate-modal__title {
+  margin: 0;
+  font-family: var(--home-font-display, "Fraunces", serif);
+  font-size: 1.45rem;
+  line-height: 1.2;
+  color: #f8fafc;
+  padding-right: 1.5rem;
+}
+
+.auth-gate-modal__body {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.auth-gate-modal__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+.auth-gate-modal__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.7rem;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+}
+
+.auth-gate-modal__btn--primary {
+  background: linear-gradient(135deg, #34d399 0%, #2dd4bf 100%);
+  color: #042f2e;
+}
+
+.auth-gate-modal__btn--ghost {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+}
+
+.auth-gate-modal__dismiss {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  justify-self: center;
+  margin-top: 0.15rem;
+}
+
+.auth-gate-modal__dismiss:hover {
+  color: #e2e8f0;
+}
+
+.scorecard-empty__hint {
+  margin: 0.35rem 0 0;
+  color: var(--muted, #94a3b8);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.scorecard-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.scorecard-empty__actions .refresh-btn {
+  text-decoration: none;
 }
 
 .policy-action-modal {

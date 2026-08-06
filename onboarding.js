@@ -453,8 +453,8 @@
       return;
     }
 
-    const user = await requireUser();
-    if (!user) return;
+  const user = await requireUser({ forceRedirect: true, next: "onboarding.html" });
+  if (!user) return;
 
     setStatus("Loading key votes…", "loading");
     try {

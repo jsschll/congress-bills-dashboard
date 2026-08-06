@@ -155,9 +155,15 @@ function escapeProfileHtml(value) {
 }
 
 function requireAuthRedirect() {
-  const next = encodeURIComponent(
-    `${window.location.pathname}${window.location.search}`
-  );
+  if (typeof promptAuthGate === "function") {
+    promptAuthGate({
+      next: "profile.html",
+      title: "Your profile is one step away",
+      body: "Create a free account to save your location, follow representatives, and keep a personal Action Match.",
+    });
+    return;
+  }
+  const next = encodeURIComponent("profile.html");
   window.location.href = `auth.html?next=${next}`;
 }
 
@@ -2030,6 +2036,10 @@ registrationForm?.addEventListener("submit", async (event) => {
   await bootNav("profile");
   currentUser = await getUser();
   if (!currentUser) {
+    setProfileStatus(
+      "Sign in to view your profile, saved location, and Action Match.",
+      "loading"
+    );
     requireAuthRedirect();
     return;
   }

@@ -406,6 +406,19 @@ async function renderAppNav(activePage = "home") {
     }
     syncHeaderAuth(null);
     buildLoggedOutActions(actions, activePage);
+    // Profile stays gated — open contextual auth modal instead of dumping guests
+    // onto auth.html mid-browse.
+    nav.querySelectorAll('a[href="profile.html"]').forEach((link) => {
+      link.addEventListener("click", (event) => {
+        if (typeof promptAuthGate !== "function") return;
+        event.preventDefault();
+        promptAuthGate({
+          next: "profile.html",
+          title: "Your profile is one step away",
+          body: "Create a free account to save your location, follow representatives, and keep a personal Action Match.",
+        });
+      });
+    });
     if (!isSupabaseConfigured()) {
       const hint = document.createElement("span");
       hint.className = "app-nav__hint";

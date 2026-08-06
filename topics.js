@@ -121,6 +121,19 @@ async function follow(kind, value) {
   if (!cleaned) return;
   if (isFollowing(kind, cleaned)) return;
 
+  if (!currentUser) {
+    if (typeof promptAuthGate === "function") {
+      promptAuthGate({
+        next: "topics.html",
+        title: "Follow topics with a free account",
+        body: "Create a free account to track topics, receive personalized alerts, and contact your representatives directly.",
+      });
+    } else {
+      await requireUser({ next: "topics.html" });
+    }
+    return;
+  }
+
   setTopicsStatus("Saving…", "loading");
   const client = getSupabase();
   const { error } = await client.from("followed_topics").insert({
@@ -194,12 +207,21 @@ policyFilter.addEventListener("input", renderPolicyAreas);
     return;
   }
 
-  currentUser = await requireUser();
-  if (!currentUser) return;
+  currentUser = (await getUser().catch(() => null)) || null;
 
   try {
-    await loadFollows();
-    renderFollowing();
+    if (currentUser) {
+      await loadFollows();
+      renderFollowing();
+    } else {
+      follows = [];
+      followingList.replaceChildren();
+      const empty = document.createElement("p");
+      empty.className = "muted-copy";
+      empty.textContent =
+        "Browse policy areas below. Sign in to save topics and get personalized alerts.";
+      followingList.append(empty);
+    }
     renderPolicyAreas();
   } catch (error) {
     console.error(error);

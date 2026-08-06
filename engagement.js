@@ -36,11 +36,34 @@
     return "Federal";
   }
 
-  function redirectToAuth() {
-    const next = encodeURIComponent(
-      `${window.location.pathname}${window.location.search}`
-    );
-    window.location.href = `auth.html?next=${next}`;
+  function redirectToAuth(reason = "action") {
+    const next =
+      typeof currentPageNextPath === "function"
+        ? currentPageNextPath()
+        : `${window.location.pathname}${window.location.search}`.replace(
+            /^\//,
+            ""
+          );
+    if (typeof promptAuthGate === "function") {
+      const copy =
+        reason === "follow"
+          ? {
+              title: "Follow bills with a free account",
+              body: "Create a free account to follow bills, get alerts when they move, and keep a personal watchlist.",
+            }
+          : reason === "stance"
+            ? {
+                title: "Save your position",
+                body: "Create a free account to record Support or Oppose, build your Action Match, and contact your representatives.",
+              }
+            : {
+                title: "Take action with a free account",
+                body: "Create a free account to track topics, receive personalized alerts, and contact your representatives directly.",
+              };
+      promptAuthGate({ next, ...copy });
+      return;
+    }
+    window.location.href = `auth.html?next=${encodeURIComponent(next)}`;
   }
 
   async function fetchLookup(query) {
@@ -258,7 +281,7 @@
     const client = getSupabase();
     const user = await getUser();
     if (!client || !user) {
-      redirectToAuth();
+      redirectToAuth("follow");
       return { following: false, changed: false };
     }
     if (!item?.id) return { following: false, changed: false };
@@ -758,7 +781,7 @@ Sincerely,
   async function openTakeAction(item) {
     const user = await getUser();
     if (!user) {
-      redirectToAuth();
+      redirectToAuth("action");
       return;
     }
     if (!state.homeAddress) {
@@ -832,7 +855,7 @@ Sincerely,
     const client = getSupabase();
     const user = await getUser();
     if (!client || !user) {
-      redirectToAuth();
+      redirectToAuth("stance");
       return;
     }
     if (!item?.id) return;

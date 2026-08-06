@@ -592,9 +592,13 @@ function bindFollowButton(person) {
 
   button.addEventListener("click", async () => {
     if (!followUser) {
-      window.location.href = `auth.html?next=${encodeURIComponent(
-        `${window.location.pathname}${window.location.search}`
-      )}`;
+      if (typeof promptAuthGate === "function") {
+        promptAuthGate({
+          next: currentPageNextPath?.() || "politician.html",
+          title: "Follow officials with a free account",
+          body: "Create a free account to follow representatives, save votes, and get alerts when they act.",
+        });
+      }
       return;
     }
     button.disabled = true;
@@ -1471,10 +1475,30 @@ function setNotesStatus(message, type = "loading") {
 }
 
 function authNextHref() {
-  const next = encodeURIComponent(
-    `${window.location.pathname}${window.location.search}`
-  );
-  return `auth.html?next=${next}`;
+  const next =
+    typeof currentPageNextPath === "function"
+      ? currentPageNextPath()
+      : `${window.location.pathname}${window.location.search}`.replace(
+          /^\//,
+          ""
+        );
+  return typeof authHrefForNext === "function"
+    ? authHrefForNext(next)
+    : `auth.html?next=${encodeURIComponent(next)}`;
+}
+
+function promptPoliticianAuth(copy = {}) {
+  if (typeof promptAuthGate === "function") {
+    promptAuthGate({
+      next: currentPageNextPath?.() || "politician.html",
+      title: copy.title || "Create a free account",
+      body:
+        copy.body ||
+        "Create a free account to track topics, receive personalized alerts, and contact your representatives directly.",
+    });
+    return;
+  }
+  window.location.href = authNextHref();
 }
 
 function noteHasContent() {
@@ -1708,7 +1732,10 @@ async function loadPoliticianNote(person, user) {
 async function savePoliticianNote(person, user) {
   const client = typeof getSupabase === "function" ? getSupabase() : null;
   if (!client || !user) {
-    window.location.href = authNextHref();
+    promptPoliticianAuth({
+      title: "Save notes with a free account",
+      body: "Create a free account to keep private notes on meetings and follow-ups with your representatives.",
+    });
     return;
   }
   const body = String(noteBodyInput?.value || "").trim();
