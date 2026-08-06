@@ -1990,8 +1990,12 @@
   function renderDonor(el, finance, options = {}) {
     if (!el) return;
     if (!finance) {
-      el.innerHTML =
-        '<p class="scorecard-empty">Campaign finance data is not available yet.</p>';
+      el.innerHTML = `
+        <p class="scorecard-card__eyebrow">Donor Alignment</p>
+        <h3 class="scorecard-card__title">Where the money comes from</h3>
+        <p class="scorecard-empty">
+          FEC campaign-finance totals are not available for this member yet.
+        </p>`;
       return;
     }
     const selectedIndustry = String(options.selectedIndustry || "").trim();
@@ -2033,7 +2037,7 @@
             ? `${escapeHtml(formatUsd(finance.totalRaised))}${
                 finance.cycle ? ` · ${escapeHtml(finance.cycle)}` : ""
               }`
-            : "Cycle totals unavailable"
+            : "FEC cycle totals unavailable"
         }
       </p>
       <div class="scorecard-bar" role="img" aria-label="Funding mix">
@@ -2056,9 +2060,13 @@
           )
           .join("")}
       </ul>
-      <h4 class="scorecard-subtitle">Top 5 industry contributors</h4>
+      <h4 class="scorecard-subtitle">Top contribution sources</h4>
       <p class="scorecard-industries__hint">
-        Tap an industry to filter Action Match and Recent Votes.
+        From FEC itemized receipts${
+          finance.cycle
+            ? ` · cycle ${escapeHtml(String(finance.cycle))}`
+            : ""
+        }. Tap a source to filter Action Match and Recent Votes.
       </p>
       ${
         industries.length
@@ -2087,7 +2095,7 @@
                 })
                 .join("")}
             </ol>`
-          : `<p class="scorecard-empty">No industry contributor rows yet.</p>`
+          : `<p class="scorecard-empty">No itemized employer totals for this FEC cycle yet.</p>`
       }
       ${
         selectedIndustry
