@@ -1052,19 +1052,31 @@ function renderDeltaGroup(label, values, tone) {
   `;
 }
 
+function looksLikeTruncatedHeadline(text) {
+  const value = String(text || "").trim();
+  if (!value) return true;
+  if (/[.!?…]"?$/.test(value)) return false;
+  // Abrupt cutoffs like "pull U.S" / "the Pres" / trailing connector words.
+  if (/\b(u\.s|the|a|an|to|of|for|and|or|with|from|by|in|on)\s*$/i.test(value)) {
+    return true;
+  }
+  if (value.length < 28) return false;
+  // Incomplete-looking endings without terminal punctuation.
+  return !/[.!?]$/.test(value) && /\s[A-Za-z]{1,3}$/.test(value);
+}
+
 function billCardHeadline(item, pitch) {
   const shortTitle = String(item.short_title || item.shortTitle || "").trim();
-  if (shortTitle && shortTitle.length <= 110) return shortTitle;
-  if (pitch) {
-    const first = pitch.split(/(?<=[.!?])\s+/)[0] || pitch;
-    return clampVoteHeadline(first, 16);
+  if (shortTitle && shortTitle.length <= 110 && !looksLikeTruncatedHeadline(shortTitle)) {
+    return shortTitle;
   }
-  return clampVoteHeadline(item.title || "Legislation", 14);
+  if (pitch) return firstCompleteSentence(pitch, 140);
+  return firstCompleteSentence(item.title || "Legislation", 120);
 }
 
 function renderBillCard(item) {
   const card = document.createElement("article");
-  card.className = "policy-bill-card compact-feed-card";
+  card.className = "policy-bill-card feed-social-card";
 
   const followed = isFollowedBill(item);
   const delta = item.deltaSummary || { added: [], changed: [], removed: [] };
@@ -1081,11 +1093,15 @@ function renderBillCard(item) {
     statusLabel.toLowerCase() !== pitch.toLowerCase() &&
     !/calendar no\.?\s*$/i.test(statusLabel);
   const headline = billCardHeadline(item, pitch);
-  const tags = [item.level, item.tags?.[0]].filter(Boolean).slice(0, 2);
+  const levelLabel = String(item.level || "Federal").trim() || "Federal";
+  const topic = String(item.tags?.[0] || item.policyArea || "").trim();
   const updated =
     formatRelativeDate(item.lastUpdated) || formatShortDate(item.lastUpdated);
-  const metaParts = [item.billNumber, item.jurisdiction, updated && `Updated ${updated}`]
-    .filter(Boolean);
+  const subParts = [
+    item.billNumber,
+    item.jurisdiction,
+    updated && `Updated ${updated}`,
+  ].filter(Boolean);
   const detailsId = `bill-details-${String(item.id || item.billNumber || Math.random())
     .replace(/[^a-zA-Z0-9_-]/g, "")
     .slice(0, 48)}`;
@@ -1097,42 +1113,59 @@ function renderBillCard(item) {
           ).toUpperCase()
         )}">${escapePolicyHtml(item.primarySponsor.name)}</a>`
       : escapePolicyHtml(item.primarySponsor?.name || "Sponsor unavailable");
+  const statusTone = /\b(pass|enact|sign|became law|agreed)\b/i.test(statusLabel)
+    ? "passed"
+    : /\b(fail|reject|veto|defeat)\b/i.test(statusLabel)
+      ? "failed"
+      : "neutral";
 
   card.innerHTML = `
-    <div class="vote-feed-card__main">
-      <div class="vote-feed-card__body">
-        <div class="vote-feed-card__tags" aria-label="Bill tags">
-          ${tags
-            .map(
-              (tag) =>
-                `<span class="vote-feed-card__tag">${escapePolicyHtml(
-                  tag
-                )}</span>`
-            )
-            .join("")}
-        </div>
-        <h2 class="vote-feed-card__headline">${escapePolicyHtml(headline)}</h2>
+    <div class="feed-social-card__top">
+      <div class="feed-social-card__badges">
+        <span class="feed-social-card__badge is-chamber">${escapePolicyHtml(
+          levelLabel
+        )}</span>
         ${
-          metaParts.length
-            ? `<p class="vote-feed-card__meta">${escapePolicyHtml(
-                metaParts.join(" · ")
-              )}</p>`
+          topic
+            ? `<span class="feed-social-card__badge is-topic">${escapePolicyHtml(
+                topic
+              )}</span>`
             : ""
         }
       </div>
+      ${
+        showStatus
+          ? `<span class="feed-social-card__result is-${statusTone}">${escapePolicyHtml(
+              statusLabel
+            )}</span>`
+          : ""
+      }
     </div>
-    <button
-      type="button"
-      class="vote-feed-card__toggle"
-      aria-expanded="false"
-      aria-controls="${detailsId}"
-    >
-      Tap for more
-    </button>
-    <div class="vote-feed-card__details" id="${detailsId}" hidden>
+    <div class="feed-social-card__middle">
+      <h2 class="feed-social-card__headline">${escapePolicyHtml(headline)}</h2>
+      ${
+        subParts.length
+          ? `<p class="feed-social-card__sub">${escapePolicyHtml(
+              subParts.join(" · ")
+            )}</p>`
+          : ""
+      }
+    </div>
+    <div class="feed-social-card__bar">
+      <button
+        type="button"
+        class="feed-social-card__more"
+        aria-expanded="false"
+        aria-controls="${detailsId}"
+      >
+        <span>Tap for details / AI</span>
+        <span class="feed-social-card__chevron" aria-hidden="true">▾</span>
+      </button>
+    </div>
+    <div class="feed-social-card__details" id="${detailsId}" hidden>
       <div class="policy-bill-card__header">
         <div>
-          <p class="vote-feed-card__official-title">${escapePolicyHtml(
+          <p class="feed-social-card__official">${escapePolicyHtml(
             item.title || "Legislation"
           )}</p>
           <p class="policy-bill-card__meta">
@@ -1148,17 +1181,8 @@ function renderBillCard(item) {
           ${followed ? "Following" : "Follow bill"}
         </button>
       </div>
-      <section class="policy-bill-card__summary" aria-label="Summary">
-        <p class="vote-feed-card__summary-text">${escapePolicyHtml(
-          pitch || "Summary unavailable."
-        )}</p>
-        ${
-          showStatus
-            ? `<p class="policy-bill-card__status">${escapePolicyHtml(
-                statusLabel
-              )}</p>`
-            : ""
-        }
+      <section class="feed-social-card__summary" aria-label="Summary">
+        <p>${escapePolicyHtml(pitch || "Summary unavailable.")}</p>
       </section>
       <div class="policy-bill-card__progress" role="list" aria-label="Bill status">
         ${(item.allSteps || [])
@@ -1208,22 +1232,30 @@ function renderBillCard(item) {
     </div>
   `;
 
-  const toggle = card.querySelector(".vote-feed-card__toggle");
-  const details = card.querySelector(".vote-feed-card__details");
+  const toggle = card.querySelector(".feed-social-card__more");
+  const details = card.querySelector(".feed-social-card__details");
   const setExpanded = (open) => {
     card.classList.toggle("is-expanded", open);
     if (details) details.hidden = !open;
     if (toggle) {
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      toggle.textContent = open ? "Show less" : "Tap for more";
+      const label = toggle.querySelector("span");
+      if (label) {
+        label.textContent = open ? "Show less" : "Tap for details / AI";
+      }
+      const chevron = toggle.querySelector(".feed-social-card__chevron");
+      if (chevron) chevron.textContent = open ? "▴" : "▾";
     }
   };
-  toggle?.addEventListener("click", () => {
+  toggle?.addEventListener("click", (event) => {
+    event.stopPropagation();
     setExpanded(!card.classList.contains("is-expanded"));
   });
-  card.querySelector(".vote-feed-card__main")?.addEventListener("click", () => {
-    if (!card.classList.contains("is-expanded")) setExpanded(true);
-  });
+  card
+    .querySelector(".feed-social-card__middle")
+    ?.addEventListener("click", () => {
+      if (!card.classList.contains("is-expanded")) setExpanded(true);
+    });
 
   card
     .querySelector(".policy-bill-card__follow")
@@ -1325,62 +1357,125 @@ function voteCardDateLabel(item) {
   return formatShortDate(raw) || String(raw).slice(0, 10);
 }
 
-function clampVoteHeadline(text, maxWords = 16) {
+function firstCompleteSentence(text, maxChars = 140) {
   const cleaned = String(text || "")
     .replace(/\s+/g, " ")
     .trim();
   if (!cleaned) return "";
-  const words = cleaned.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return cleaned.replace(/[.]+$/, "");
-  return `${words
-    .slice(0, maxWords)
-    .join(" ")
-    .replace(/[,:;–—-]+$/, "")}…`;
+
+  // Mask abbreviations so "U.S. troops" is not treated as a sentence break.
+  const placeholders = [];
+  const protectedText = cleaned.replace(
+    /\b(?:U\.S\.A\.|U\.S\.|Jr\.|Sr\.|Mr\.|Mrs\.|Ms\.|Dr\.|vs\.|etc\.|[A-Z]\.)/gi,
+    (match) => {
+      const idx = placeholders.length;
+      placeholders.push(match);
+      return `\u0000${idx}\u0000`;
+    }
+  );
+  const endMatch = protectedText.match(/^(.+?[.!?])(?:\s+[A-Z0-9“"]|$)/);
+  const sentence = (endMatch?.[1] || protectedText)
+    .replace(/\u0000(\d+)\u0000/g, (_, idx) => placeholders[Number(idx)] || "")
+    .trim();
+
+  if (sentence.length <= maxChars) return sentence;
+
+  // Prefer a clean clause break over mid-word truncation.
+  const clipped = sentence.slice(0, maxChars);
+  const breakAt = Math.max(
+    clipped.lastIndexOf("; "),
+    clipped.lastIndexOf(", "),
+    clipped.lastIndexOf(" — "),
+    clipped.lastIndexOf(" - "),
+    clipped.lastIndexOf(" ")
+  );
+  if (breakAt > 48) {
+    return `${clipped.slice(0, breakAt).replace(/[,:;–—-]+$/, "")}…`;
+  }
+  return `${clipped.trim()}…`;
 }
 
 function voteCardHeadline(item, copy = {}) {
   const shortTitle = String(
     copy.shortTitle || item.short_title || item.shortTitle || ""
   ).trim();
-  if (shortTitle && shortTitle.length <= 110) return shortTitle;
+  if (shortTitle && !looksLikeTruncatedHeadline(shortTitle)) {
+    return firstCompleteSentence(shortTitle, 120);
+  }
 
   const summary = String(
     copy.summary ||
       item.card_summary ||
       item.cardSummary ||
       item.plain_summary ||
+      item.plainSummary ||
       item.shortPitch ||
       item.summary ||
       ""
   ).trim();
-  if (summary) {
-    const first = summary.split(/(?<=[.!?])\s+/)[0] || summary;
-    return clampVoteHeadline(first, 16);
-  }
+  if (summary) return firstCompleteSentence(summary, 140);
+
+  if (shortTitle) return firstCompleteSentence(shortTitle, 120);
 
   const title =
     String(item.title || "").trim() ||
     String(item.voteQuestion || "").trim() ||
     "Congressional vote";
-  return clampVoteHeadline(title, 14);
+  return firstCompleteSentence(title, 120);
 }
 
-function voteCardTags(item, chamberLabel, motion) {
-  const tags = [];
-  if (chamberLabel) tags.push(chamberLabel);
-  const motionLabel = String(motion?.label || "").trim();
-  if (motionLabel && motionLabel.toLowerCase() !== "floor vote") {
-    tags.push(motionLabel);
-  } else if (item.result) {
-    tags.push(String(item.result).trim());
+function inferVoteTopic(item = {}) {
+  const explicit = String(
+    item.primaryCategory ||
+      item.primary_category ||
+      item.category ||
+      item.subjectCategory ||
+      item.policyArea ||
+      item.tags?.[0] ||
+      ""
+  ).trim();
+  if (explicit) return explicit;
+
+  const haystack = [
+    item.short_title,
+    item.shortTitle,
+    item.plain_summary,
+    item.summary,
+    item.title,
+    item.voteQuestion,
+  ]
+    .join(" ")
+    .toLowerCase();
+  const rules = [
+    ["Healthcare", /\b(health|medicare|medicaid|hospital|drug|pharma|vaccine)\b/],
+    ["Defense", /\b(defense|military|armed|nato|war|troop|veteran)\b/],
+    ["Foreign Policy", /\b(foreign|sanction|diplomacy|israel|ukraine|china|treaty)\b/],
+    ["Economy & Taxes", /\b(tax|budget|appropriat|economy|finance|bank|tariff)\b/],
+    ["Energy & Environment", /\b(energy|climate|oil|gas|epa|environment|renewable)\b/],
+    ["Immigration", /\b(immigra|border|asylum|visa|deport)\b/],
+    ["Civil Rights", /\b(civil rights|voting rights|discrim|gun|justice)\b/],
+    ["Tech", /\b(tech|broadband|internet|ai\b|cyber|fcc|data)\b/],
+  ];
+  for (const [label, re] of rules) {
+    if (re.test(haystack)) return label;
   }
-  return tags.slice(0, 2);
+  return "";
+}
+
+function formatVoteResultBadge(result) {
+  const raw = String(result || "").trim();
+  if (!raw) return { label: "", tone: "neutral" };
+  const lower = raw.toLowerCase();
+  let tone = "neutral";
+  if (/\b(pass|agreed|confirm|adopt|carried)\b/.test(lower)) tone = "passed";
+  else if (/\b(fail|reject|defeat|not agree|tabled)\b/.test(lower))
+    tone = "failed";
+  return { label: raw, tone };
 }
 
 function renderVoteCard(item) {
   const card = document.createElement("article");
-  card.className =
-    "vote-feed-card vote-feed-card--compact compact-feed-card policy-bill-card";
+  card.className = "feed-social-card vote-feed-card";
 
   const title =
     String(item.title || "").trim() ||
@@ -1390,16 +1485,7 @@ function renderVoteCard(item) {
   const copy =
     typeof resolveVoteCardCopy === "function"
       ? resolveVoteCardCopy(item)
-      : {
-          yeaLabel:
-            String(item.yeaLabel || item.yea_label || "").trim() ||
-            "Support",
-          nayLabel:
-            String(item.nayLabel || item.nay_label || "").trim() ||
-            "Oppose",
-        };
-  const yeaLabel = copy.yeaLabel || "Support";
-  const nayLabel = copy.nayLabel || "Oppose";
+      : { yeaLabel: "Support", nayLabel: "Oppose" };
   const yeaMeans = String(
     copy.yeaMeans || item.yeaMeans || item.yea_means || ""
   ).trim();
@@ -1410,6 +1496,7 @@ function renderVoteCard(item) {
     copy.displaySummary?.full ||
       copy.summary ||
       item.plain_summary ||
+      item.plainSummary ||
       item.summary ||
       "No summary available for this vote."
   ).trim();
@@ -1431,117 +1518,137 @@ function renderVoteCard(item) {
           detail: voteKindLabel(item.voteKind, item),
           isProcedural: false,
         };
-  const tags = voteCardTags(item, chamberLabel, motion);
-  const metaParts = [
+  const topic = inferVoteTopic(item);
+  const resultBadge = formatVoteResultBadge(item.result);
+  const subParts = [
     billNumber,
     dateLabel,
-    item.result ? String(item.result).trim() : "",
+    motion.label && motion.label !== "Floor Vote" ? motion.label : "",
   ].filter(Boolean);
-  const detailsId = `vote-details-${String(item.id || item.rollCallId || Math.random())
+  const detailsId = `vote-details-${String(
+    item.id || item.rollCallId || Math.random()
+  )
     .replace(/[^a-zA-Z0-9_-]/g, "")
     .slice(0, 48)}`;
 
   card.innerHTML = `
-    <div class="vote-feed-card__main">
-      <div class="vote-feed-card__body">
-        <div class="vote-feed-card__tags" aria-label="Vote tags">
-          ${tags
-            .map(
-              (tag) =>
-                `<span class="vote-feed-card__tag">${escapePolicyHtml(
-                  tag
-                )}</span>`
-            )
-            .join("")}
-        </div>
-        <h2 class="vote-feed-card__headline">${escapePolicyHtml(headline)}</h2>
+    <div class="feed-social-card__top">
+      <div class="feed-social-card__badges">
+        <span class="feed-social-card__badge is-chamber">${escapePolicyHtml(
+          chamberLabel
+        )}</span>
         ${
-          metaParts.length
-            ? `<p class="vote-feed-card__meta">${escapePolicyHtml(
-                metaParts.join(" · ")
-              )}</p>`
+          topic
+            ? `<span class="feed-social-card__badge is-topic">${escapePolicyHtml(
+                topic
+              )}</span>`
             : ""
         }
       </div>
+      ${
+        resultBadge.label
+          ? `<span class="feed-social-card__result is-${
+              resultBadge.tone
+            }">${escapePolicyHtml(resultBadge.label)}</span>`
+          : ""
+      }
     </div>
-    <button
-      type="button"
-      class="vote-feed-card__toggle"
-      aria-expanded="false"
-      aria-controls="${detailsId}"
-    >
-      Tap for more
-    </button>
-    <div class="vote-feed-card__details" id="${detailsId}" hidden>
-      <p class="vote-feed-card__official-title">${escapePolicyHtml(title)}</p>
+    <div class="feed-social-card__middle">
+      <h2 class="feed-social-card__headline">${escapePolicyHtml(headline)}</h2>
+      ${
+        subParts.length
+          ? `<p class="feed-social-card__sub">${escapePolicyHtml(
+              subParts.join(" · ")
+            )}</p>`
+          : ""
+      }
+    </div>
+    <div class="feed-social-card__bar">
+      <button
+        type="button"
+        class="feed-social-card__more"
+        aria-expanded="false"
+        aria-controls="${detailsId}"
+      >
+        <span>Tap for details / AI</span>
+        <span class="feed-social-card__chevron" aria-hidden="true">▾</span>
+      </button>
+    </div>
+    <div class="feed-social-card__details" id="${detailsId}" hidden>
+      <p class="feed-social-card__official">${escapePolicyHtml(title)}</p>
       ${
         motion.isProcedural
-          ? `<p class="vote-feed-card__motion-note">${escapePolicyHtml(
+          ? `<p class="feed-social-card__note">${escapePolicyHtml(
               motion.detail || motion.label
             )}</p>`
           : ""
       }
-      <section class="vote-feed-card__summary" aria-label="Full summary">
-        <p class="vote-feed-card__summary-text">${escapePolicyHtml(
-          fullSummary
-        )}</p>
+      <section class="feed-social-card__summary" aria-label="Full summary">
+        <p>${escapePolicyHtml(fullSummary)}</p>
       </section>
       ${
         yeaMeans || nayMeans
-          ? `<div class="vote-feed-card__meanings" aria-label="Action impact">
-        <div class="vote-feed-card__meaning is-yea">
+          ? `<div class="feed-social-card__meanings" aria-label="Action impact">
+        <div class="feed-social-card__meaning is-yea">
           <strong>Yea means</strong>
           <p>${escapePolicyHtml(yeaMeans || "—")}</p>
         </div>
-        <div class="vote-feed-card__meaning is-nay">
+        <div class="feed-social-card__meaning is-nay">
           <strong>Nay means</strong>
           <p>${escapePolicyHtml(nayMeans || "—")}</p>
         </div>
       </div>`
           : ""
       }
-      <a class="bill-card__link vote-feed-card__roll-link" href="${escapePolicyHtml(
+      <a class="bill-card__link" href="${escapePolicyHtml(
         item.clerkUrl || item.officialUrl || "#"
       )}" target="_blank" rel="noopener noreferrer">Open roll call</a>
     </div>
   `;
 
-  const toggle = card.querySelector(".vote-feed-card__toggle");
-  const details = card.querySelector(".vote-feed-card__details");
+  const toggle = card.querySelector(".feed-social-card__more");
+  const details = card.querySelector(".feed-social-card__details");
   const setExpanded = (open) => {
     card.classList.toggle("is-expanded", open);
     if (details) details.hidden = !open;
     if (toggle) {
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      toggle.textContent = open ? "Show less" : "Tap for more";
+      const label = toggle.querySelector("span");
+      if (label) label.textContent = open ? "Show less" : "Tap for details / AI";
+      const chevron = toggle.querySelector(".feed-social-card__chevron");
+      if (chevron) chevron.textContent = open ? "▴" : "▾";
     }
   };
-  toggle?.addEventListener("click", () => {
+  toggle?.addEventListener("click", (event) => {
+    event.stopPropagation();
     setExpanded(!card.classList.contains("is-expanded"));
   });
-  card.querySelector(".vote-feed-card__main")?.addEventListener("click", () => {
-    if (!card.classList.contains("is-expanded")) setExpanded(true);
-  });
+  card
+    .querySelector(".feed-social-card__middle")
+    ?.addEventListener("click", () => {
+      if (!card.classList.contains("is-expanded")) setExpanded(true);
+    });
 
   if (window.PolicyEngagement?.mountVote) {
     window.PolicyEngagement.mountVote(card, item, {
-      supportLabel: yeaLabel,
-      opposeLabel: nayLabel,
+      supportLabel: "Support",
+      opposeLabel: "Oppose",
       prompt: "",
       compact: true,
-      showFollow: true,
+      showFollow: false,
       showAskAi: true,
       showWhoVoted: true,
-      showAlignment: true,
-      whoVotedHint: `Tap ${yeaLabel} or ${nayLabel} to compare with representatives.`,
+      showAlignment: false,
+      whoVotedHint: "Tap Support or Oppose to compare with representatives.",
     });
   } else if (window.PolicyEngagement?.mount) {
     window.PolicyEngagement.mount(card, item, {
-      supportLabel: yeaLabel,
-      opposeLabel: nayLabel,
+      supportLabel: "Support",
+      opposeLabel: "Oppose",
       prompt: "",
       compact: true,
       showTakeAction: false,
+      showAskAi: true,
     });
   }
 
@@ -1663,26 +1770,16 @@ function renderVotesFeed() {
       votesFeedEmpty.hidden = false;
       votesFeedEmpty.innerHTML = votesSubject
         ? `<h2>No votes in this subject</h2><p>Try another subject chip or clear the filter.</p>`
-        : `<h2>No processed votes yet</h2><p>Run vote sync to populate <code>processed_votes</code>, then refresh.</p>`;
+        : `<h2>No votes yet</h2><p>Check back soon — new roll calls show up here after each floor session.</p>`;
     }
     setVotesFeedStatus("", "success");
     return;
   }
   if (votesFeedEmpty) votesFeedEmpty.hidden = true;
   votesFeedList.append(...votesItems.map(renderVoteCard));
-  const houseCount = votesItems.filter(
-    (item) => String(item.chamber || "").toLowerCase() === "house"
-  ).length;
-  const senateCount = votesItems.filter(
-    (item) => String(item.chamber || "").toLowerCase() === "senate"
-  ).length;
-  const chamberBits = [];
-  if (houseCount) chamberBits.push(`${houseCount} House`);
-  if (senateCount) chamberBits.push(`${senateCount} Senate`);
+  // Keep production status quiet — no developer/debug counts.
   setVotesFeedStatus(
-    `${votesItems.length} vote${votesItems.length === 1 ? "" : "s"} from processed_votes${
-      chamberBits.length ? ` (${chamberBits.join(" · ")})` : ""
-    }${votesQuizMode ? " · Quick Match" : ""}`,
+    votesQuizMode ? "Quick Match: pick Support or Oppose on a few recent votes." : "",
     "success"
   );
 }
