@@ -76,6 +76,7 @@ const SELECT_COLS = [
   "plain_summary",
   "card_summary",
   "takeaway",
+  "onboarding_question",
   "key_points",
   "pro_argument",
   "con_argument",
@@ -167,6 +168,17 @@ function needsClaudeSummary(row = {}) {
   if (!shortTitle || isUnknownClaudeValue(shortTitle)) return true;
   if (!takeaway || isUnknownClaudeValue(takeaway)) return true;
   if (!pro || isUnknownClaudeValue(pro)) return true;
+
+  const onboardingQuestion = String(row.onboarding_question || "").trim();
+  if (
+    !onboardingQuestion ||
+    isUnknownClaudeValue(onboardingQuestion) ||
+    !/\?$/.test(onboardingQuestion) ||
+    /\b[A-Z]\?$/.test(onboardingQuestion) ||
+    /\bwhich\b/i.test(onboardingQuestion)
+  ) {
+    return true;
+  }
 
   let points = [];
   if (Array.isArray(keyPoints)) {
@@ -267,6 +279,8 @@ function buildUpdatePayload(card = {}) {
   if (scrubUnknown(card.nay_impact)) payload.nay_impact = scrubUnknown(card.nay_impact);
   const takeaway = scrubUnknown(card.takeaway) || shortTitle;
   if (takeaway) payload.takeaway = takeaway;
+  const onboardingQuestion = scrubUnknown(card.onboarding_question);
+  if (onboardingQuestion) payload.onboarding_question = onboardingQuestion;
   if (scrubUnknown(card.pro_argument)) payload.pro_argument = scrubUnknown(card.pro_argument);
   if (scrubUnknown(card.con_argument)) payload.con_argument = scrubUnknown(card.con_argument);
   if (Array.isArray(card.key_points)) {
