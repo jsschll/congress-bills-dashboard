@@ -3511,7 +3511,18 @@
           !address &&
           session?.representatives?.length
         ) {
-          payload = session;
+          // Prefer a fresh district lookup when session still has a home ZIP /
+          // address (covers sessions poisoned by an earlier Hawley deep link).
+          const sessionZip = session?.query?.zipCode || null;
+          const sessionAddress = session?.query?.address || null;
+          if (sessionZip || sessionAddress) {
+            payload = await fetchBundle({
+              zipCode: sessionZip,
+              address: sessionAddress,
+            });
+          } else {
+            payload = session;
+          }
         } else if (
           !id &&
           !bioguideId &&
@@ -3525,8 +3536,14 @@
           );
           return;
         } else {
+          // Never reuse a prior deep-link activeId (e.g. Hawley) when looking up
+          // by ZIP/address — that made "Find my representatives" return Hawley.
           payload = await fetchBundle({
-            id: id || (!bioguideId && !politicianId ? sessionActiveId : null),
+            id:
+              id ||
+              (!bioguideId && !politicianId && !zipCode && !address
+                ? sessionActiveId
+                : null),
             bioguideId,
             politicianId,
             zipCode,
@@ -3551,18 +3568,38 @@
           payload.representatives?.[0]?.profile?.id ||
           null;
 
-        writeSession({
-          ...payload,
-          activeId: state.activeId,
-          query: {
-            // Preserve the user's home ZIP/address across deep links so
-            // "my representatives" still works after opening Hawley etc.
-            zipCode: zipCode || session?.query?.zipCode || null,
-            address: address || session?.query?.address || null,
-            bioguideId,
-            politicianId,
-          },
-        });
+        // Deep links must not overwrite the user's district roster in session.
+        // Otherwise the next bare / ZIP visit can resurrect Hawley as "my reps".
+        const priorHasDistrict =
+          Boolean(session?.query?.zipCode || session?.query?.address) &&
+          Array.isArray(session?.representatives) &&
+          session.representatives.length > 0;
+        if (isDeepLink && priorHasDistrict) {
+          writeSession({
+            ...session,
+            query: {
+              ...session.query,
+              bioguideId: null,
+              politicianId: null,
+              lastViewedBioguideId: bioguideId || politicianId || null,
+            },
+          });
+        } else {
+          writeSession({
+            ...payload,
+            activeId: state.activeId,
+            query: {
+              zipCode: zipCode || session?.query?.zipCode || null,
+              address: address || session?.query?.address || null,
+              // Don't persist deep-link bioguide into the "my reps" session.
+              bioguideId: isDeepLink ? null : bioguideId,
+              politicianId: isDeepLink ? null : politicianId,
+              lastViewedBioguideId: isDeepLink
+                ? bioguideId || politicianId || null
+                : null,
+            },
+          });
+        }
 
         if (heading) {
           const singleName = payload.representative?.profile?.name;
