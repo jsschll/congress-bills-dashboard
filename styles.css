@@ -8389,10 +8389,16 @@ body.scorecard-match-modal-open {
   border-color: rgba(251, 191, 36, 0.3);
 }
 
-.scorecard-vote__motion-note {
+.scorecard-vote__motion-note,
+.scorecard-vote__motion-line {
   margin: 0.25rem 0 0.15rem;
   font-size: 0.75rem;
   color: var(--score-muted, #94a3b8);
+}
+
+.scorecard-vote__motion-line {
+  font-weight: 600;
+  color: #7dd3fc;
 }
 
 .scorecard-vote__category {
