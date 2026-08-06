@@ -4,7 +4,7 @@
 (function () {
   const QUIZ_SIZE = 7;
   const KEY_VOTE_SELECT =
-    "roll_call_id, bill_id, title, short_title, card_summary, plain_summary, takeaway, yea_impact, nay_impact, what_it_does, primary_category, bill_number, bill_type, legislation_number, congress, session_number, roll_call_number, chamber, vote_date, is_key_vote, official_url, vote_kind";
+    "roll_call_id, bill_id, title, short_title, card_summary, plain_summary, takeaway, onboarding_question, yea_impact, nay_impact, what_it_does, primary_category, bill_number, bill_type, legislation_number, congress, session_number, roll_call_number, chamber, vote_date, is_key_vote, official_url, vote_kind";
 
   const els = {
     status: document.getElementById("voter-pulse-status"),
@@ -61,101 +61,74 @@
     return "representatives.html?pulse=1";
   }
 
-  /** Display label like "HR 134" / "SJRes 37" for natural quiz copy. */
-  function formatPulseBillLabel(billNumber, title) {
-    const raw = String(billNumber || "").trim();
-    if (raw) {
-      const match = raw.match(
-        /^(H\.?\s*J\.?\s*Res\.?|S\.?\s*J\.?\s*Res\.?|H\.?\s*Con\.?\s*Res\.?|S\.?\s*Con\.?\s*Res\.?|H\.?\s*R\.?|S\.?)\s*(\d+)\b/i
-      );
-      if (match) {
-        const typeKey = match[1]
-          .replace(/\./g, "")
-          .replace(/\s+/g, "")
-          .toUpperCase();
-        const typeMap = {
-          HR: "HR",
-          S: "S",
-          HJRES: "HJRes",
-          SJRES: "SJRes",
-          HCONRES: "HConRes",
-          SCONRES: "SConRes",
-        };
-        const type = typeMap[typeKey] || typeKey;
-        return `${type} ${match[2]}`;
-      }
-      return raw.replace(/\./g, "").replace(/\s+/g, " ").trim();
-    }
-    const fallback = String(title || "").trim();
-    return fallback || "this measure";
-  }
-
-  /**
-   * First complete sentence only — never ellipsize mid-phrase.
-   * (Avoids artifacts like "convicted of sexual?")
-   */
-  function completePulseSentence(text) {
-    const cleaned = String(text || "")
+  function collapsePulseWs(text) {
+    return String(text || "")
       .replace(/\s+/g, " ")
       .trim();
-    if (!cleaned) return "";
-    if (typeof firstMatchSentence === "function") {
-      // Large cap: keep a full sentence rather than chopping at ~200 chars.
-      return firstMatchSentence(cleaned, 480);
-    }
-    const match = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/);
-    let sentence = (match ? match[0] : cleaned).trim();
-    if (sentence && !/[.!?]$/.test(sentence)) sentence = `${sentence}.`;
-    return sentence;
   }
 
-  /** Turn a summary sentence into a "which …" relative clause. */
-  function toWhichClause(sentence) {
-    let clause = String(sentence || "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/[.!?]+$/, "");
-    if (!clause) return "";
-    clause = clause
-      .replace(
-        /^(this (bill|measure|resolution|vote|amendment)|the (bill|measure|resolution)|it)\s+/i,
-        ""
+  /** Reject mid-truncated / ungrammatical stubs like "which cancels D?" */
+  function looksBrokenQuestion(text) {
+    const q = collapsePulseWs(text);
+    if (!q) return true;
+    if (q.length < 24) return true;
+    if (/\b[A-Z]\?$/.test(q)) return true;
+    if (/\b(of|the|a|an|and|or|for|to|with|by|in|on|which|that|who)\?$/i.test(q)) {
+      return true;
+    }
+    if (/\bwhich\b/i.test(q) && /\b(H\.?R\.?|S\.?J\.?Res\.?|bill)\b/i.test(q)) {
+      return true;
+    }
+    if (
+      /\b(addressing|regarding|including|requiring|providing)\s+\w{1,4}\?$/i.test(
+        q
       )
-      .replace(/^(would|will|does|did)\s+/i, "")
-      .replace(/^(which|that)\s+/i, "")
-      .trim();
-    if (!clause) return "";
-    clause = clause.charAt(0).toLowerCase() + clause.slice(1);
-    return `which ${clause}`;
+    ) {
+      return true;
+    }
+    const words = q.replace(/\?+$/, "").split(/\s+/).filter(Boolean);
+    if (words.length < 5 || words.length > 28) return true;
+    return false;
+  }
+
+  function ensureQuestionMark(text) {
+    const q = collapsePulseWs(text).replace(/[.!]+$/, "");
+    if (!q) return "";
+    return /\?$/.test(q) ? q : `${q}?`;
   }
 
   /**
-   * Natural quiz question, e.g.
-   * "Do you support HR 134, which requires mandatory detention…?"
+   * Prefer Claude's dedicated onboarding_question. Fall back to takeaway or a
+   * complete standalone question — never stitch "Do you support [ID], which…".
    */
   function buildQuestionText(row) {
-    const billLabel = formatPulseBillLabel(
-      row.bill_number,
-      row.short_title || row.title
-    );
-    // Prefer full card/plain summaries over short yea_impact clauses that may
-    // have been word-capped upstream.
-    const impact = String(
-      row.card_summary ||
-        row.plain_summary ||
-        row.what_it_does ||
-        row.takeaway ||
-        row.summary ||
-        row.yea_impact ||
-        ""
-    ).trim();
-    const sentence = completePulseSentence(impact);
-    if (sentence) {
-      if (/\?$/.test(sentence)) return sentence;
-      const which = toWhichClause(sentence);
-      if (which) return `Do you support ${billLabel}, ${which}?`;
+    const dedicated = collapsePulseWs(row.onboarding_question || "");
+    if (dedicated && !looksBrokenQuestion(ensureQuestionMark(dedicated))) {
+      return ensureQuestionMark(dedicated);
     }
-    return `Do you support ${billLabel}?`;
+
+    const takeaway = collapsePulseWs(row.takeaway || "");
+    if (takeaway) {
+      if (/\?$/.test(takeaway) && !looksBrokenQuestion(takeaway)) {
+        return takeaway;
+      }
+      // Headline → complete question without bill-number stitching.
+      const topic = takeaway
+        .replace(/[.!?]+$/, "")
+        .replace(/^(a|an|the)\s+/i, "");
+      const fromTakeaway = ensureQuestionMark(
+        `Do you support ${topic.charAt(0).toLowerCase()}${topic.slice(1)}`
+      );
+      if (!looksBrokenQuestion(fromTakeaway)) return fromTakeaway;
+    }
+
+    const topic = collapsePulseWs(row.short_title || "").replace(/[.!?]+$/, "");
+    if (topic && topic.length >= 8) {
+      const fromTitle = ensureQuestionMark(`Do you support the measure on ${topic}`);
+      if (!looksBrokenQuestion(fromTitle)) return fromTitle;
+    }
+
+    return "Do you support this congressional measure?";
   }
 
   function rowToQuestion(row) {
@@ -237,58 +210,63 @@
     return picked.slice(0, limit);
   }
 
-  async function loadQuestions(client) {
-    let rows = [];
-    const keyQuery = await client
-      .from("processed_votes")
-      .select(KEY_VOTE_SELECT)
-      .eq("is_key_vote", true)
-      .order("vote_date", { ascending: false })
-      .limit(64);
-    if (keyQuery.error) {
-      // Older DBs may lack is_key_vote / breakdown columns.
-      console.warn(keyQuery.error);
-      const legacySelect =
-        "roll_call_id, bill_id, title, summary, bill_number, bill_type, legislation_number, congress, session_number, roll_call_number, chamber, vote_date, official_url, vote_kind";
-      const legacy = await client
+  async function selectVoteRows(client, { keyOnly = false, limit = 64 } = {}) {
+    const attempts = [
+      KEY_VOTE_SELECT,
+      KEY_VOTE_SELECT.replace(", onboarding_question", ""),
+      "roll_call_id, bill_id, title, short_title, card_summary, plain_summary, takeaway, summary, primary_category, bill_number, bill_type, legislation_number, congress, session_number, roll_call_number, chamber, vote_date, is_key_vote, official_url, vote_kind",
+      "roll_call_id, bill_id, title, summary, bill_number, bill_type, legislation_number, congress, session_number, roll_call_number, chamber, vote_date, official_url, vote_kind",
+    ];
+    let lastError = null;
+    for (const select of attempts) {
+      let query = client
         .from("processed_votes")
-        .select(legacySelect)
+        .select(select)
         .order("vote_date", { ascending: false })
-        .limit(80);
-      if (legacy.error) throw legacy.error;
-      rows = legacy.data || [];
-    } else {
-      rows = keyQuery.data || [];
+        .limit(limit);
+      if (keyOnly && /\bis_key_vote\b/.test(select)) {
+        query = query.eq("is_key_vote", true);
+      }
+      const { data, error } = await query;
+      if (!error) return data || [];
+      lastError = error;
+      console.warn(error);
     }
+    if (lastError) throw lastError;
+    return [];
+  }
+
+  async function loadQuestions(client) {
+    let rows = await selectVoteRows(client, { keyOnly: true, limit: 64 });
 
     if (rows.length < QUIZ_SIZE) {
-      const recent = await client
-        .from("processed_votes")
-        .select(KEY_VOTE_SELECT)
-        .order("vote_date", { ascending: false })
-        .limit(80);
-      if (recent.error) {
-        console.warn(recent.error);
-      } else {
-        const seen = new Set(rows.map((r) => r.roll_call_id));
-        for (const row of recent.data || []) {
-          if (seen.has(row.roll_call_id)) continue;
-          const kind = String(row.vote_kind || "").toLowerCase();
-          const hasSummary = Boolean(
+      const recent = await selectVoteRows(client, { keyOnly: false, limit: 80 });
+      const seen = new Set(rows.map((r) => r.roll_call_id));
+      for (const row of recent) {
+        if (seen.has(row.roll_call_id)) continue;
+        const kind = String(row.vote_kind || "").toLowerCase();
+        const hasCopy = Boolean(
+          row.onboarding_question ||
             row.card_summary ||
-              row.plain_summary ||
-              row.takeaway ||
-              row.yea_impact ||
-              row.summary
-          );
-          if (!hasSummary && kind !== "final_passage" && kind !== "amendment") {
-            continue;
-          }
-          rows.push(row);
-          seen.add(row.roll_call_id);
+            row.plain_summary ||
+            row.takeaway ||
+            row.yea_impact ||
+            row.summary
+        );
+        if (!hasCopy && kind !== "final_passage" && kind !== "amendment") {
+          continue;
         }
+        rows.push(row);
+        seen.add(row.roll_call_id);
       }
     }
+
+    // Prefer rows that already have a dedicated quiz question.
+    rows.sort((a, b) => {
+      const aq = String(a.onboarding_question || "").trim() ? 1 : 0;
+      const bq = String(b.onboarding_question || "").trim() ? 1 : 0;
+      return bq - aq;
+    });
 
     return diversifyQuestions(rows, QUIZ_SIZE);
   }
