@@ -61,11 +61,30 @@
   color: inherit;
 }
 
-.a1-reaction-dock {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.a1-theme--local {
+  background: transparent;
+  color: inherit;
+}
+
+.a1-theme--versus {
+  background: transparent;
+  color: inherit;
+}
+
+.a1-article-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.a1-reaction-dock,
+.a1-reaction-dock--anchored {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .a1-reaction-btn--pulse {

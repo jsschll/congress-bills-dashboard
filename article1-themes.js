@@ -119,7 +119,7 @@
 
   function reactionDockHtml() {
     return `
-      <div class="a1-reaction-dock" role="toolbar" aria-label="Bill reactions">
+      <div class="a1-reaction-dock a1-reaction-dock--anchored" role="toolbar" aria-label="Bill reactions">
         <div class="engagement-mount-point" aria-label="Your stance"></div>
         <button type="button" class="details-toggle-btn a1-ask-ai-btn">✨ Ask AI</button>
       </div>

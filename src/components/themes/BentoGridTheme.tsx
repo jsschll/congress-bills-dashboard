@@ -79,7 +79,7 @@ export function BentoGridTheme({
         "bento-grid-theme",
         "relative isolate overflow-hidden rounded-2xl",
         "border border-slate-200 bg-slate-50 text-slate-900",
-        "px-4 pb-28 pt-5 sm:px-5 sm:pt-6 md:px-6",
+        "px-4 pb-5 pt-5 sm:px-5 sm:pt-6 md:px-6",
         "font-['IBM_Plex_Sans','Source_Sans_3','Segoe_UI',sans-serif]",
         className,
       ]

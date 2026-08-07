@@ -14,7 +14,7 @@
  * Feed:   /api/bills-feed (+ processed_votes theme seeds)
  * Live:   article1-themes.js / article1-themes.css
  */
-export const ARTICLE1_PRODUCTION_BUILD_ID = "2026-08-07-themes-1-6-local-versus";
+export const ARTICLE1_PRODUCTION_BUILD_ID = "2026-08-07-themes-1-6-dock-anchored";
 
 export const ARTICLE1_THEME_EXPORTS = [
   "EditorialCollageTheme",

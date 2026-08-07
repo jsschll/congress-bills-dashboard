@@ -56,7 +56,7 @@ export function EditorialCollageTheme({
         "editorial-collage",
         "relative isolate overflow-hidden rounded-[1.75rem]",
         "bg-[#FDF8F2] text-[#1C1410]",
-        "px-4 pb-28 pt-5 sm:px-6 sm:pt-7 md:px-8",
+        "px-4 pb-5 pt-5 sm:px-6 sm:pt-7 md:px-8",
         "font-['Source_Sans_3','Avenir_Next','Segoe_UI',sans-serif]",
         className,
       ]
@@ -132,7 +132,7 @@ export function EditorialCollageTheme({
             <img
               src={imageSrc}
               alt={imageAlt ?? hook}
-              className="h-full w-full object-cover contrast-[1.08] saturate-[1.05]"
+              className="h-full w-full object-contain contrast-[1.08] saturate-[1.05]"
             />
           ) : (
             <div
@@ -147,8 +147,8 @@ export function EditorialCollageTheme({
                 }}
               />
               <div className="absolute -right-6 top-8 h-40 w-40 rotate-12 rounded-[2rem] bg-[#D6A862]/35 blur-[1px]" />
-              <div className="absolute bottom-10 left-8 h-24 w-36 -rotate-6 rounded-full bg-[#FDF8F2]/12" />
-              <div className="absolute inset-0 flex items-end p-5 sm:p-6">
+              <div className="absolute top-10 left-8 h-24 w-36 -rotate-6 rounded-full bg-[#FDF8F2]/12" />
+              <div className="absolute inset-0 flex items-start p-5 sm:p-6">
                 <span className="max-w-[14rem] font-['Fraunces',Georgia,serif] text-lg font-semibold leading-snug text-[#FDF8F2]/90 sm:text-xl">
                   Editorial frame
                 </span>
