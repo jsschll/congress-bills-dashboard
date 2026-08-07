@@ -1172,7 +1172,7 @@ function resolveFeedCardCopy(item = {}, copy = {}) {
   }
   summary = stripLeadingTitleFromSummary(summary, cleanTitle);
 
-  // Prefer a punchy plain-English hook for fast scrolling.
+  // Prefer a punchy plain-English hook for impact bullets / fallbacks.
   let headline = "";
   if (
     shortTitle &&
@@ -1192,10 +1192,21 @@ function resolveFeedCardCopy(item = {}, copy = {}) {
     headline = cleanTitle;
   }
 
+  const displayTitle = clampFeedHeadlineWords(
+    looksLikeOfficialBillTitle(cleanTitle) ? cleanTitle : headline || cleanTitle,
+    8
+  );
+
   return {
     title: cleanTitle,
+    displayTitle: displayTitle || "Legislation",
     headline: clampFeedHeadlineWords(headline || cleanTitle || "Legislation", 12),
     summary: summary || "",
+    impacts: buildFeedImpactBullets(item, copy, {
+      title: cleanTitle,
+      headline,
+      summary,
+    }),
   };
 }
 
@@ -1215,6 +1226,117 @@ function clampFeedHeadlineWords(text, maxWords = 12) {
     .replace(/[,:;–—-]+$/, "")}…`;
 }
 
+function clampFeedImpactLine(text, maxWords = 14) {
+  return clampFeedHeadlineWords(text, maxWords);
+}
+
+function parseFeedKeyPointList(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry || "").replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parseFeedKeyPointList(parsed);
+    } catch {
+      return value
+        .split(/\n+|•|;/)
+        .map((part) => part.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function extractFeedDollarFootprint(text = "") {
+  const raw = String(text || "");
+  const match = raw.match(
+    /\$[\d,.]+(?:\s*(?:billion|million|trillion|bn|m|k))?|\b\d+(?:\.\d+)?\s*(?:billion|million|trillion)\b/i
+  );
+  if (!match) return "";
+  const around = raw.slice(
+    Math.max(0, match.index - 24),
+    Math.min(raw.length, match.index + match[0].length + 24)
+  );
+  if (/\b(cut|save|reduc|deficit|lower)\b/i.test(around)) {
+    return `Saves ~${match[0]}`;
+  }
+  if (/\b(cost|spend|appropriat|fund|authoriz|increase|billion|million)\b/i.test(around)) {
+    return `Costs ~${match[0]}`;
+  }
+  return `Costs ~${match[0]}`;
+}
+
+function inferFeedImpactAudience(item = {}, categoryLabel = "", summary = "") {
+  const haystack = [
+    categoryLabel,
+    item.primaryCategory,
+    item.category,
+    summary,
+    item.short_title,
+    item.title,
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (/immigra|border|asylum|deport|visa/.test(haystack)) return "Border security & immigrants";
+  if (/veteran|armed|troop|military|defense/.test(haystack)) return "Service members & defense";
+  if (/small business|employer|worker|wage|labor/.test(haystack))
+    return "Workers & small businesses";
+  if (/tax|irs|taxpayer|budget|appropriat/.test(haystack)) return "Local taxpayers";
+  if (/health|medicare|medicaid|patient|hospital/.test(haystack))
+    return "Patients & health systems";
+  if (/energy|climate|oil|gas|epa|environment/.test(haystack))
+    return "Energy consumers & communities";
+  if (/student|school|education|college/.test(haystack)) return "Students & schools";
+  if (/housing|rent|mortgage|homeowner/.test(haystack)) return "Renters & homeowners";
+  return "People affected by this policy";
+}
+
+/**
+ * Build the strict 3-bullet impact face for collapsed feed cards.
+ */
+function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
+  const summary = String(resolved.summary || copy.summary || "").trim();
+  const headline = String(resolved.headline || "").trim();
+  const categoryLabel = formatFeedCategoryPill(item).label;
+  const keyPoints = parseFeedKeyPointList(item.key_points || item.keyPoints);
+  const yea = String(
+    copy.yeaMeans || item.yea_impact || item.yeaImpact || item.yeaMeans || ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const takeaway = String(item.takeaway || copy.takeaway || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const whatRaw =
+    keyPoints[0] ||
+    headline ||
+    firstCompleteSentence(summary, 110) ||
+    yea ||
+    takeaway ||
+    "Updates a federal policy rule.";
+  const impactRaw =
+    keyPoints[1] ||
+    yea ||
+    takeaway ||
+    inferFeedImpactAudience(item, categoryLabel, summary);
+  const moneyRaw =
+    extractFeedDollarFootprint(
+      [summary, takeaway, yea, keyPoints.join(" "), item.shortPitch].join(" ")
+    ) ||
+    keyPoints[2] ||
+    "$0 / Policy change";
+
+  return {
+    what: clampFeedImpactLine(whatRaw, 14),
+    impact: clampFeedImpactLine(impactRaw, 10),
+    cost: clampFeedImpactLine(moneyRaw, 10),
+  };
+}
+
 function formatFeedStatusTag(item = {}, { isVote = false } = {}) {
   const chamberRaw = String(item.chamber || item.jurisdiction || "").toLowerCase();
   const chamber = chamberRaw.includes("senate")
@@ -1227,17 +1349,17 @@ function formatFeedStatusTag(item = {}, { isVote = false } = {}) {
 
   if (/\b(passed|pass|agreed|confirmed|adopted|carried|enacted|became law|signed)\b/.test(lower)) {
     const label = chamber ? `Passed ${chamber}` : "Passed";
-    return { label, tone: "passed", icon: "✓" };
+    return { label, tone: "passed", icon: "🟢" };
   }
   if (/\b(failed|fail|rejected|reject|defeated|defeat|not agree|tabled|vetoed|veto)\b/.test(lower)) {
     const label = chamber ? `Rejected ${chamber}` : "Rejected";
-    return { label, tone: "failed", icon: "✕" };
+    return { label, tone: "failed", icon: "🔴" };
   }
-  if (isVote) return { label: "Pending Vote", tone: "pending", icon: "◎" };
+  if (isVote) return { label: "Pending Vote", tone: "pending", icon: "🟡" };
   if (result && result.length <= 28 && !/calendar no\.?\s*$/i.test(result)) {
-    return { label: result, tone: "pending", icon: "◎" };
+    return { label: result, tone: "pending", icon: "🟡" };
   }
-  return { label: "Pending Vote", tone: "pending", icon: "◎" };
+  return { label: "Pending Vote", tone: "pending", icon: "🟡" };
 }
 
 function formatFeedCategoryPill(item = {}) {
@@ -1319,22 +1441,27 @@ function wireFeedCardAskAi(card, item) {
 }
 
 /**
- * Visual-first social feed card:
- * category icon + status → short headline → Bill ID • Date → actions
+ * Visual-first social feed card with strict 3-bullet impact face.
+ * No paragraph summaries on the collapsed card.
  */
 function renderSocialFeedCardShell({
   status,
   category,
-  headline,
-  subtext,
+  title,
+  impacts,
 }) {
   const tone = String(status?.tone || "pending").replace(/[^a-z0-9_-]/gi, "");
-  const statusIcon = status?.icon || "◎";
+  const statusIcon = status?.icon || "🟡";
   const categoryLabel =
     typeof category === "string" ? category : category?.label || "";
   const categoryIcon =
     (typeof category === "object" && category?.icon) ||
     feedCategoryIcon(categoryLabel);
+  const bullets = {
+    what: impacts?.what || "Updates a federal policy rule.",
+    impact: impacts?.impact || "People affected by this policy",
+    cost: impacts?.cost || "$0 / Policy change",
+  };
   return `
     <div class="feed-social-card__header">
       <div class="category-pill" title="${escapePolicyHtml(categoryLabel || "Congress")}">
@@ -1344,27 +1471,38 @@ function renderSocialFeedCardShell({
         )}</span>
       </div>
       <span class="status-badge is-${tone}">
-        <span class="status-badge__icon" aria-hidden="true">${escapePolicyHtml(
-          statusIcon
-        )}</span>
+        <span class="status-badge__icon" aria-hidden="true">${statusIcon}</span>
         <span class="status-badge__label">${escapePolicyHtml(
           status?.label || "Pending Vote"
         )}</span>
       </span>
     </div>
     <div class="feed-social-card__body">
-      <h3 class="feed-social-card__headline">${escapePolicyHtml(headline)}</h3>
-      ${
-        subtext
-          ? `<div class="feed-social-card__sub">${escapePolicyHtml(
-              subtext
-            )}</div>`
-          : ""
-      }
+      <h3 class="feed-social-card__headline">${escapePolicyHtml(title)}</h3>
+      <ul class="feed-impact-list" aria-label="Key impacts">
+        <li class="feed-impact-list__item">
+          <span class="feed-impact-list__icon" aria-hidden="true">🎯</span>
+          <span class="feed-impact-list__copy">
+            <strong>What it does:</strong> ${escapePolicyHtml(bullets.what)}
+          </span>
+        </li>
+        <li class="feed-impact-list__item">
+          <span class="feed-impact-list__icon" aria-hidden="true">👤</span>
+          <span class="feed-impact-list__copy">
+            <strong>Impact:</strong> ${escapePolicyHtml(bullets.impact)}
+          </span>
+        </li>
+        <li class="feed-impact-list__item">
+          <span class="feed-impact-list__icon" aria-hidden="true">💵</span>
+          <span class="feed-impact-list__copy">
+            <strong>Cost / Savings:</strong> ${escapePolicyHtml(bullets.cost)}
+          </span>
+        </li>
+      </ul>
     </div>
     <div class="feed-social-card__actions">
       <button type="button" class="details-toggle-btn">
-        💬 Ask AI / Details
+        💬 Ask AI / Deep Dive
       </button>
       <div class="engagement-mount-point" aria-label="Your stance"></div>
     </div>
@@ -1381,15 +1519,12 @@ function renderBillCard(item) {
   const cardCopy = resolveFeedCardCopy(item, { summary: pitch });
   const status = formatFeedStatusTag(item, { isVote: false });
   const category = formatFeedCategoryPill(item);
-  const updated =
-    formatRelativeDate(item.lastUpdated) || formatShortDate(item.lastUpdated);
-  const subtext = [item.billNumber, updated].filter(Boolean).join(" • ");
 
   card.innerHTML = renderSocialFeedCardShell({
     status,
     category,
-    headline: cardCopy.headline,
-    subtext,
+    title: cardCopy.displayTitle,
+    impacts: cardCopy.impacts,
   });
 
   wireFeedCardAskAi(card, item);
@@ -1531,7 +1666,6 @@ function renderVoteCard(item) {
   const card = document.createElement("article");
   card.className = "feed-social-card vote-feed-card";
 
-  const dateLabel = voteCardDateLabel(item);
   const copy =
     typeof resolveVoteCardCopy === "function"
       ? resolveVoteCardCopy(item)
@@ -1539,16 +1673,12 @@ function renderVoteCard(item) {
   const cardCopy = resolveFeedCardCopy(item, copy);
   const status = formatFeedStatusTag(item, { isVote: true });
   const category = formatFeedCategoryPill(item);
-  const billNumber =
-    item.billNumber ||
-    (item.rollCallNumber ? `Roll Call ${item.rollCallNumber}` : "");
-  const subtext = [billNumber, dateLabel].filter(Boolean).join(" • ");
 
   card.innerHTML = renderSocialFeedCardShell({
     status,
     category,
-    headline: cardCopy.headline,
-    subtext,
+    title: cardCopy.displayTitle,
+    impacts: cardCopy.impacts,
   });
 
   wireFeedCardAskAi(card, item);

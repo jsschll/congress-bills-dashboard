@@ -7690,11 +7690,13 @@ body.politician-notes-modal-open {
 }
 
 .feed-social-card__body {
+  display: grid;
+  gap: 0.55rem;
   min-width: 0;
 }
 
 .feed-social-card__headline {
-  margin: 0 0 4px;
+  margin: 0;
   max-width: 100%;
   min-width: 0;
   font-size: 1rem;
@@ -7703,23 +7705,47 @@ body.politician-notes-modal-open {
   color: #f8fafc;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   overflow: hidden;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.feed-social-card__sub {
+.feed-impact-list {
   margin: 0;
-  max-width: 100%;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.feed-impact-list__item {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
   min-width: 0;
-  color: #94a3b8;
-  font-size: 0.75rem;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.feed-impact-list__icon {
+  font-size: 0.9rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.feed-impact-list__copy {
+  min-width: 0;
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.feed-impact-list__copy strong {
+  color: #f8fafc;
+  font-weight: 700;
 }
 
 .feed-social-card__actions {
