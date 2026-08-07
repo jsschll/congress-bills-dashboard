@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from "react";
-import { BillMetrics, type BillMetricsProps } from "./BillMetrics";
+import type { BillMetricsProps } from "./BillMetrics";
 import { ReactionDock } from "./ReactionDock";
-import { ThemeWrapper } from "./ThemeWrapper";
-import { BentoGridTheme } from "./themes/BentoGridTheme";
-import { EditorialCollageTheme } from "./themes/EditorialCollageTheme";
+import {
+  resolveArticleTheme,
+  ThemeWrapper,
+} from "./ThemeWrapper";
 import {
   DEFAULT_REACTIONS,
   EMPTY_VOTE_COUNTS,
@@ -51,14 +52,14 @@ function mergeCounts(seed?: Partial<VoteCounts>): VoteCounts {
 /**
  * Master container for Article 1 bill content.
  * Owns universal interaction state (reaction + vote counts).
- * Visual themes attach via ThemeWrapper / themeVariant only.
+ * Theme selection is delegated to ThemeWrapper.
  */
 export function ArticleCard({
   billId,
   title,
   category,
   keyImpacts,
-  themeVariant = "default",
+  themeVariant,
   humanHook,
   promptQuestion,
   imageSrc,
@@ -101,6 +102,7 @@ export function ArticleCard({
   );
 
   const totalVotes = Object.values(voteCounts).reduce((sum, n) => sum + n, 0);
+  const resolvedTheme = resolveArticleTheme(category, themeVariant);
 
   const resolvedMetrics =
     metrics.length > 0
@@ -124,11 +126,9 @@ export function ArticleCard({
     reactionLabel !== null ? (
       <p
         className={
-          themeVariant === "bento-grid"
+          resolvedTheme === "bento-grid"
             ? "text-xs font-medium text-slate-500"
-            : themeVariant === "editorial-collage"
-              ? "text-xs font-medium text-[#8A6A45]"
-              : "text-xs font-medium text-white/60"
+            : "text-xs font-medium text-[#8A6A45]"
         }
         aria-live="polite"
       >
@@ -138,80 +138,6 @@ export function ArticleCard({
       </p>
     ) : null;
 
-  let themedContent: React.ReactNode;
-
-  if (themeVariant === "editorial-collage") {
-    themedContent = (
-      <ThemeWrapper themeVariant="editorial-collage">
-        <EditorialCollageTheme
-          billId={billId}
-          title={title}
-          category={category}
-          keyImpacts={keyImpacts}
-          humanHook={humanHook}
-          promptQuestion={promptQuestion}
-          imageSrc={imageSrc}
-          imageAlt={imageAlt}
-        >
-          {children}
-          {reactionEcho}
-        </EditorialCollageTheme>
-      </ThemeWrapper>
-    );
-  } else if (themeVariant === "bento-grid") {
-    themedContent = (
-      <ThemeWrapper themeVariant="bento-grid">
-        <BentoGridTheme
-          billId={billId}
-          title={title}
-          category={category}
-          keyImpacts={keyImpacts}
-          financialSummary={financialSummary}
-          metrics={resolvedMetrics}
-        >
-          {children}
-          {reactionEcho}
-        </BentoGridTheme>
-      </ThemeWrapper>
-    );
-  } else {
-    themedContent = (
-      <ThemeWrapper themeVariant={themeVariant}>
-        <header className="a1-article-header flex flex-col gap-2">
-          <span className="inline-flex w-fit items-center rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/80">
-            {category}
-          </span>
-          <h2 className="text-xl font-bold leading-snug tracking-tight text-white sm:text-2xl">
-            {title}
-          </h2>
-        </header>
-
-        {keyImpacts.length > 0 ? (
-          <section className="a1-key-impacts" aria-label="Key impacts">
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/55">
-              Key Impacts
-            </h3>
-            <ul className="flex flex-col gap-1.5">
-              {keyImpacts.map((impact, index) => (
-                <li
-                  key={`${billId}-impact-${index}`}
-                  className="text-sm leading-relaxed text-white/85"
-                >
-                  {impact}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        <BillMetrics metrics={resolvedMetrics} />
-
-        {children}
-        {reactionEcho}
-      </ThemeWrapper>
-    );
-  }
-
   return (
     <article
       className={["a1-article-card relative", className]
@@ -220,9 +146,24 @@ export function ArticleCard({
       data-bill-id={billId}
       data-submitted={hasSubmitted ? "true" : "false"}
       data-a1-shell="article-card"
-      data-theme={themeVariant}
+      data-theme={resolvedTheme}
     >
-      {themedContent}
+      <ThemeWrapper
+        billId={billId}
+        title={title}
+        category={category}
+        keyImpacts={keyImpacts}
+        themeVariant={themeVariant}
+        humanHook={humanHook}
+        promptQuestion={promptQuestion}
+        imageSrc={imageSrc}
+        imageAlt={imageAlt}
+        financialSummary={financialSummary}
+        metrics={resolvedMetrics}
+      >
+        {children}
+        {reactionEcho}
+      </ThemeWrapper>
 
       {showReactionDock ? (
         <ReactionDock

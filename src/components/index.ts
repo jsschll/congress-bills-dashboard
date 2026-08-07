@@ -7,8 +7,15 @@ export type { ReactionDockProps } from "./ReactionDock";
 export { BillMetrics } from "./BillMetrics";
 export type { BillMetricsProps } from "./BillMetrics";
 
-export { ThemeWrapper } from "./ThemeWrapper";
-export type { ThemeWrapperProps } from "./ThemeWrapper";
+export {
+  ThemeWrapper,
+  isFinanceCategory,
+  resolveArticleTheme,
+} from "./ThemeWrapper";
+export type {
+  ResolvedArticleTheme,
+  ThemeWrapperProps,
+} from "./ThemeWrapper";
 
 export {
   EditorialCollageTheme,
