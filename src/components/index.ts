@@ -6,6 +6,7 @@ export type { ReactionDockProps } from "./ReactionDock";
 
 export {
   VoteFeedback,
+  VoteSideGauge,
   VoteStampOverlay,
   reactionIdToFeedbackStance,
   readLocalFeedVote,
@@ -15,6 +16,7 @@ export {
 export type {
   VoteFeedbackProps,
   VoteFeedbackStance,
+  VoteSideGaugeProps,
   VoteStampOverlayProps,
 } from "./VoteFeedback";
 

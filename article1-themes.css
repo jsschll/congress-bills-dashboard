@@ -1831,6 +1831,62 @@ body.feed-breakdown-open {
   to { opacity: 0; transform: scale(0.92); }
 }
 
+/* ── Vertical Pass/Kill side gauge (right inner edge) ───────────────── */
+
+.vote-side-gauge {
+  position: absolute;
+  top: 10%;
+  bottom: calc(5.5rem + 8%);
+  right: 0.55rem;
+  z-index: 6;
+  width: 0.45rem;
+  pointer-events: none;
+}
+
+.vote-side-gauge__track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  /* Kill % shows as the uncovered red track */
+  background: #e11d48;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.vote-side-gauge__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  border-radius: inherit;
+  /* Pass % fills upward in green */
+  background: #10b981;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: height;
+}
+
+.vote-side-gauge.is-settled .vote-side-gauge__fill {
+  transition: none;
+}
+
+.feed-social-card:not(.a1-story-feed) .vote-side-gauge {
+  top: 0.75rem;
+  bottom: 4.5rem;
+  right: 0.45rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vote-side-gauge__fill {
+    transition: none;
+  }
+}
+
 .policy-engage__logged-panel.vote-feedback-panel {
   display: flex;
   flex-direction: column;
@@ -1858,35 +1914,14 @@ body.feed-breakdown-open {
   width: 100%;
 }
 
-.vote-feedback-bar__track {
-  position: relative;
-  display: flex;
-  width: 100%;
-  height: 0.7rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(28, 20, 16, 0.08);
+/* Horizontal percentage track removed — Pass/Kill % lives on the side gauge */
+.vote-feedback-bar__track,
+.vote-feedback-bar--compact .vote-feedback-bar__track {
+  display: none !important;
 }
 
 .vote-feedback-bar__fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  flex: 0 0 auto;
-  transition: width 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.vote-feedback-bar.is-filled .vote-feedback-bar__fill,
-.vote-feedback-bar.is-settled .vote-feedback-bar__fill {
-  width: var(--target-width, 50%);
-}
-
-.vote-feedback-bar__fill--pass {
-  background: linear-gradient(90deg, #059669, #34d399);
-}
-
-.vote-feedback-bar__fill--kill {
-  background: linear-gradient(90deg, #e11d48, #fb7185);
+  display: none;
 }
 
 .vote-feedback-bar__meta {
