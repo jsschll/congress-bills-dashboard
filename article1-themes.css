@@ -29,6 +29,11 @@
   max-height: none;
 }
 
+.a1-themed-card .a1-theme--compact {
+  max-height: 280px;
+}
+
+
 .a1-theme {
   position: relative;
   display: flex;
@@ -37,10 +42,146 @@
   border: 1px solid #e2e8f0;
   background: #f8fafc;
   color: #0f172a;
-  padding: 1rem 1rem 1rem;
+  padding: 0.85rem 0.9rem 0.85rem;
   overflow: hidden;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
 }
+
+/* Compact feed face — keep ~2 cards visible per viewport */
+.a1-theme--compact {
+  min-height: 0;
+  max-height: 280px;
+  gap: 0.55rem;
+}
+
+.a1-face__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
+.a1-face {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.a1-face__headline {
+  margin: 0;
+  font-size: clamp(1.02rem, 2.6vw, 1.2rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.a1-theme--editorial .a1-face__headline {
+  font-family: Georgia, "Times New Roman", serif;
+  text-transform: uppercase;
+  letter-spacing: -0.015em;
+  color: #1c1410;
+}
+
+.a1-face__tldr {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 550;
+  line-height: 1.35;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a1-face__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.a1-face__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 0.32rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a1-face__chip--pipeline {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  color: #075985;
+}
+
+.a1-face__chip--local {
+  border-color: #bbf7d0;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.a1-face__chip--influence {
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+.a1-face__chip--versus {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.a1-face__chip--fiscal {
+  border-color: #e2e8f0;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.a1-face__chip-sep {
+  opacity: 0.45;
+  margin: 0 0.1rem;
+}
+
+.a1-face__footer {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+.a1-face__footer .a1-reaction-dock {
+  margin-top: 0;
+}
+
+.a1-theme--editorial.a1-theme--compact {
+  background: #fdf8f2;
+  border-color: #e8d9c6;
+  color: #1c1410;
+}
+
+.a1-theme--editorial .a1-face__tldr {
+  color: #5c4a38;
+}
+
 
 .a1-section-label {
   margin: 0 0 0.45rem;

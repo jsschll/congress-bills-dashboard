@@ -169,11 +169,24 @@
     return { title, summary, impactsList };
   }
 
+  function clampFaceLine(text, maxWords = 14) {
+    const cleaned = normalizeCopyLine(text);
+    if (!cleaned) return "";
+    const words = cleaned.split(/\s+/).filter(Boolean);
+    if (words.length <= maxWords) {
+      return cleaned.replace(/[,:;–—-]+$/, "").replace(/\.$/, "");
+    }
+    return `${words
+      .slice(0, maxWords)
+      .join(" ")
+      .replace(/[,:;–—-]+$/, "")}…`;
+  }
+
   function reactionDockHtml() {
     return `
       <div class="a1-reaction-dock a1-reaction-dock--anchored" role="toolbar" aria-label="Bill reactions">
         <div class="engagement-mount-point" aria-label="Your stance"></div>
-        <button type="button" class="details-toggle-btn a1-ask-ai-btn">✨ Ask AI</button>
+        <button type="button" class="details-toggle-btn a1-ask-ai-btn" title="Open deep dive">✨ Deep Dive</button>
       </div>
     `;
   }
@@ -187,119 +200,67 @@
     `;
   }
 
-  function renderEditorial({ billId, title, category, impactsList, summary, item }) {
-    const bullets = impactsList
-      .map(
-        (impact) => `
-        <li class="a1-editorial__impact">
-          <span class="a1-editorial__bullet" aria-hidden="true"></span>
-          <span>${escapeHtml(impact)}</span>
-        </li>`
-      )
-      .join("");
-
-    const imageSrc = String(
-      item.imageSrc || item.image_src || item.imageUrl || item.image_url || ""
-    ).trim();
-    const imageAlt = String(item.imageAlt || item.image_alt || title).trim();
-
-    const artHtml = imageSrc
-      ? `
-          <div class="a1-editorial__art">
-            <div class="a1-editorial__frame">
-              <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(
-          imageAlt
-        )}" loading="lazy" decoding="async" />
-            </div>
-          </div>`
-      : "";
-
+  /**
+   * Shared compact face: headline + 1-line TL;DR (+ optional visual chip).
+   * Deep details stay out of the face — Ask AI / Deep Dive owns them.
+   */
+  function compactFaceShell({
+    themeClass,
+    billId,
+    category,
+    headline,
+    tldr,
+    chipHtml = "",
+    extraBadges = "",
+  }) {
     return `
-      <div class="a1-theme a1-theme--editorial${
-        imageSrc ? "" : " a1-theme--editorial-copy-only"
-      }">
-        <header class="a1-editorial__header">
-          <div class="a1-editorial__header-main">
-            <p class="a1-kicker">${escapeHtml(category)}</p>
-            <h3 class="a1-editorial__hook">${escapeHtml(title)}</h3>
-          </div>
-          <div class="a1-editorial__stamp" aria-label="Bill ${escapeHtml(billId)}">
-            <span>${escapeHtml(billId)}</span>
-          </div>
-          ${microActionsHtml()}
-        </header>
-        <div class="a1-editorial__layout${
-          imageSrc ? "" : " a1-editorial__layout--copy-only"
-        }">
-          ${artHtml}
-          <div class="a1-editorial__copy">
-            <div class="a1-editorial__sticker">
-              <p class="a1-section-label">Key Impacts</p>
-              <ul class="a1-editorial__impacts">${
-                bullets ||
-                `<li class="a1-editorial__impact"><span>${escapeHtml(
-                  summary || title
-                )}</span></li>`
-              }</ul>
-              <p class="a1-editorial__prompt">Should Congress pass this ${escapeHtml(
-                (category || "bill").toLowerCase()
-              )}?</p>
-            </div>
-            <footer class="a1-editorial__footer">
-              ${reactionDockHtml()}
-            </footer>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderBento({ billId, title, category, impactsList, summary, costLabel, metrics }) {
-    const metricHtml = (metrics || [])
-      .map(
-        (m) => `
-        <section class="a1-bento__metric">
-          <p class="a1-section-label">${escapeHtml(m.label)}</p>
-          <p class="a1-bento__metric-value">${escapeHtml(m.value)}</p>
-        </section>`
-      )
-      .join("");
-
-    const impactHtml = impactsList
-      .map(
-        (impact, index) => `
-        <li class="a1-bento__impact">
-          <span class="a1-bento__impact-num">${String(index + 1).padStart(2, "0")}</span>
-          <span>${escapeHtml(impact)}</span>
-        </li>`
-      )
-      .join("");
-
-    return `
-      <div class="a1-theme a1-theme--bento">
-        <header class="a1-bento__header">
+      <div class="a1-theme a1-theme--compact ${themeClass}">
+        <header class="a1-face__header">
           <div class="a1-bento__badges">
-            <span class="a1-badge a1-badge--dark">${escapeHtml(category || "Policy")}</span>
-            ${costLabel ? `<span class="a1-badge a1-badge--soft">${escapeHtml(costLabel)}</span>` : ""}
+            <span class="a1-badge a1-badge--dark">${escapeHtml(
+              category || "Congress"
+            )}</span>
+            ${extraBadges}
           </div>
           <span class="a1-mono-pill">${escapeHtml(billId)}</span>
           ${microActionsHtml()}
         </header>
-        <div class="a1-bento__grid">
-          <section class="a1-bento__main">
-            <p class="a1-section-label">Impact summary</p>
-            <h3>${escapeHtml(summary || title)}</h3>
-            <p class="a1-bento__main-meta">Structured brief · ${escapeHtml(billId)}</p>
-          </section>
-          ${metricHtml}
-          <section class="a1-bento__impacts">
-            <p class="a1-section-label">Key Impacts</p>
-            <ul>${impactHtml || `<li class="a1-bento__impact"><span>${escapeHtml(title)}</span></li>`}</ul>
-          </section>
+        <div class="a1-face">
+          <h3 class="a1-face__headline">${escapeHtml(headline)}</h3>
+          <p class="a1-face__tldr">${escapeHtml(tldr)}</p>
+          ${chipHtml ? `<div class="a1-face__chips">${chipHtml}</div>` : ""}
         </div>
-        ${reactionDockHtml()}
+        <footer class="a1-face__footer">
+          ${reactionDockHtml()}
+        </footer>
       </div>
     `;
+  }
+
+  function renderEditorial({ billId, title, category, summary }) {
+    return compactFaceShell({
+      themeClass: "a1-theme--editorial a1-theme--editorial-copy-only",
+      billId,
+      category,
+      headline: clampFaceLine(title, 12),
+      tldr: clampFaceLine(summary || title, 16),
+    });
+  }
+
+  function renderBento({ billId, title, category, summary, costLabel }) {
+    const chip = costLabel
+      ? `<span class="a1-face__chip a1-face__chip--fiscal">${escapeHtml(
+          costLabel
+        )}</span>`
+      : "";
+    return compactFaceShell({
+      themeClass: "a1-theme--bento",
+      billId,
+      category: category || "Policy",
+      headline: clampFaceLine(title, 12),
+      tldr: clampFaceLine(summary || title, 16),
+      chipHtml: chip,
+    });
   }
 
   function pipelineSteps(item = {}) {
@@ -311,74 +272,38 @@
     else if (/floor|debate|chamber|vote|cloture/.test(label)) current = "floor";
 
     const steps = [
-      { id: "committee", label: "In Committee", icon: "⚖️", desc: "Markup & hearings" },
-      { id: "floor", label: "Floor Debate", icon: "🎙️", desc: "Chamber consideration" },
-      { id: "final", label: "Final Action", icon: "🗳️", desc: "Passage or veto" },
+      { id: "committee", label: "In Committee" },
+      { id: "floor", label: "Floor Debate" },
+      { id: "final", label: "Final Action" },
     ];
     const order = ["committee", "floor", "final"];
-    const currentIdx = order.indexOf(current);
-    return steps.map((step, index) => ({
-      ...step,
-      status:
-        index < currentIdx ? "complete" : index === currentIdx ? "current" : "upcoming",
-    }));
+    const currentIdx = Math.max(0, order.indexOf(current));
+    return {
+      steps,
+      currentIdx,
+      currentLabel: steps[currentIdx].label,
+      stepNumber: currentIdx + 1,
+      totalSteps: steps.length,
+    };
   }
 
-  function renderPipeline({ billId, title, category, impactsList, summary, item }) {
-    const steps = pipelineSteps(item);
-    const stepHtml = steps
-      .map(
-        (step) => `
-        <li class="a1-pipeline__step is-${step.status}">
-          <div class="a1-pipeline__icon" aria-hidden="true">${
-            step.status === "complete" ? "✓" : step.icon
-          }</div>
-          <div>
-            <p class="a1-pipeline__step-label">${escapeHtml(step.label)}</p>
-            <p class="a1-pipeline__step-desc">${escapeHtml(step.desc)}</p>
-            <span class="a1-pipeline__status">${
-              step.status === "complete"
-                ? "Complete"
-                : step.status === "current"
-                  ? "In progress"
-                  : "Upcoming"
-            }</span>
-          </div>
-        </li>`
-      )
-      .join("");
-
-    const impactHtml = impactsList
-      .map((impact) => `<li>${escapeHtml(impact)}</li>`)
-      .join("");
-
-    return `
-      <div class="a1-theme a1-theme--pipeline">
-        <header class="a1-pipeline__header">
-          <div class="a1-bento__badges">
-            <span class="a1-badge a1-badge--dark">${escapeHtml(category || "Procedural")}</span>
-            <span class="a1-badge a1-badge--sky">Tracking</span>
-          </div>
-          <span class="a1-mono-pill">${escapeHtml(billId)}</span>
-          ${microActionsHtml()}
-        </header>
-        <section class="a1-pipeline__summary">
-          <p class="a1-section-label">What the bill does</p>
-          <h3>${escapeHtml(summary || title)}</h3>
-          ${
-            impactHtml
-              ? `<ul class="a1-pipeline__impacts">${impactHtml}</ul>`
-              : ""
-          }
-        </section>
-        <section class="a1-pipeline__tracker" aria-label="Legislative pipeline">
-          <p class="a1-section-label">Procedural pipeline</p>
-          <p class="a1-pipeline__track-line">In Committee → Floor Debate → Final Action</p>
-          <ol class="a1-pipeline__steps">${stepHtml}</ol>
-        </section>
-        ${reactionDockHtml()}
-      </div>
-    `;
+  function renderPipeline({ billId, title, category, summary, item }) {
+    const pipe = pipelineSteps(item);
+    const chip = `
+      <span class="a1-face__chip a1-face__chip--pipeline" aria-label="Legislative progress">
+        ⏳ ${escapeHtml(pipe.currentLabel)} · Step ${pipe.stepNumber} of ${
+      pipe.totalSteps
+    }
+      </span>`;
+    return compactFaceShell({
+      themeClass: "a1-theme--pipeline",
+      billId,
+      category: category || "Procedural",
+      headline: clampFaceLine(title, 12),
+      tldr: clampFaceLine(summary || title, 16),
+      chipHtml: chip,
+      extraBadges: `<span class="a1-badge a1-badge--sky">Tracking</span>`,
+    });
   }
 
   function defaultStakeholders() {
@@ -390,71 +315,32 @@
     ];
   }
 
-  function renderInfluence({ billId, title, category, impactsList, summary, item }) {
+  function renderInfluence({ billId, title, category, summary, item }) {
     const stakeholders =
       Array.isArray(item.stakeholders) && item.stakeholders.length
         ? item.stakeholders
         : defaultStakeholders();
-    const support = stakeholders.filter((s) => String(s.stance).toLowerCase() !== "oppose");
-    const oppose = stakeholders.filter((s) => String(s.stance).toLowerCase() === "oppose");
-
-    const node = (s, side) => {
-      const weight = Math.min(1, Math.max(0.25, Number(s.weight) || 0.5));
-      const size = Math.round(52 + weight * 34);
-      const color = side === "support" ? SUPPORT : OPPOSE;
-      return `
-        <div class="a1-influence__node a1-influence__node--${side}" style="width:${size}px;height:${size}px;border-color:${color};box-shadow:0 0 0 3px ${
-          side === "support" ? "rgba(5,150,105,0.12)" : "rgba(225,29,72,0.12)"
-        }">
-          <span class="a1-influence__node-name">${escapeHtml(s.name || "Stakeholder")}</span>
-          ${
-            s.spendLabel
-              ? `<span class="a1-influence__node-spend" style="color:${color}">${escapeHtml(
-                  s.spendLabel
-                )}</span>`
-              : ""
-          }
-        </div>`;
-    };
-
-    const impactHtml = impactsList
-      .map((impact) => `<li>${escapeHtml(impact)}</li>`)
-      .join("");
-
-    return `
-      <div class="a1-theme a1-theme--influence">
-        <header class="a1-influence__header">
-          <div class="a1-bento__badges">
-            <span class="a1-badge a1-badge--dark">${escapeHtml(category || "Lobbying")}</span>
-            <span class="a1-badge a1-badge--soft">Stakeholder map</span>
-          </div>
-          <span class="a1-mono-pill">${escapeHtml(billId)}</span>
-          ${microActionsHtml()}
-        </header>
-        <section class="a1-influence__map" aria-label="Influence network">
-          <div class="a1-influence__col a1-influence__col--oppose">
-            <span class="a1-influence__side-label" style="color:${OPPOSE}">Oppose</span>
-            ${oppose.map((s) => node(s, "oppose")).join("")}
-          </div>
-          <div class="a1-influence__center">
-            <div class="a1-influence__bill">
-              <span class="a1-section-label">Bill</span>
-              <strong>${escapeHtml(billId)}</strong>
-            </div>
-          </div>
-          <div class="a1-influence__col a1-influence__col--support">
-            <span class="a1-influence__side-label" style="color:${SUPPORT}">Agree</span>
-            ${support.map((s) => node(s, "support")).join("")}
-          </div>
-        </section>
-        <section class="a1-influence__summary">
-          <p class="a1-section-label">Who is pushing — and who is fighting</p>
-          <h3>${escapeHtml(summary || title)}</h3>
-          ${impactHtml ? `<ul>${impactHtml}</ul>` : ""}
-        </section>
-        ${reactionDockHtml()}
-      </div>
-    `;
+    const support = stakeholders.filter(
+      (s) => String(s.stance).toLowerCase() !== "oppose"
+    ).length;
+    const oppose = stakeholders.filter(
+      (s) => String(s.stance).toLowerCase() === "oppose"
+    ).length;
+    const chip = `
+      <span class="a1-face__chip a1-face__chip--influence">
+        <span style="color:${SUPPORT}">●</span> ${support} Agree
+        <span class="a1-face__chip-sep">·</span>
+        <span style="color:${OPPOSE}">●</span> ${oppose} Oppose
+      </span>`;
+    return compactFaceShell({
+      themeClass: "a1-theme--influence",
+      billId,
+      category: category || "Lobbying",
+      headline: clampFaceLine(title, 12),
+      tldr: clampFaceLine(summary || title, 16),
+      chipHtml: chip,
+      extraBadges: `<span class="a1-badge a1-badge--soft">Stakeholder map</span>`,
+    });
   }
 
   function defaultDistricts() {
@@ -481,101 +367,45 @@
     ];
   }
 
-  function renderLocal({ billId, title, category, impactsList, summary, item }) {
+  function renderLocal({ billId, title, category, summary, impactsList, item }) {
     const districts =
       Array.isArray(item.districts) && item.districts.length
         ? item.districts
         : defaultDistricts();
     const focus =
-      item.focusDistrict ||
-      item.focus_district ||
-      "TX-22 · Katy area";
-    const funding =
-      item.fundingLabel ||
-      item.funding_label ||
-      item.fundingAllocation ||
-      item.funding_allocation ||
-      "$352M regional";
-    const regional =
-      item.regionalImpact || item.regional_impact || "High";
-
-    const districtHtml = districts
-      .map((row) => {
-        const emphasis = Boolean(row.emphasis);
-        return `
-        <li class="a1-local__district ${emphasis ? "is-emphasis" : ""}">
-          <div>
-            <p class="a1-local__district-label">${escapeHtml(row.label || "District")}</p>
-            <p class="a1-local__district-detail">${escapeHtml(
-              row.detail || "District impact"
-            )}</p>
-          </div>
-          ${
-            row.amount
-              ? `<span class="a1-local__district-amount">${escapeHtml(
-                  row.amount
-                )}</span>`
-              : ""
-          }
-        </li>`;
-      })
-      .join("");
-
-    const impactHtml = impactsList
-      .map((impact) => `<li>${escapeHtml(impact)}</li>`)
-      .join("");
-
-    return `
-      <div class="a1-theme a1-theme--local">
-        <header class="a1-local__header">
-          <div class="a1-bento__badges">
-            <span class="a1-badge a1-badge--dark">${escapeHtml(
-              category || "Local"
-            )}</span>
-            <span class="a1-badge a1-badge--soft">District impact</span>
-          </div>
-          <span class="a1-mono-pill">${escapeHtml(billId)}</span>
-          ${microActionsHtml()}
-        </header>
-        <div class="a1-local__grid">
-          <section class="a1-local__panel" aria-label="District breakdown">
-            <p class="a1-section-label">District breakdown</p>
-            <ul class="a1-local__districts">${districtHtml}</ul>
-          </section>
-          <section class="a1-local__map" aria-label="Regional map">
-            <p class="a1-section-label">Regional map</p>
-            <div class="a1-local__map-canvas" aria-hidden="true">
-              <span class="a1-local__map-block a1-local__map-block--a">TX-07</span>
-              <span class="a1-local__map-block a1-local__map-block--focus">TX-22 ★</span>
-              <span class="a1-local__map-block a1-local__map-block--c">TX-09</span>
-            </div>
-            <p class="a1-local__map-caption">${escapeHtml(focus)}</p>
-          </section>
-        </div>
-        <section class="a1-local__metrics" aria-label="Localized metrics">
-          <div class="a1-local__metric">
-            <p class="a1-section-label">Funding allocation</p>
-            <p class="a1-local__metric-value">${escapeHtml(funding)}</p>
-          </div>
-          <div class="a1-local__metric">
-            <p class="a1-section-label">Focus district</p>
-            <p class="a1-local__metric-value">${escapeHtml(focus)}</p>
-          </div>
-          <div class="a1-local__metric">
-            <p class="a1-section-label">Regional impact</p>
-            <p class="a1-local__metric-value a1-local__metric-value--good">${escapeHtml(
-              regional
-            )}</p>
-          </div>
-        </section>
-        <section class="a1-local__summary">
-          <p class="a1-section-label">Localized impact</p>
-          <h3>${escapeHtml(summary || title)}</h3>
-          ${impactHtml ? `<ul>${impactHtml}</ul>` : ""}
-        </section>
-        ${reactionDockHtml()}
-      </div>
-    `;
+      districts.find((d) => d.emphasis) ||
+      districts[0] || {
+        label: "TX-22",
+        amount: "$184M",
+        detail: "Flood projects",
+      };
+    const firstImpact = normalizeCopyLine(impactsList[0] || "");
+    let chipLabel = "";
+    if (firstImpact && /\$\d/.test(firstImpact) && /tx[-\s]?\d+/i.test(firstImpact)) {
+      chipLabel = firstImpact;
+    } else if (focus.amount && focus.label) {
+      const projectHint = /flood/i.test(
+        `${focus.detail || ""} ${firstImpact} ${summary || ""}`
+      )
+        ? "Flood Projects"
+        : "Local Projects";
+      chipLabel = `${focus.amount} to ${focus.label} ${projectHint}`;
+    } else {
+      chipLabel = firstImpact || summary || title;
+    }
+    const chip = `
+      <span class="a1-face__chip a1-face__chip--local">
+        📍 ${escapeHtml(clampFaceLine(chipLabel, 10))}
+      </span>`;
+    return compactFaceShell({
+      themeClass: "a1-theme--local",
+      billId,
+      category: category || "Local",
+      headline: clampFaceLine(title, 12),
+      tldr: clampFaceLine(summary || title, 16),
+      chipHtml: chip,
+      extraBadges: `<span class="a1-badge a1-badge--soft">District impact</span>`,
+    });
   }
 
   function defaultVersusClauses() {
@@ -611,7 +441,7 @@
     ];
   }
 
-  function renderVersus({ billId, title, category, impactsList, summary, item }) {
+  function renderVersus({ billId, title, category, summary, item }) {
     const clauses =
       (Array.isArray(item.versusClauses) && item.versusClauses.length
         ? item.versusClauses
@@ -620,71 +450,24 @@
         ? item.versus_clauses
         : null) ||
       defaultVersusClauses();
-    const leftLabel =
-      item.versusLeftLabel || item.versus_left_label || "Bill A · Original";
-    const rightLabel =
-      item.versusRightLabel || item.versus_right_label || "Bill B · Amendment";
-
-    const clauseHtml = clauses
-      .map((clause) => {
-        const tone = String(clause.tone || "neutral").toLowerCase();
-        const color =
-          tone === "agree" ? SUPPORT : tone === "oppose" ? OPPOSE : "#64748b";
-        const toneText =
-          tone === "agree" ? "Agree" : tone === "oppose" ? "Oppose" : "Note";
-        return `
-        <li class="a1-versus__clause is-${escapeHtml(tone)}">
-          <div class="a1-versus__clause-head">
-            <p class="a1-section-label">${escapeHtml(clause.label || "Clause")}</p>
-            <span class="a1-versus__tone" style="color:${color};border-color:${color}55;background:${color}12">${toneText}</span>
-          </div>
-          <div class="a1-versus__cols">
-            <div class="a1-versus__col a1-versus__col--left">
-              <p>${escapeHtml(clause.left || "—")}</p>
-            </div>
-            <div class="a1-versus__col a1-versus__col--right" style="box-shadow: inset 3px 0 0 ${color}">
-              <p>${escapeHtml(clause.right || "—")}</p>
-            </div>
-          </div>
-        </li>`;
-      })
-      .join("");
-
-    const impactHtml = impactsList
-      .map((impact) => `<li>${escapeHtml(impact)}</li>`)
-      .join("");
-
-    return `
-      <div class="a1-theme a1-theme--versus">
-        <header class="a1-versus__header">
-          <div class="a1-bento__badges">
-            <span class="a1-badge a1-badge--dark">${escapeHtml(
-              category || "Comparison"
-            )}</span>
-            <span class="a1-badge a1-badge--soft">Versus</span>
-          </div>
-          <span class="a1-mono-pill">${escapeHtml(billId)}</span>
-          ${microActionsHtml()}
-        </header>
-        <div class="a1-versus__labels">
-          <div class="a1-versus__label a1-versus__label--left">${escapeHtml(
-            leftLabel
-          )}</div>
-          <div class="a1-versus__label a1-versus__label--right">${escapeHtml(
-            rightLabel
-          )}</div>
-        </div>
-        <section class="a1-versus__compare" aria-label="Clause comparison">
-          <ul>${clauseHtml}</ul>
-        </section>
-        <section class="a1-versus__summary">
-          <p class="a1-section-label">What changed</p>
-          <h3>${escapeHtml(summary || title)}</h3>
-          ${impactHtml ? `<ul>${impactHtml}</ul>` : ""}
-        </section>
-        ${reactionDockHtml()}
-      </div>
-    `;
+    const changed = clauses.filter(
+      (c) => String(c.tone || "").toLowerCase() === "oppose"
+    ).length;
+    const chip = `
+      <span class="a1-face__chip a1-face__chip--versus">
+        ↔ Original vs Amendment · ${changed || clauses.length} key change${
+      (changed || clauses.length) === 1 ? "" : "s"
+    }
+      </span>`;
+    return compactFaceShell({
+      themeClass: "a1-theme--versus",
+      billId,
+      category: category || "Comparison",
+      headline: clampFaceLine(title, 12),
+      tldr: clampFaceLine(summary || title, 16),
+      chipHtml: chip,
+      extraBadges: `<span class="a1-badge a1-badge--soft">Versus</span>`,
+    });
   }
 
   function buildMetrics(item = {}, impacts = {}) {
@@ -750,9 +533,6 @@
       themeLabel: themeLabel(theme),
       html: `
         <div class="a1-card-shell" data-a1-theme="${escapeHtml(theme)}">
-          <div class="a1-theme-badge" data-theme="${escapeHtml(theme)}">
-            Theme · ${escapeHtml(themeLabel(theme))}
-          </div>
           ${body}
         </div>
       `,
