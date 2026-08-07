@@ -1871,10 +1871,6 @@ function buildFeedSocialProof(item = {}, community = null) {
 }
 
 function renderFeedSocialProofHtml(proof = {}) {
-  const pct =
-    proof.hasData && proof.supportPct != null
-      ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
-      : 0;
   const tone = String(proof.tone || "first").replace(/[^a-z0-9_-]/gi, "");
   return `
     <div class="feed-social-proof__row">
@@ -1882,36 +1878,31 @@ function renderFeedSocialProofHtml(proof = {}) {
         proof.urgency || "⚡ Be the 1st to Vote!"
       )}</span>
     </div>
-    <div
-      class="feed-story-meter"
-      role="img"
-      aria-label="${
-        proof.hasData ? `${pct}% leaning Pass` : "No community votes yet"
-      }"
-    >
-      <span class="feed-story-meter__fill" style="width:${pct}%"></span>
-    </div>
   `;
 }
 
 function applyFeedVoteRatioLabels(card, proof = {}) {
   const supportBtn = card?.querySelector?.('[data-stance="support"]');
   const opposeBtn = card?.querySelector?.('[data-stance="oppose"]');
-  if (!supportBtn || !opposeBtn) return;
-  const hasRatio =
-    proof.hasData &&
-    proof.supportPct != null &&
-    proof.opposePct != null;
-  const passLabel = hasRatio
-    ? `👍 PASS IT • ${proof.supportPct}%`
-    : "👍 PASS IT";
-  const killLabel = hasRatio
-    ? `👎 KILL IT • ${proof.opposePct}%`
-    : "👎 KILL IT";
-  supportBtn.dataset.liveLabel = passLabel;
-  opposeBtn.dataset.liveLabel = killLabel;
-  supportBtn.textContent = passLabel;
-  opposeBtn.textContent = killLabel;
+  // Keep Pass/Kill labels clean — Pass % lives on the side thermometer.
+  if (supportBtn && opposeBtn) {
+    const passLabel = "👍 PASS IT";
+    const killLabel = "👎 KILL IT";
+    supportBtn.dataset.liveLabel = passLabel;
+    opposeBtn.dataset.liveLabel = killLabel;
+    supportBtn.textContent = passLabel;
+    opposeBtn.textContent = killLabel;
+  }
+
+  const passPct =
+    proof.hasData && proof.supportPct != null
+      ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
+      : null;
+  if (passPct != null && window.VoteFeedback?.mountOrUpdateThermoGauge) {
+    window.VoteFeedback.mountOrUpdateThermoGauge(card, passPct, {
+      animate: true,
+    });
+  }
 }
 
 async function hydrateFeedSocialProof(card, item) {
@@ -1930,7 +1921,7 @@ async function hydrateFeedSocialProof(card, item) {
   el.innerHTML = renderFeedSocialProofHtml(proof);
   applyFeedVoteRatioLabels(card, proof);
 
-  // Keep post-vote ratio bar in sync with live community split.
+  // Keep local split + side thermometer in sync with live community Pass %.
   const local = window.VoteFeedback?.getLocalVote?.(item);
   const stance =
     local?.stance ||
@@ -1943,34 +1934,22 @@ async function hydrateFeedSocialProof(card, item) {
       killPct: proof.opposePct,
       total: proof.total,
     });
+    window.VoteFeedback.mountOrUpdateThermoGauge?.(card, proof.supportPct, {
+      animate: false,
+    });
+    // Clear any legacy horizontal post-vote track if still present.
     const panel = card.querySelector(".policy-engage__logged-panel.vote-feedback-panel");
-    if (panel && !panel.hidden) {
-      window.VoteFeedback.mountPostVoteBar(panel, {
-        stance,
-        passPct: proof.supportPct,
-        killPct: proof.opposePct,
-        animate: false,
-        showChange: true,
-      });
-      panel.querySelector(".policy-engage__change")?.addEventListener("click", () => {
-        const engage = card.querySelector(".policy-engage");
-        // Re-show buttons via a synthetic change: remount stance UI.
-        const supportBtn = card.querySelector('[data-stance="support"]');
-        const opposeBtn = card.querySelector('[data-stance="oppose"]');
-        const stances = card.querySelector(".policy-engage__stances");
-        if (stances) stances.hidden = false;
-        panel.hidden = false;
-        panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
-        panel.innerHTML = `
-          <p class="policy-engage__logged-hint">
-            Choose Pass It or Kill It to update your vote.
-          </p>
-        `;
-        supportBtn?.classList.toggle("is-active", stance === "support");
-        opposeBtn?.classList.toggle("is-active", stance === "oppose");
-        engage?.classList.add("is-changing-vote");
-      });
+    if (panel) {
+      panel.hidden = true;
+      panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+      panel.innerHTML = "";
     }
+    const stances = card.querySelector(".policy-engage__stances");
+    if (stances) stances.hidden = false;
+    const supportBtn = card.querySelector('[data-stance="support"]');
+    const opposeBtn = card.querySelector('[data-stance="oppose"]');
+    supportBtn?.classList.toggle("is-active", stance === "support");
+    opposeBtn?.classList.toggle("is-active", stance === "oppose");
   }
 }
 

@@ -193,6 +193,111 @@
     );
   }
 
+  function findThermoHost(card) {
+    if (!card) return null;
+    return (
+      card.querySelector(".a1-story-card") ||
+      card.querySelector(".a1-card-shell") ||
+      card.querySelector(".a1-article-card") ||
+      card
+    );
+  }
+
+  /**
+   * Smooth Red → Orange → Yellow → Green from Pass % (0–100).
+   * Hue walks 0° (red) → 120° (green) in HSL.
+   */
+  function passPctToColor(passPct) {
+    const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+    const hue = t * 120;
+    const sat = 92;
+    const light = 48 + t * 4;
+    return `hsl(${hue.toFixed(1)} ${sat}% ${light.toFixed(1)}%)`;
+  }
+
+  function applyThermoFill(gauge, pct, color, { animate = true, fromZero = false } = {}) {
+    if (!gauge) return;
+    const fill = gauge.querySelector(".vote-thermo-gauge__fill");
+    gauge.setAttribute("aria-label", `${pct}% Pass`);
+    gauge.dataset.passPct = String(pct);
+    gauge.classList.remove("is-settled");
+
+    const applyTarget = () => {
+      gauge.style.setProperty("--thermo-pct", `${pct}%`);
+      gauge.style.setProperty("--thermo-color", color);
+      if (fill) {
+        fill.style.height = `${pct}%`;
+        fill.style.backgroundColor = color;
+      }
+      gauge.classList.add("is-ready");
+    };
+
+    if (!animate) {
+      applyTarget();
+      gauge.classList.add("is-settled");
+      return;
+    }
+
+    // First paint: grow from empty. Later updates interpolate from current fill.
+    if (fromZero || !gauge.classList.contains("is-ready")) {
+      gauge.classList.remove("is-ready");
+      gauge.style.setProperty("--thermo-pct", "0%");
+      if (fill) fill.style.height = "0%";
+      void gauge.offsetWidth;
+      requestAnimationFrame(applyTarget);
+      return;
+    }
+
+    requestAnimationFrame(applyTarget);
+  }
+
+  function buildThermoGaugeHtml(passPct = 50) {
+    const pct = clampPct(passPct);
+    const color = passPctToColor(pct);
+    return `
+      <div
+        class="vote-thermo-gauge"
+        role="img"
+        aria-label="${pct}% Pass"
+        style="--thermo-pct:${pct}%; --thermo-color:${color};"
+        data-pass-pct="${pct}"
+      >
+        <div class="vote-thermo-gauge__track">
+          <span class="vote-thermo-gauge__fill" style="height:${pct}%; background-color:${color};"></span>
+        </div>
+      </div>
+    `;
+  }
+
+  function mountOrUpdateThermoGauge(cardOrEl, passPct, { animate = true } = {}) {
+    const card = findCardRoot(cardOrEl);
+    const host = findThermoHost(card);
+    if (!host) return null;
+    const pct = clampPct(passPct);
+    const color = passPctToColor(pct);
+    let gauge = host.querySelector(":scope > .vote-thermo-gauge");
+    if (!gauge) {
+      gauge = host.querySelector(".vote-thermo-gauge");
+    }
+    const isNew = !gauge;
+    if (!gauge) {
+      host.insertAdjacentHTML(
+        "beforeend",
+        buildThermoGaugeHtml(animate ? 0 : pct)
+      );
+      gauge = host.querySelector(".vote-thermo-gauge");
+      const prior = host.style.position;
+      if (!prior || prior === "static") host.style.position = "relative";
+    }
+    if (!gauge) return null;
+
+    applyThermoFill(gauge, pct, color, {
+      animate,
+      fromZero: isNew && animate,
+    });
+    return gauge;
+  }
+
   function clearMotionClasses(card) {
     if (!card) return;
     card.classList.remove(
@@ -224,14 +329,14 @@
       stamp.className = `vote-feedback-stamp vote-feedback-stamp--${mode}`;
       stamp.setAttribute("aria-hidden", "true");
       stamp.innerHTML = isPass
-        ? `<span class="vote-feedback-stamp__badge">PASS IT</span>`
+        ? `<span class="vote-feedback-stamp__badge">PASS</span>`
         : `<span class="vote-feedback-stamp__badge">KILLED</span>`;
       const prior = host.style.position;
       if (!prior || prior === "static") host.style.position = "relative";
       host.appendChild(stamp);
       window.setTimeout(() => {
         stamp.classList.add("is-leaving");
-        window.setTimeout(() => stamp.remove(), 220);
+        window.setTimeout(() => stamp.remove(), 240);
       }, STAMP_MS);
     }
 
@@ -240,6 +345,9 @@
     }, MOTION_MS);
   }
 
+  /**
+   * Compact logged-vote row (no horizontal percentage track — thermo handles that).
+   */
   function buildPostVoteBarHtml({
     stance,
     passPct,
@@ -252,19 +360,13 @@
     const kill = clampPct(killPct != null ? killPct : 100 - pass);
     return `
       <div
-        class="vote-feedback-bar ${animate ? "is-animating" : "is-settled"}"
+        class="vote-feedback-bar vote-feedback-bar--compact ${
+          animate ? "is-animating" : "is-settled"
+        } is-filled"
         data-user-stance="${isPass ? "support" : "oppose"}"
         role="status"
         aria-live="polite"
       >
-        <div
-          class="vote-feedback-bar__track"
-          role="img"
-          aria-label="${pass}% Pass, ${kill}% Kill"
-        >
-          <span class="vote-feedback-bar__fill vote-feedback-bar__fill--pass" style="--target-width:${pass}%"></span>
-          <span class="vote-feedback-bar__fill vote-feedback-bar__fill--kill" style="--target-width:${kill}%"></span>
-        </div>
         <div class="vote-feedback-bar__meta">
           <span class="vote-feedback-bar__choice ${
             isPass ? "is-pass" : "is-kill"
@@ -291,25 +393,24 @@
     container.hidden = false;
     container.innerHTML = buildPostVoteBarHtml(options);
     const bar = container.querySelector(".vote-feedback-bar");
-    if (bar && options.animate !== false) {
-      requestAnimationFrame(() => {
-        bar.classList.add("is-filled");
-      });
-    } else if (bar) {
+    if (bar) {
       bar.classList.add("is-filled", "is-settled");
+    }
+    const card = findCardRoot(container);
+    if (card) {
+      mountOrUpdateThermoGauge(card, options.passPct, {
+        animate: options.animate !== false,
+      });
     }
     return bar;
   }
 
   /**
-   * Apply post-vote UI into engagement roots (hides action buttons).
+   * Apply post-vote UI: keep Pass/Kill buttons clean, drive the side thermometer.
+   * Horizontal percentage track is intentionally omitted.
    */
   function applyPostVoteState(roots, item, stance, split, { animate = true } = {}) {
     if (!roots) return;
-    const stances = roots.stancesEl;
-    const panel = roots.loggedPanel;
-    if (stances) stances.hidden = true;
-    if (!panel) return;
 
     const passPct = split?.passPct ?? 62;
     const killPct = split?.killPct ?? 38;
@@ -320,24 +421,36 @@
       total: split?.total || 0,
     });
 
-    panel.hidden = false;
-    panel.classList.toggle("is-support", stance === "support");
-    panel.classList.toggle("is-oppose", stance === "oppose");
-    panel.classList.add("vote-feedback-panel");
-    mountPostVoteBar(panel, {
-      stance,
-      passPct,
-      killPct,
-      animate,
-      showChange: true,
-    });
+    const stances = roots.stancesEl;
+    const panel = roots.loggedPanel;
+    const supportBtn = roots.supportBtn;
+    const opposeBtn = roots.opposeBtn;
 
-    panel.querySelector(".policy-engage__change")?.addEventListener("click", () => {
-      roots.changeMode = true;
-      if (typeof roots.reapplyLoggedUI === "function") {
-        roots.reapplyLoggedUI(stance);
-      }
-    });
+    // Keep the Pass/Kill row visible and free of percentage overlays.
+    if (stances) stances.hidden = false;
+    if (panel) {
+      panel.hidden = true;
+      panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+      panel.innerHTML = "";
+    }
+
+    if (supportBtn) {
+      supportBtn.textContent =
+        supportBtn.dataset.liveLabel || roots.supportLabel || "👍 PASS IT";
+      supportBtn.classList.toggle("is-active", stance === "support");
+      supportBtn.classList.remove("is-logged", "is-dimmed");
+      supportBtn.setAttribute("aria-pressed", String(stance === "support"));
+    }
+    if (opposeBtn) {
+      opposeBtn.textContent =
+        opposeBtn.dataset.liveLabel || roots.opposeLabel || "👎 KILL IT";
+      opposeBtn.classList.toggle("is-active", stance === "oppose");
+      opposeBtn.classList.remove("is-logged", "is-dimmed");
+      opposeBtn.setAttribute("aria-pressed", String(stance === "oppose"));
+    }
+
+    const card = roots.root || roots.card || findCardRoot(stances || panel);
+    mountOrUpdateThermoGauge(card, passPct, { animate });
   }
 
   return {
@@ -351,5 +464,8 @@
     mountPostVoteBar,
     applyPostVoteState,
     findCardRoot,
+    passPctToColor,
+    buildThermoGaugeHtml,
+    mountOrUpdateThermoGauge,
   };
 });

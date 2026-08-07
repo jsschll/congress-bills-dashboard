@@ -6,8 +6,8 @@ import {
   ThemeWrapper,
 } from "./ThemeWrapper";
 import {
-  VoteFeedback,
   VoteStampOverlay,
+  VoteThermoGauge,
   reactionIdToFeedbackStance,
   readLocalFeedVote,
   splitFromCounts,
@@ -189,6 +189,11 @@ export function ArticleCard({
   const feedbackStance = reactionIdToFeedbackStance(selectedReaction);
   const showPostVote =
     hasSubmitted && (feedbackStance === "pass" || feedbackStance === "kill");
+  const thermoSplit = splitFromCounts(
+    voteCounts,
+    feedbackStance || (totalVotes > 0 ? "pass" : null)
+  );
+  const showThermo = totalVotes > 0 || showPostVote;
 
   const displayMetrics =
     resolvedMetrics.length > 0
@@ -223,6 +228,9 @@ export function ArticleCard({
       data-a1-shell="article-card"
       data-theme={resolvedTheme}
     >
+      {showThermo ? (
+        <VoteThermoGauge passPct={thermoSplit.passPct} animate />
+      ) : null}
       <ThemeWrapper
         bill={bill}
         billId={resolvedBillId}
@@ -238,24 +246,12 @@ export function ArticleCard({
         metrics={displayMetrics}
         actionBar={
           showReactionDock ? (
-            showPostVote && feedbackStance ? (
-              <VoteFeedback
-                stance={feedbackStance}
-                voteCounts={voteCounts}
-                animate
-                onChange={() => {
-                  setHasSubmitted(false);
-                  setSelectedReaction(null);
-                }}
-              />
-            ) : (
-              <ReactionDock
-                selectedReaction={selectedReaction}
-                disabled={false}
-                onReact={handleReact}
-                theme={resolvedTheme}
-              />
-            )
+            <ReactionDock
+              selectedReaction={selectedReaction}
+              disabled={false}
+              onReact={handleReact}
+              theme={resolvedTheme}
+            />
           ) : null
         }
       >

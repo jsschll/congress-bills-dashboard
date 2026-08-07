@@ -164,7 +164,7 @@
   right: 0;
   bottom: 0;
   z-index: 3;
-  padding: 1.1rem 1rem 1rem;
+  padding: 1.1rem 1.6rem 1rem 1rem;
   pointer-events: none;
 }
 
@@ -287,11 +287,6 @@
   border-color: #fb7185;
   color: #fff1f2;
   box-shadow: 0 8px 22px rgba(244, 63, 94, 0.28);
-}
-
-.a1-story-card .policy-engage__logged-panel.vote-feedback-panel {
-  background: rgba(255, 252, 247, 0.96);
-  border-color: rgba(255, 255, 255, 0.18);
 }
 
 /* Hide legacy theme badge when using story shell */
@@ -1786,11 +1781,15 @@ body.feed-breakdown-open {
   display: grid;
   place-items: center;
   pointer-events: none;
-  animation: vote-stamp-in 0.38s cubic-bezier(0.22, 1.55, 0.36, 1) both;
+  animation: vote-stamp-in 0.42s ease-out both;
 }
 
 .vote-feedback-stamp.is-leaving {
-  animation: vote-stamp-out 0.22s ease-in forwards;
+  animation: vote-stamp-out 0.24s ease-in forwards;
+}
+
+.vote-feedback-stamp.is-leaving .vote-feedback-stamp__badge {
+  animation: vote-stamp-badge-out 0.24s ease-in forwards;
 }
 
 .vote-feedback-stamp__badge {
@@ -1804,39 +1803,159 @@ body.feed-breakdown-open {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  transform: rotate(-8deg);
   border: 3px solid currentColor;
-  box-shadow: 0 10px 28px rgba(16, 12, 8, 0.28);
+  transform-origin: center center;
+  animation: vote-stamp-badge-pop 0.48s cubic-bezier(0.22, 1.55, 0.36, 1) both;
 }
 
 .vote-feedback-stamp--pass .vote-feedback-stamp__badge {
   color: #ecfdf5;
-  background: rgba(6, 95, 70, 0.88);
+  background: rgba(6, 95, 70, 0.9);
   border-color: rgba(52, 211, 153, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(16, 185, 129, 0.25),
+    0 0 32px rgba(16, 185, 129, 0.65),
+    0 0 48px rgba(16, 185, 129, 0.35),
+    0 12px 28px rgba(16, 12, 8, 0.3);
 }
 
 .vote-feedback-stamp--kill .vote-feedback-stamp__badge {
   color: #fff1f2;
-  background: rgba(76, 5, 25, 0.9);
+  background: rgba(76, 5, 25, 0.92);
   border-color: rgba(251, 113, 133, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(244, 63, 94, 0.28),
+    0 0 32px rgba(244, 63, 94, 0.65),
+    0 0 48px rgba(244, 63, 94, 0.35),
+    0 12px 28px rgba(16, 12, 8, 0.3);
 }
 
+/* Scale-and-snap lives on the badge: 1.3 → 1.0 with a 3–5° tilt */
 @keyframes vote-stamp-in {
-  0% { opacity: 0; transform: scale(1.45); }
-  60% { opacity: 1; transform: scale(0.96); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes vote-stamp-badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1.3) rotate(-5deg);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(0.96) rotate(3deg);
+  }
+  78% {
+    transform: scale(1.05) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-4deg);
+  }
 }
 
 @keyframes vote-stamp-out {
-  to { opacity: 0; transform: scale(0.92); }
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes vote-stamp-badge-out {
+  to {
+    opacity: 0;
+    transform: scale(0.9) rotate(-6deg);
+  }
+}
+
+/* ── Vertical Pass% thermometer (card inner edge) ───────────────────── */
+
+@property --thermo-pct {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+@property --thermo-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: hsl(60 92% 50%);
+}
+
+.vote-thermo-gauge {
+  position: absolute;
+  top: 12%;
+  bottom: 14%;
+  right: 0.55rem;
+  z-index: 6;
+  width: 0.55rem;
+  pointer-events: none;
+  --thermo-pct: 0%;
+  --thermo-color: hsl(60 92% 50%);
+}
+
+.vote-thermo-gauge__track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.25),
+    0 4px 12px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(4px);
+}
+
+.vote-thermo-gauge__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--thermo-pct, 0%);
+  border-radius: inherit;
+  background-color: var(--thermo-color, hsl(60 92% 50%));
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--thermo-color) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    height 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.75s ease,
+    box-shadow 0.75s ease;
+  will-change: height, background-color;
+}
+
+.vote-thermo-gauge:not(.is-ready) .vote-thermo-gauge__fill {
+  height: 0% !important;
+}
+
+.vote-thermo-gauge.is-settled .vote-thermo-gauge__fill {
+  transition: none;
+}
+
+.a1-story-card .vote-thermo-gauge {
+  top: 10%;
+  bottom: calc(5.5rem + 8%);
+  right: 0.6rem;
+}
+
+.feed-social-card:not(.a1-story-feed) .vote-thermo-gauge {
+  top: 0.75rem;
+  bottom: 4.5rem;
+  right: 0.45rem;
 }
 
 .policy-engage__logged-panel.vote-feedback-panel {
   display: flex;
   flex-direction: column;
   width: 100%;
-  gap: 0.55rem;
-  padding: 0.55rem 0.65rem 0.6rem;
+  gap: 0.35rem;
+  padding: 0.5rem 0.65rem;
   border-radius: 1rem;
   background: rgba(255, 252, 247, 0.92);
   border: 1px solid rgba(212, 184, 150, 0.55);
@@ -1851,6 +1970,11 @@ body.feed-breakdown-open {
   backdrop-filter: none;
 }
 
+.a1-story-card .policy-engage__logged-panel.vote-feedback-panel {
+  background: rgba(255, 252, 247, 0.96);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
 .vote-feedback-bar {
   display: flex;
   flex-direction: column;
@@ -1858,35 +1982,14 @@ body.feed-breakdown-open {
   width: 100%;
 }
 
-.vote-feedback-bar__track {
-  position: relative;
-  display: flex;
-  width: 100%;
-  height: 0.7rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(28, 20, 16, 0.08);
+/* Horizontal track removed — percentages live on the side thermometer */
+.vote-feedback-bar__track,
+.vote-feedback-bar--compact .vote-feedback-bar__track {
+  display: none !important;
 }
 
 .vote-feedback-bar__fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  flex: 0 0 auto;
-  transition: width 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.vote-feedback-bar.is-filled .vote-feedback-bar__fill,
-.vote-feedback-bar.is-settled .vote-feedback-bar__fill {
-  width: var(--target-width, 50%);
-}
-
-.vote-feedback-bar__fill--pass {
-  background: linear-gradient(90deg, #059669, #34d399);
-}
-
-.vote-feedback-bar__fill--kill {
-  background: linear-gradient(90deg, #e11d48, #fb7185);
+  display: none;
 }
 
 .vote-feedback-bar__meta {
@@ -1962,12 +2065,18 @@ body.feed-breakdown-open {
   .a1-themed-card.vote-motion--kill.is-vote-burst,
   .feed-social-card.vote-motion--pass.is-vote-burst,
   .feed-social-card.vote-motion--kill.is-vote-burst,
-  .vote-feedback-stamp {
+  .vote-feedback-stamp,
+  .vote-feedback-stamp__badge {
     animation: none;
   }
 
-  .vote-feedback-bar__fill {
+  .vote-thermo-gauge__fill {
     transition: none;
+  }
+
+  .vote-feedback-stamp--pass .vote-feedback-stamp__badge,
+  .vote-feedback-stamp--kill .vote-feedback-stamp__badge {
+    transform: rotate(-4deg);
   }
 }
 

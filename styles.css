@@ -7997,23 +7997,11 @@ body.politician-notes-modal-open {
 }
 
 .feed-story-meter {
-  width: 100%;
-  height: 0.3rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-  margin: 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: none !important;
 }
 
 .feed-story-meter__fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #10b981 0%, #2dd4bf 55%, #67e8f9 100%);
-  box-shadow: 0 0 12px rgba(45, 212, 191, 0.55);
-  transition: width 0.35s ease;
+  display: none !important;
 }
 
 .feed-social-card .engagement-mount-point {
