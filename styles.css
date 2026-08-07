@@ -4019,6 +4019,15 @@ body {
 }
 
 /* Compact Feed chrome so the first card is above the fold */
+.page-feed {
+  background:
+    radial-gradient(ellipse 70% 45% at 8% -5%, rgba(34, 211, 238, 0.14), transparent 55%),
+    radial-gradient(ellipse 55% 40% at 92% 0%, rgba(16, 185, 129, 0.12), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 50% 100%, rgba(30, 64, 175, 0.1), transparent 55%),
+    linear-gradient(180deg, #070b14 0%, #0b1220 45%, #0a101c 100%);
+  background-attachment: fixed;
+}
+
 .page-feed .header {
   gap: 0.55rem;
   margin-bottom: 0.15rem;
@@ -4047,9 +4056,25 @@ body {
   display: none !important;
 }
 
-.page-feed .policy-feed-filters .refresh-btn {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.8rem;
+.page-feed .policy-feed-filters {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.page-feed .policy-feed-tabs__button {
+  background: rgba(15, 23, 42, 0.45);
+  border-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.page-feed .policy-feed-coverage__badge {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
 }
 
 .page-app .refresh-btn,
