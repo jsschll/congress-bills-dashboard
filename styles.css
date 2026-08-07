@@ -7623,8 +7623,8 @@ body.politician-notes-modal-open {
   min-width: 0;
 }
 
-.feed-social-card__status,
-.feed-social-card__category {
+.feed-social-card .status-badge,
+.feed-social-card .category-pill {
   display: inline-flex;
   align-items: center;
   max-width: 55%;
@@ -7639,44 +7639,48 @@ body.politician-notes-modal-open {
   text-overflow: ellipsis;
 }
 
-.feed-social-card__status {
+.feed-social-card .status-badge {
   background: rgba(30, 41, 59, 0.95);
   border-color: rgba(148, 163, 184, 0.28);
   color: #cbd5e1;
 }
 
-.feed-social-card__status.is-passed {
+.feed-social-card .status-badge.is-passed {
   background: rgba(16, 185, 129, 0.14);
   border-color: rgba(52, 211, 153, 0.35);
   color: #6ee7b7;
 }
 
-.feed-social-card__status.is-failed {
+.feed-social-card .status-badge.is-failed {
   background: rgba(248, 113, 113, 0.12);
   border-color: rgba(248, 113, 113, 0.35);
   color: #fca5a5;
 }
 
-.feed-social-card__status.is-pending {
+.feed-social-card .status-badge.is-pending {
   background: rgba(56, 189, 248, 0.1);
   border-color: rgba(56, 189, 248, 0.28);
   color: #7dd3fc;
 }
 
-.feed-social-card__category {
+.feed-social-card .category-pill {
   flex-shrink: 0;
   background: rgba(51, 65, 85, 0.55);
   border-color: rgba(148, 163, 184, 0.22);
   color: #94a3b8;
 }
 
+.feed-social-card__body {
+  min-width: 0;
+}
+
 .feed-social-card__headline {
-  margin: 0;
+  margin: 0 0 4px;
   max-width: 100%;
   min-width: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  line-height: 1.35;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
   color: #f8fafc;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -7706,16 +7710,18 @@ body.politician-notes-modal-open {
   gap: 0.75rem;
   min-width: 0;
   width: 100%;
+  padding-top: 0.5rem;
+  border-top: 1px solid #1e293b;
 }
 
-.feed-social-card__ask {
+.feed-social-card .details-toggle-btn {
   appearance: none;
-  border: 0;
-  background: transparent;
-  color: #6ee7b7;
+  border: none;
+  background: none;
+  color: #38bdf8;
   font: inherit;
-  font-size: 0.84rem;
-  font-weight: 650;
+  font-size: 0.8rem;
+  font-weight: 600;
   padding: 0.2rem 0;
   cursor: pointer;
   white-space: nowrap;
@@ -7724,12 +7730,12 @@ body.politician-notes-modal-open {
   text-align: left;
 }
 
-.feed-social-card__ask:hover,
-.feed-social-card__ask:focus-visible {
-  color: #a7f3d0;
+.feed-social-card .details-toggle-btn:hover,
+.feed-social-card .details-toggle-btn:focus-visible {
+  color: #7dd3fc;
 }
 
-.feed-social-card__stances {
+.feed-social-card .engagement-mount-point {
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -7738,7 +7744,7 @@ body.politician-notes-modal-open {
   max-width: 100%;
 }
 
-.feed-social-card__stances .policy-engage,
+.feed-social-card .engagement-mount-point .policy-engage,
 .feed-social-card .policy-engage {
   margin: 0;
   padding: 0;
@@ -7748,7 +7754,7 @@ body.politician-notes-modal-open {
   min-width: 0;
 }
 
-.feed-social-card__stances .policy-engage__actions,
+.feed-social-card .engagement-mount-point .policy-engage__actions,
 .feed-social-card .policy-engage__actions {
   display: flex;
   flex-wrap: nowrap;
@@ -7758,7 +7764,7 @@ body.politician-notes-modal-open {
   max-width: 100%;
 }
 
-.feed-social-card__stances .policy-engage__stances,
+.feed-social-card .engagement-mount-point .policy-engage__stances,
 .feed-social-card .policy-engage__stances {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -7766,7 +7772,7 @@ body.politician-notes-modal-open {
   min-width: 0;
 }
 
-.feed-social-card__stances .policy-engage__stance,
+.feed-social-card .engagement-mount-point .policy-engage__stance,
 .feed-social-card .policy-engage__stance {
   min-width: 0;
   width: auto;
