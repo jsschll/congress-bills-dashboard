@@ -1,4 +1,5 @@
 import type { BillMetric, ThemeVariant } from "../components/types";
+import { resolveBillImage } from "./bill-image-mapper";
 
 /**
  * Live / structured legislative bill shape accepted by Article 1.
@@ -793,6 +794,15 @@ export function mapLiveBillToArticleProps(
     title
   );
 
+  const resolvedImage = resolveBillImage({
+    ...bill,
+    title,
+    category,
+    shortPitch,
+    whatItDoes,
+    keyImpacts,
+  });
+
   return {
     billId: resolveBillId(bill),
     title,
@@ -800,8 +810,9 @@ export function mapLiveBillToArticleProps(
     keyImpacts,
     humanHook: humanHook || undefined,
     promptQuestion: firstPresent(bill.promptQuestion, bill.prompt_question) || undefined,
-    imageSrc: firstPresent(bill.imageSrc, bill.image_src) || undefined,
-    imageAlt: firstPresent(bill.imageAlt, bill.image_alt) || undefined,
+    imageSrc: firstPresent(bill.imageSrc, bill.image_src) || resolvedImage.url,
+    imageAlt:
+      firstPresent(bill.imageAlt, bill.image_alt) || resolvedImage.alt || undefined,
     financialSummary: financialSummary || undefined,
     whatItDoes: whatItDoes || undefined,
     metrics: buildMetricsFromBill(bill),

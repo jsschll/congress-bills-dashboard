@@ -198,6 +198,24 @@
       )
       .join("");
 
+    const mapper =
+      typeof globalThis !== "undefined" && globalThis.BillImageMapper
+        ? globalThis.BillImageMapper
+        : typeof window !== "undefined" && window.BillImageMapper
+          ? window.BillImageMapper
+          : null;
+    const resolvedImage =
+      mapper && typeof mapper.resolveBillImage === "function"
+        ? mapper.resolveBillImage({
+            ...item,
+            title,
+            category,
+            tags: item.tags,
+            summary: summary || item.summary,
+            keyImpacts: impactsList,
+            key_impacts: impactsList,
+          })
+        : null;
     const imageSrc = String(
       item.imageSrc ||
         item.image_src ||
@@ -205,9 +223,15 @@
         item.image_url ||
         item.photoUrl ||
         item.photo_url ||
+        (resolvedImage && resolvedImage.url) ||
         ""
     ).trim();
-    const imageAlt = String(item.imageAlt || item.image_alt || title).trim();
+    const imageAlt = String(
+      item.imageAlt ||
+        item.image_alt ||
+        (resolvedImage && resolvedImage.alt) ||
+        title
+    ).trim();
 
     // Always keep the magazine art plane. Prefer a real photo; otherwise an
     // atmospheric blur wash (never an empty labeled placeholder box).

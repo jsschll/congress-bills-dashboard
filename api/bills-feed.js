@@ -7,6 +7,7 @@ const {
   PROCESSED_VOTES_SELECT_LEGACY,
 } = require("../lib/processed-votes-feed");
 const { seedFederalAndStateBills } = require("../lib/bills-feed-seed");
+const { enrichBillImages } = require("../lib/utils/billImageMapper");
 
 const API_BASE = "https://api.congress.gov/v3";
 const OPENSTATES_BASE = "https://v3.openstates.org";
@@ -905,20 +906,20 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const merged = [
-      ...seedItems,
-      ...federalItems,
-      ...stateItems,
-      ...localItems,
-    ].sort(
-      (a, b) => {
+    const merged = enrichBillImages(
+      [
+        ...seedItems,
+        ...federalItems,
+        ...stateItems,
+        ...localItems,
+      ].sort((a, b) => {
         const aSeed = String(a.source || "").includes("seed") ? 1 : 0;
         const bSeed = String(b.source || "").includes("seed") ? 1 : 0;
         if (aSeed !== bSeed) return bSeed - aSeed;
         return (
           new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
         );
-      }
+      })
     );
 
     if (!merged.length) {
@@ -948,6 +949,7 @@ module.exports = async function handler(req, res) {
         seedFallback: seedItems.length > 0,
         themeSeeds: seedItems.filter((item) => item.source === "theme_seed")
           .length,
+        billImages: "category_stock",
       },
       items: merged,
     });
