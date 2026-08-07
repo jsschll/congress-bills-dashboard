@@ -261,11 +261,36 @@
     });
   }
 
+  function thermoGaugeHtml(passPct = 0) {
+    const pct = Math.max(0, Math.min(100, Math.round(Number(passPct) || 0)));
+    return `
+      <div
+        class="vote-thermo-gauge"
+        role="img"
+        aria-label="${pct}% Pass"
+        style="--thermo-pct:${pct}%; --thermo-color:hsl(60 92% 50%);"
+        data-pass-pct="${pct}"
+      >
+        <div class="vote-thermo-gauge__tube">
+          <div class="vote-thermo-gauge__ticks" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="vote-thermo-gauge__track">
+            <span class="vote-thermo-gauge__fill" style="height:${pct}%"></span>
+          </div>
+        </div>
+        <div class="vote-thermo-gauge__bulb" aria-hidden="true">
+          <span class="vote-thermo-gauge__bulb-fill"></span>
+        </div>
+      </div>
+    `;
+  }
+
   /**
    * Instagram/TikTok-style story peek: fixed-height hero + overlay type + vote dock.
    * Dense theme layouts live in the breakdown drawer template.
    */
-  function renderStoryPeek(payload, theme, label) {
+  function renderStoryPeek(payload, theme) {
     const { billId, title, category, impactsList, summary, item } = payload;
     const { imageSrc, imageAlt, defaultStockUrl } = resolveHeroImage(item, {
       title,
@@ -294,9 +319,6 @@
           <div class="a1-story-card__scrim" aria-hidden="true"></div>
           <div class="a1-story-card__top">
             <div class="a1-story-card__pills">
-              <span class="a1-story-card__pill a1-story-card__pill--theme">${escapeHtml(
-                label
-              )}</span>
               <span class="a1-story-card__pill a1-story-card__pill--cat">${escapeHtml(
                 category || "Congress"
               )}</span>
@@ -325,6 +347,7 @@
           </button>
           ${reactionDockHtml()}
         </div>
+        ${thermoGaugeHtml(0)}
       </div>
     `;
   }
@@ -883,7 +906,7 @@
       item,
     };
 
-    const peek = withChrome(true, () => renderStoryPeek(payload, theme, label));
+    const peek = withChrome(true, () => renderStoryPeek(payload, theme));
     const detail = renderThemeDetail(theme, payload);
 
     return {
@@ -897,7 +920,7 @@
           <template class="a1-story-detail-template">
             <div class="a1-story-detail" data-a1-theme="${escapeHtml(theme)}">
               <div class="a1-story-detail__intro">
-                <p class="a1-story-detail__eyebrow">${escapeHtml(label)} · Full breakdown</p>
+                <p class="a1-story-detail__eyebrow">Full breakdown</p>
                 <h3 class="a1-story-detail__title">${escapeHtml(title)}</h3>
                 <p class="a1-story-detail__bill">${escapeHtml(billId)} · ${escapeHtml(
                   categoryLabel
