@@ -1311,7 +1311,9 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     .replace(/\s+/g, " ")
     .trim();
   const displayTitle = String(resolved.displayTitle || "").trim();
-  const keyPoints = parseFeedKeyPointList(item.key_points || item.keyPoints);
+  const keyPoints = parseFeedKeyPointList(
+    item.key_impacts || item.keyImpacts || item.key_points || item.keyPoints
+  );
   const yea = String(
     copy.yeaMeans || item.yea_impact || item.yeaImpact || item.yeaMeans || ""
   )
