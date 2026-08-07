@@ -1,4 +1,4 @@
-/* Article 1 live-feed themes (vanilla port of Themes 1–4) */
+/* Article 1 live-feed themes (vanilla port of Themes 1–6) */
 
 .a1-theme-badge {
   display: inline-flex;
@@ -665,4 +665,333 @@
     flex-wrap: wrap;
     justify-content: center;
   }
+}
+
+/* ——— Theme #5: Local Impact ——— */
+
+.a1-local__header,
+.a1-versus__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+
+.a1-local__grid {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+@media (min-width: 720px) {
+  .a1-local__grid {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+}
+
+.a1-local__panel,
+.a1-local__map,
+.a1-local__metric,
+.a1-local__summary,
+.a1-versus__compare,
+.a1-versus__summary {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  padding: 0.9rem 1rem;
+}
+
+.a1-local__districts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.a1-local__district {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.65rem;
+  background: #f8fafc;
+  padding: 0.65rem 0.75rem;
+}
+
+.a1-local__district.is-emphasis {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.a1-local__district-label {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.a1-local__district-detail {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 550;
+  color: #64748b;
+}
+
+.a1-local__district.is-emphasis .a1-local__district-detail {
+  color: #cbd5e1;
+}
+
+.a1-local__district-amount {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.a1-local__district.is-emphasis .a1-local__district-amount {
+  color: #6ee7b7;
+}
+
+.a1-local__map-canvas {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  grid-template-rows: 1.2fr 0.9fr;
+  gap: 0.45rem;
+  min-height: 11rem;
+  margin-top: 0.35rem;
+}
+
+.a1-local__map-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.65rem;
+  border: 1.5px solid #94a3b8;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.a1-local__map-block--a {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.a1-local__map-block--focus {
+  grid-column: 2;
+  grid-row: 1;
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.a1-local__map-block--c {
+  grid-column: 1 / span 2;
+  grid-row: 2;
+}
+
+.a1-local__map-caption {
+  margin: 0.7rem 0 0;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: #475569;
+}
+
+.a1-local__metrics {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .a1-local__metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.a1-local__metric-value {
+  margin: 0.2rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 750;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.a1-local__metric-value--good {
+  color: #047857;
+}
+
+.a1-local__summary h3,
+.a1-versus__summary h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 750;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.a1-local__summary ul,
+.a1-versus__summary ul {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid #f1f5f9;
+  list-style: none;
+}
+
+.a1-local__summary li,
+.a1-versus__summary li {
+  position: relative;
+  padding-left: 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 550;
+  color: #334155;
+}
+
+.a1-local__summary li + li,
+.a1-versus__summary li + li {
+  margin-top: 0.35rem;
+}
+
+.a1-local__summary li::before,
+.a1-versus__summary li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: #0f172a;
+}
+
+/* ——— Theme #6: Versus Comparison ——— */
+
+.a1-versus__labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-bottom: 0.65rem;
+}
+
+.a1-versus__label {
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.a1-versus__label--left {
+  border: 1px solid #a7f3d0;
+  background: rgba(5, 150, 105, 0.08);
+  color: #065f46;
+}
+
+.a1-versus__label--right {
+  border: 1px solid #fecdd3;
+  background: rgba(225, 29, 72, 0.07);
+  color: #9f1239;
+}
+
+.a1-versus__compare {
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 0.85rem;
+}
+
+.a1-versus__compare ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.a1-versus__clause + .a1-versus__clause {
+  border-top: 1px solid #f1f5f9;
+}
+
+.a1-versus__clause-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  background: rgba(248, 250, 252, 0.9);
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.a1-versus__clause-head .a1-section-label {
+  margin: 0;
+}
+
+.a1-versus__tone {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.4rem;
+  border: 1px solid;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.6rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.a1-versus__cols {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .a1-versus__cols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.a1-versus__col {
+  padding: 0.75rem 0.9rem;
+}
+
+.a1-versus__col--left {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+@media (min-width: 640px) {
+  .a1-versus__col--left {
+    border-bottom: 0;
+    border-right: 1px solid #f1f5f9;
+  }
+}
+
+.a1-versus__col p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  font-weight: 550;
+  color: #334155;
+}
+
+.a1-versus__clause.is-agree .a1-versus__col--right p {
+  color: #065f46;
+  font-weight: 650;
+}
+
+.a1-versus__clause.is-oppose .a1-versus__col--right p {
+  color: #9f1239;
+  font-weight: 650;
 }

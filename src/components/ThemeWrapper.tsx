@@ -2,18 +2,26 @@ import React from "react";
 import { BentoGridTheme } from "./themes/BentoGridTheme";
 import { EditorialCollageTheme } from "./themes/EditorialCollageTheme";
 import { InfluenceTheme } from "./themes/InfluenceTheme";
+import { LocalTheme } from "./themes/LocalTheme";
 import { PipelineTheme } from "./themes/PipelineTheme";
+import { VersusTheme } from "./themes/VersusTheme";
 import type { BillMetric, ThemeVariant } from "./types";
 import {
   collectBillThemeSignals,
   collectProceduralSignals,
   isInfluenceBill,
+  isLocalBill,
   isProceduralBill,
+  isVersusBill,
   mapLiveBillToArticleProps,
   resolveBillCategoryLabel,
+  resolveLocalImpactFromBill,
+  resolveVersusClausesFromBill,
   type InfluenceStakeholderView,
   type LegislativeBill,
+  type LocalDistrictView,
   type PipelineStepView,
+  type VersusClauseView,
 } from "../lib/live-bill";
 
 /** Visual themes ThemeWrapper can dynamically select between. */
@@ -21,7 +29,9 @@ export type ResolvedArticleTheme =
   | "editorial-collage"
   | "bento-grid"
   | "pipeline"
-  | "influence";
+  | "influence"
+  | "local"
+  | "versus";
 
 const FINANCE_SIGNAL_PATTERN =
   /\b(finance|financial|budget|budgets|economy|economic|fiscal|trade|appropriations?|treasury|tax|taxes|revenue|deficit|debt|commerce|banking|securities)\b/i;
@@ -35,6 +45,12 @@ const PROCEDURAL_SIGNAL_PATTERN =
 const INFLUENCE_SIGNAL_PATTERN =
   /\b(regulatory|regulation|lobbying|lobbyist|stakeholder(\s+map)?|influence(\s+network)?|donor|pac)\b/i;
 
+const LOCAL_SIGNAL_PATTERN =
+  /\b(local|district[-\s]?specific|infrastructure|district\s+impact|regional\s+impact|katy|tx[-\s]?22)\b/i;
+
+const VERSUS_SIGNAL_PATTERN =
+  /\b(comparison|amendment|versus|vs\.?|side[-\s]?by[-\s]?side|original\s+text)\b/i;
+
 export type ThemeWrapperProps = {
   /** Live / structured bill object — preferred source for routing + copy. */
   bill?: LegislativeBill;
@@ -44,7 +60,7 @@ export type ThemeWrapperProps = {
   keyImpacts?: string[];
   /**
    * Explicit theme override. When omitted, bill category / tags decide among
-   * Influence, Pipeline, Bento, and Editorial.
+   * Versus, Local, Influence, Pipeline, Bento, and Editorial.
    */
   themeVariant?: ThemeVariant;
   humanHook?: string;
@@ -55,6 +71,13 @@ export type ThemeWrapperProps = {
   whatItDoes?: string;
   pipelineSteps?: PipelineStepView[];
   stakeholders?: InfluenceStakeholderView[];
+  districts?: LocalDistrictView[];
+  focusDistrict?: string;
+  regionalImpact?: string;
+  fundingLabel?: string;
+  versusClauses?: VersusClauseView[];
+  versusLeftLabel?: string;
+  versusRightLabel?: string;
   metrics?: BillMetric[];
   className?: string;
   children?: React.ReactNode;
@@ -89,12 +112,28 @@ export function isInfluenceCategory(signals = ""): boolean {
 }
 
 /**
+ * True when signals describe local / district / infrastructure impact.
+ */
+export function isLocalCategory(signals = ""): boolean {
+  return LOCAL_SIGNAL_PATTERN.test(signals);
+}
+
+/**
+ * True when signals describe comparison / amendment / versus content.
+ */
+export function isVersusCategory(signals = ""): boolean {
+  return VERSUS_SIGNAL_PATTERN.test(signals);
+}
+
+/**
  * Resolve which Article 1 visual theme to render from real bill properties.
  *
- * Routing (Task C):
- * - Finance / Budget / Appropriations → Bento
- * - Procedural / Authorization / Tracker → Pipeline
+ * Routing:
+ * - Comparison / Amendment / Versus → Versus
+ * - Local / District-Specific / Infrastructure → Local
  * - Regulatory / Lobbying / Stakeholder Map → Influence
+ * - Procedural / Authorization / Tracker → Pipeline
+ * - Finance / Budget / Appropriations → Bento
  * - Everything else → Editorial
  */
 export function resolveArticleTheme(
@@ -102,6 +141,8 @@ export function resolveArticleTheme(
   themeVariant?: ThemeVariant,
   bill?: LegislativeBill
 ): ResolvedArticleTheme {
+  if (themeVariant === "versus") return "versus";
+  if (themeVariant === "local") return "local";
   if (themeVariant === "influence") return "influence";
   if (themeVariant === "pipeline" || themeVariant === "urgent") {
     return "pipeline";
@@ -120,6 +161,16 @@ export function resolveArticleTheme(
   ]
     .filter(Boolean)
     .join(" ");
+
+  // Comparison / Amendment / Versus
+  if ((bill && isVersusBill(bill)) || isVersusCategory(signals)) {
+    return "versus";
+  }
+
+  // Local / District-Specific / Infrastructure
+  if ((bill && isLocalBill(bill)) || isLocalCategory(signals)) {
+    return "local";
+  }
 
   // Regulatory / Lobbying / Stakeholder Map → Influence Network
   if ((bill && isInfluenceBill(bill)) || isInfluenceCategory(signals)) {
@@ -160,6 +211,13 @@ export function ThemeWrapper({
   whatItDoes,
   pipelineSteps,
   stakeholders,
+  districts,
+  focusDistrict,
+  regionalImpact,
+  fundingLabel,
+  versusClauses,
+  versusLeftLabel,
+  versusRightLabel,
   metrics,
   className = "",
   children,
@@ -195,6 +253,43 @@ export function ThemeWrapper({
     stakeholders && stakeholders.length > 0
       ? stakeholders
       : mapped?.stakeholders || [];
+  const localFromBill = bill
+    ? resolveLocalImpactFromBill(bill)
+    : mapped
+      ? {
+          districts: mapped.districts,
+          focusDistrict: mapped.focusDistrict,
+          regionalImpact: mapped.regionalImpact,
+          fundingLabel: mapped.fundingLabel,
+        }
+      : null;
+  const resolvedDistricts =
+    districts && districts.length > 0
+      ? districts
+      : localFromBill?.districts || [];
+  const resolvedFocusDistrict =
+    focusDistrict || localFromBill?.focusDistrict || undefined;
+  const resolvedRegionalImpact =
+    regionalImpact || localFromBill?.regionalImpact || undefined;
+  const resolvedFundingLabel =
+    fundingLabel || localFromBill?.fundingLabel || undefined;
+  const versusFromBill = bill
+    ? resolveVersusClausesFromBill(bill)
+    : mapped
+      ? {
+          clauses: mapped.versusClauses,
+          leftLabel: mapped.versusLeftLabel,
+          rightLabel: mapped.versusRightLabel,
+        }
+      : null;
+  const resolvedVersusClauses =
+    versusClauses && versusClauses.length > 0
+      ? versusClauses
+      : versusFromBill?.clauses || [];
+  const resolvedVersusLeft =
+    versusLeftLabel || versusFromBill?.leftLabel || undefined;
+  const resolvedVersusRight =
+    versusRightLabel || versusFromBill?.rightLabel || undefined;
 
   const themeSignals = [
     resolvedCategory,
@@ -226,7 +321,34 @@ export function ThemeWrapper({
       data-bill-id={resolvedBillId}
       data-a1-shell="theme-wrapper"
     >
-      {resolvedTheme === "influence" ? (
+      {resolvedTheme === "versus" ? (
+        <VersusTheme
+          billId={resolvedBillId}
+          title={resolvedTitle}
+          category={resolvedCategory}
+          keyImpacts={resolvedKeyImpacts}
+          summary={resolvedWhatItDoes}
+          leftLabel={resolvedVersusLeft}
+          rightLabel={resolvedVersusRight}
+          clauses={resolvedVersusClauses}
+        >
+          {children}
+        </VersusTheme>
+      ) : resolvedTheme === "local" ? (
+        <LocalTheme
+          billId={resolvedBillId}
+          title={resolvedTitle}
+          category={resolvedCategory}
+          keyImpacts={resolvedKeyImpacts}
+          summary={resolvedWhatItDoes}
+          focusDistrict={resolvedFocusDistrict}
+          regionalImpact={resolvedRegionalImpact}
+          fundingLabel={resolvedFundingLabel}
+          districts={resolvedDistricts}
+        >
+          {children}
+        </LocalTheme>
+      ) : resolvedTheme === "influence" ? (
         <InfluenceTheme
           billId={resolvedBillId}
           title={resolvedTitle}
