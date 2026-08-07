@@ -12,12 +12,19 @@ import {
   type ThemeVariant,
   type VoteCounts,
 } from "./types";
+import {
+  collectBillThemeSignals,
+  mapLiveBillToArticleProps,
+  type LegislativeBill,
+} from "../lib/live-bill";
 
 export type ArticleCardProps = {
-  billId: string;
-  title: string;
-  category: string;
-  keyImpacts: string[];
+  /** Live / structured legislative bill — preferred over flat props. */
+  bill?: LegislativeBill;
+  billId?: string;
+  title?: string;
+  category?: string;
+  keyImpacts?: string[];
   themeVariant?: ThemeVariant;
   /** Human-centric magazine hook (Editorial Collage header). */
   humanHook?: string;
@@ -52,9 +59,10 @@ function mergeCounts(seed?: Partial<VoteCounts>): VoteCounts {
 /**
  * Master container for Article 1 bill content.
  * Owns universal interaction state (reaction + vote counts).
- * Theme selection is delegated to ThemeWrapper.
+ * Theme selection is delegated to ThemeWrapper using live bill properties.
  */
 export function ArticleCard({
+  bill,
   billId,
   title,
   category,
@@ -72,6 +80,30 @@ export function ArticleCard({
   className = "",
   showReactionDock = true,
 }: ArticleCardProps) {
+  const mapped = bill ? mapLiveBillToArticleProps(bill) : null;
+  const resolvedBillId = billId || mapped?.billId || "Bill";
+  const resolvedTitle = title || mapped?.title || "Untitled legislation";
+  const resolvedCategory = category || mapped?.category || "Legislation";
+  const resolvedKeyImpacts = keyImpacts?.length
+    ? keyImpacts
+    : mapped?.keyImpacts || [];
+  const resolvedMetrics = metrics.length
+    ? metrics
+    : mapped?.metrics || [];
+  const resolvedThemeVariant = themeVariant || mapped?.themeVariant;
+  const themeSignals = [
+    resolvedCategory,
+    mapped?.themeSignals || "",
+    bill ? collectBillThemeSignals(bill) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const resolvedTheme = resolveArticleTheme(
+    themeSignals,
+    resolvedThemeVariant,
+    bill
+  );
+
   const [selectedReaction, setSelectedReaction] = useState<ReactionId | null>(
     null
   );
@@ -92,21 +124,24 @@ export function ArticleCard({
           next[reactionId] = next[reactionId] + 1;
         }
 
-        onReactionSubmit?.({ billId, reactionId, voteCounts: next });
+        onReactionSubmit?.({
+          billId: resolvedBillId,
+          reactionId,
+          voteCounts: next,
+        });
         return next;
       });
       setSelectedReaction(reactionId);
       setHasSubmitted(true);
     },
-    [billId, onReactionSubmit, selectedReaction]
+    [onReactionSubmit, resolvedBillId, selectedReaction]
   );
 
   const totalVotes = Object.values(voteCounts).reduce((sum, n) => sum + n, 0);
-  const resolvedTheme = resolveArticleTheme(category, themeVariant);
 
-  const resolvedMetrics =
-    metrics.length > 0
-      ? metrics
+  const displayMetrics =
+    resolvedMetrics.length > 0
+      ? resolvedMetrics
       : [
           {
             id: "votes",
@@ -143,23 +178,24 @@ export function ArticleCard({
       className={["a1-article-card relative", className]
         .filter(Boolean)
         .join(" ")}
-      data-bill-id={billId}
+      data-bill-id={resolvedBillId}
       data-submitted={hasSubmitted ? "true" : "false"}
       data-a1-shell="article-card"
       data-theme={resolvedTheme}
     >
       <ThemeWrapper
-        billId={billId}
-        title={title}
-        category={category}
-        keyImpacts={keyImpacts}
-        themeVariant={themeVariant}
-        humanHook={humanHook}
-        promptQuestion={promptQuestion}
-        imageSrc={imageSrc}
-        imageAlt={imageAlt}
-        financialSummary={financialSummary}
-        metrics={resolvedMetrics}
+        bill={bill}
+        billId={resolvedBillId}
+        title={resolvedTitle}
+        category={resolvedCategory}
+        keyImpacts={resolvedKeyImpacts}
+        themeVariant={resolvedThemeVariant}
+        humanHook={humanHook || mapped?.humanHook}
+        promptQuestion={promptQuestion || mapped?.promptQuestion}
+        imageSrc={imageSrc || mapped?.imageSrc}
+        imageAlt={imageAlt || mapped?.imageAlt}
+        financialSummary={financialSummary || mapped?.financialSummary}
+        metrics={displayMetrics}
       >
         {children}
         {reactionEcho}

@@ -10,12 +10,28 @@ export type { BillMetricsProps } from "./BillMetrics";
 export {
   ThemeWrapper,
   isFinanceCategory,
+  isHumanCenteredCategory,
   resolveArticleTheme,
 } from "./ThemeWrapper";
 export type {
   ResolvedArticleTheme,
   ThemeWrapperProps,
 } from "./ThemeWrapper";
+
+export {
+  collectBillThemeSignals,
+  extractLiveBillsFromFeed,
+  isLiveLegislativeBill,
+  mapLiveBillToArticleProps,
+  resolveBillCategoryLabel,
+  resolveBillId,
+  resolveBillTitle,
+} from "../lib/live-bill";
+export type {
+  ArticleBillViewModel,
+  BillsFeedResponse,
+  LegislativeBill,
+} from "../lib/live-bill";
 
 export {
   EditorialCollageTheme,
