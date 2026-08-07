@@ -1060,8 +1060,14 @@ Sincerely,
     supportBtn.textContent =
       supportBtn.dataset.liveLabel || supportLabel;
     opposeBtn.textContent = opposeBtn.dataset.liveLabel || opposeLabel;
-    supportBtn.classList.toggle("is-active", hasSupport && editing);
-    opposeBtn.classList.toggle("is-active", hasOppose && editing);
+    supportBtn.classList.toggle(
+      "is-active",
+      roots.voteFeedbackMode ? hasSupport : hasSupport && editing
+    );
+    opposeBtn.classList.toggle(
+      "is-active",
+      roots.voteFeedbackMode ? hasOppose : hasOppose && editing
+    );
     supportBtn.classList.remove("is-logged", "is-dimmed");
     opposeBtn.classList.remove("is-logged", "is-dimmed");
     supportBtn.setAttribute("aria-pressed", String(hasSupport));
@@ -1069,7 +1075,6 @@ Sincerely,
 
     if (hasVote && !editing) {
       if (roots.voteFeedbackMode && global.VoteFeedback) {
-        if (stances) stances.hidden = true;
         const local = global.VoteFeedback.getLocalVote(roots.item || {}) || {};
         const split = {
           passPct: local.passPct,

@@ -325,6 +325,24 @@
           </button>
           ${reactionDockHtml()}
         </div>
+        <div
+          class="vote-side-gauge"
+          role="img"
+          aria-label="Pass percentage"
+          data-pass-pct="0"
+          style="--thermo-pct:0%; --thermo-color:hsl(0 95% 50%);"
+        >
+          <div class="vote-side-gauge__tube">
+            <span class="vote-side-gauge__ticks" aria-hidden="true"></span>
+            <div class="vote-side-gauge__track">
+              <span class="vote-side-gauge__fill" style="height:0%"></span>
+            </div>
+            <span class="vote-side-gauge__shine" aria-hidden="true"></span>
+          </div>
+          <div class="vote-side-gauge__bulb" aria-hidden="true">
+            <span class="vote-side-gauge__bulb-fluid"></span>
+          </div>
+        </div>
       </div>
     `;
   }

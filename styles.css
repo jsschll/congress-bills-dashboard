@@ -7678,6 +7678,7 @@ body.politician-notes-modal-open {
   max-height: 300px;
   color: #e8eef7;
   overflow: hidden;
+  position: relative;
   transition:
     border-color 0.3s ease,
     box-shadow 0.3s ease,
@@ -7996,24 +7997,10 @@ body.politician-notes-modal-open {
   color: #cbd5e1;
 }
 
-.feed-story-meter {
-  width: 100%;
-  height: 0.3rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-  margin: 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
+/* Legacy horizontal meter — replaced by glass thermometer (.vote-side-gauge) */
+.feed-story-meter,
 .feed-story-meter__fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #10b981 0%, #2dd4bf 55%, #67e8f9 100%);
-  box-shadow: 0 0 12px rgba(45, 212, 191, 0.55);
-  transition: width 0.35s ease;
+  display: none !important;
 }
 
 .feed-social-card .engagement-mount-point {

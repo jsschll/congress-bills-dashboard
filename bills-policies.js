@@ -1871,10 +1871,6 @@ function buildFeedSocialProof(item = {}, community = null) {
 }
 
 function renderFeedSocialProofHtml(proof = {}) {
-  const pct =
-    proof.hasData && proof.supportPct != null
-      ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
-      : 0;
   const tone = String(proof.tone || "first").replace(/[^a-z0-9_-]/gi, "");
   return `
     <div class="feed-social-proof__row">
@@ -1882,41 +1878,36 @@ function renderFeedSocialProofHtml(proof = {}) {
         proof.urgency || "⚡ Be the 1st to Vote!"
       )}</span>
     </div>
-    <div
-      class="feed-story-meter"
-      role="img"
-      aria-label="${
-        proof.hasData ? `${pct}% leaning Pass` : "No community votes yet"
-      }"
-    >
-      <span class="feed-story-meter__fill" style="width:${pct}%"></span>
-    </div>
   `;
 }
 
 function applyFeedVoteRatioLabels(card, proof = {}) {
   const supportBtn = card?.querySelector?.('[data-stance="support"]');
   const opposeBtn = card?.querySelector?.('[data-stance="oppose"]');
-  if (!supportBtn || !opposeBtn) return;
-  const hasRatio =
-    proof.hasData &&
-    proof.supportPct != null &&
-    proof.opposePct != null;
-  const passLabel = hasRatio
-    ? `👍 PASS IT • ${proof.supportPct}%`
-    : "👍 PASS IT";
-  const killLabel = hasRatio
-    ? `👎 KILL IT • ${proof.opposePct}%`
-    : "👎 KILL IT";
-  supportBtn.dataset.liveLabel = passLabel;
-  opposeBtn.dataset.liveLabel = killLabel;
-  supportBtn.textContent = passLabel;
-  opposeBtn.textContent = killLabel;
+  // Keep Pass/Kill labels clean — Pass % lives on the side gauge.
+  if (supportBtn && opposeBtn) {
+    const passLabel = "👍 PASS IT";
+    const killLabel = "👎 KILL IT";
+    supportBtn.dataset.liveLabel = passLabel;
+    opposeBtn.dataset.liveLabel = killLabel;
+    supportBtn.textContent = passLabel;
+    opposeBtn.textContent = killLabel;
+  }
+
+  const passPct =
+    proof.hasData && proof.supportPct != null
+      ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
+      : null;
+  if (passPct != null && window.VoteFeedback?.mountOrUpdateSideGauge) {
+    window.VoteFeedback.mountOrUpdateSideGauge(card, passPct, {
+      animate: true,
+    });
+  }
 }
 
 async function hydrateFeedSocialProof(card, item) {
-  const el = card?.querySelector(".feed-social-proof");
-  if (!el || !item?.id) return;
+  if (!card || !item?.id) return;
+  const el = card.querySelector(".feed-social-proof");
   let proof = buildFeedSocialProof(item);
   let community = null;
   try {
@@ -1927,15 +1918,25 @@ async function hydrateFeedSocialProof(card, item) {
   } catch (_) {
     /* keep roll-call / empty fallback */
   }
-  el.innerHTML = renderFeedSocialProofHtml(proof);
+  if (el) {
+    el.innerHTML = renderFeedSocialProofHtml(proof);
+  }
   applyFeedVoteRatioLabels(card, proof);
 
-  // Keep post-vote ratio bar in sync with live community split.
+  // Keep local split + side gauge in sync with live community Pass %.
   const local = window.VoteFeedback?.getLocalVote?.(item);
   const stance =
     local?.stance ||
     window.PolicyEngagement?.getStance?.(item.id) ||
     null;
+
+  // Always paint the side gauge when we have a Pass % (story cards have no social-proof row).
+  if (proof.hasData && proof.supportPct != null) {
+    window.VoteFeedback?.mountOrUpdateSideGauge?.(card, proof.supportPct, {
+      animate: !stance,
+    });
+  }
+
   if (stance && window.VoteFeedback && proof.hasData) {
     window.VoteFeedback.setLocalVote(item, {
       stance,
@@ -1943,34 +1944,19 @@ async function hydrateFeedSocialProof(card, item) {
       killPct: proof.opposePct,
       total: proof.total,
     });
+    // Clear any legacy horizontal post-vote track if still present.
     const panel = card.querySelector(".policy-engage__logged-panel.vote-feedback-panel");
-    if (panel && !panel.hidden) {
-      window.VoteFeedback.mountPostVoteBar(panel, {
-        stance,
-        passPct: proof.supportPct,
-        killPct: proof.opposePct,
-        animate: false,
-        showChange: true,
-      });
-      panel.querySelector(".policy-engage__change")?.addEventListener("click", () => {
-        const engage = card.querySelector(".policy-engage");
-        // Re-show buttons via a synthetic change: remount stance UI.
-        const supportBtn = card.querySelector('[data-stance="support"]');
-        const opposeBtn = card.querySelector('[data-stance="oppose"]');
-        const stances = card.querySelector(".policy-engage__stances");
-        if (stances) stances.hidden = false;
-        panel.hidden = false;
-        panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
-        panel.innerHTML = `
-          <p class="policy-engage__logged-hint">
-            Choose Pass It or Kill It to update your vote.
-          </p>
-        `;
-        supportBtn?.classList.toggle("is-active", stance === "support");
-        opposeBtn?.classList.toggle("is-active", stance === "oppose");
-        engage?.classList.add("is-changing-vote");
-      });
+    if (panel) {
+      panel.hidden = true;
+      panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+      panel.innerHTML = "";
     }
+    const stances = card.querySelector(".policy-engage__stances");
+    if (stances) stances.hidden = false;
+    const supportBtn = card.querySelector('[data-stance="support"]');
+    const opposeBtn = card.querySelector('[data-stance="oppose"]');
+    supportBtn?.classList.toggle("is-active", stance === "support");
+    opposeBtn?.classList.toggle("is-active", stance === "oppose");
   }
 }
 
@@ -2320,6 +2306,24 @@ function renderSocialFeedCardShell({
       <button type="button" class="details-toggle-btn">
         ✨ Ask AI
       </button>
+    </div>
+    <div
+      class="vote-side-gauge"
+      role="img"
+      aria-label="Pass percentage"
+      data-pass-pct="0"
+      style="--thermo-pct:0%; --thermo-color:hsl(0 95% 50%);"
+    >
+      <div class="vote-side-gauge__tube">
+        <span class="vote-side-gauge__ticks" aria-hidden="true"></span>
+        <div class="vote-side-gauge__track">
+          <span class="vote-side-gauge__fill" style="height:0%"></span>
+        </div>
+        <span class="vote-side-gauge__shine" aria-hidden="true"></span>
+      </div>
+      <div class="vote-side-gauge__bulb" aria-hidden="true">
+        <span class="vote-side-gauge__bulb-fluid"></span>
+      </div>
     </div>
   `;
 }

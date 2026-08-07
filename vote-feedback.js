@@ -1,5 +1,5 @@
 /**
- * Pass It / Kill It vote motion + post-vote ratio bar (Phase 1 gamification).
+ * Pass It / Kill It vote motion + glass thermometer Pass% gauge.
  * Dual export: browser global `VoteFeedback` + CommonJS.
  */
 (function (root, factory) {
@@ -193,6 +193,134 @@
     );
   }
 
+  function findSideGaugeHost(card) {
+    if (!card) return null;
+    return (
+      card.querySelector(".a1-story-card") ||
+      card.querySelector(".a1-card-shell") ||
+      card.querySelector(".a1-article-card") ||
+      card
+    );
+  }
+
+  /**
+   * Smooth Red (0%) → Yellow (50%) → Green (100%) from Pass %.
+   * Hue walks 0° (red) → 120° (green) in HSL.
+   */
+  function passPctToColor(passPct) {
+    const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+    const hue = t * 120;
+    const sat = 95;
+    const light = 48 + t * 4;
+    return `hsl(${hue.toFixed(1)} ${sat}% ${light.toFixed(1)}%)`;
+  }
+
+  function applySideGaugeFill(gauge, pct, { animate = true, fromZero = false } = {}) {
+    if (!gauge) return;
+    const fill = gauge.querySelector(".vote-side-gauge__fill");
+    const bulb = gauge.querySelector(".vote-side-gauge__bulb-fluid");
+    const color = passPctToColor(pct);
+    const kill = 100 - pct;
+    gauge.setAttribute("aria-label", `${pct}% Pass, ${kill}% Kill`);
+    gauge.dataset.passPct = String(pct);
+    gauge.classList.remove("is-settled");
+
+    const applyTarget = () => {
+      gauge.style.setProperty("--thermo-pct", `${pct}%`);
+      gauge.style.setProperty("--thermo-color", color);
+      if (fill) {
+        fill.style.height = `${pct}%`;
+        fill.style.backgroundColor = color;
+      }
+      if (bulb) bulb.style.backgroundColor = color;
+      gauge.classList.add("is-ready");
+    };
+
+    if (!animate) {
+      applyTarget();
+      gauge.classList.add("is-settled");
+      return;
+    }
+
+    if (fromZero || !gauge.classList.contains("is-ready")) {
+      gauge.classList.remove("is-ready");
+      gauge.style.setProperty("--thermo-pct", "0%");
+      if (fill) fill.style.height = "0%";
+      void gauge.offsetWidth;
+      requestAnimationFrame(applyTarget);
+      return;
+    }
+
+    requestAnimationFrame(applyTarget);
+  }
+
+  function buildSideGaugeHtml(passPct = 0) {
+    const pct = clampPct(passPct);
+    const kill = 100 - pct;
+    const color = passPctToColor(pct);
+    return `
+      <div
+        class="vote-side-gauge"
+        role="img"
+        aria-label="${pct}% Pass, ${kill}% Kill"
+        data-pass-pct="${pct}"
+        style="--thermo-pct:${pct}%; --thermo-color:${color};"
+      >
+        <div class="vote-side-gauge__tube">
+          <span class="vote-side-gauge__ticks" aria-hidden="true"></span>
+          <div class="vote-side-gauge__track">
+            <span
+              class="vote-side-gauge__fill"
+              style="height:${pct}%; background-color:${color};"
+            ></span>
+          </div>
+          <span class="vote-side-gauge__shine" aria-hidden="true"></span>
+        </div>
+        <div class="vote-side-gauge__bulb" aria-hidden="true">
+          <span
+            class="vote-side-gauge__bulb-fluid"
+            style="background-color:${color};"
+          ></span>
+        </div>
+      </div>
+    `;
+  }
+
+  function mountOrUpdateSideGauge(cardOrEl, passPct, { animate = true } = {}) {
+    const card = findCardRoot(cardOrEl);
+    const host = findSideGaugeHost(card);
+    if (!host) return null;
+    const pct = clampPct(passPct);
+    let gauge = host.querySelector(":scope > .vote-side-gauge");
+    if (!gauge) gauge = host.querySelector(".vote-side-gauge");
+    const isNew = !gauge;
+    if (!gauge) {
+      host.insertAdjacentHTML(
+        "beforeend",
+        buildSideGaugeHtml(animate ? 0 : pct)
+      );
+      gauge = host.querySelector(".vote-side-gauge");
+      const prior = host.style.position;
+      if (!prior || prior === "static") host.style.position = "relative";
+    } else if (!gauge.querySelector(".vote-side-gauge__tube")) {
+      // Upgrade legacy slim-bar markup in place.
+      const next = document.createElement("div");
+      next.innerHTML = buildSideGaugeHtml(animate ? 0 : pct);
+      const upgraded = next.firstElementChild;
+      if (upgraded) {
+        gauge.replaceWith(upgraded);
+        gauge = upgraded;
+      }
+    }
+    if (!gauge) return null;
+
+    applySideGaugeFill(gauge, pct, {
+      animate,
+      fromZero: isNew && animate,
+    });
+    return gauge;
+  }
+
   function clearMotionClasses(card) {
     if (!card) return;
     card.classList.remove(
@@ -240,76 +368,35 @@
     }, MOTION_MS);
   }
 
-  function buildPostVoteBarHtml({
-    stance,
-    passPct,
-    killPct,
-    animate = true,
-    showChange = true,
-  } = {}) {
-    const isPass = stance === "support" || stance === "pass";
-    const pass = clampPct(passPct);
-    const kill = clampPct(killPct != null ? killPct : 100 - pass);
-    return `
-      <div
-        class="vote-feedback-bar ${animate ? "is-animating" : "is-settled"}"
-        data-user-stance="${isPass ? "support" : "oppose"}"
-        role="status"
-        aria-live="polite"
-      >
-        <div
-          class="vote-feedback-bar__track"
-          role="img"
-          aria-label="${pass}% Pass, ${kill}% Kill"
-        >
-          <span class="vote-feedback-bar__fill vote-feedback-bar__fill--pass" style="--target-width:${pass}%"></span>
-          <span class="vote-feedback-bar__fill vote-feedback-bar__fill--kill" style="--target-width:${kill}%"></span>
-        </div>
-        <div class="vote-feedback-bar__meta">
-          <span class="vote-feedback-bar__choice ${
-            isPass ? "is-pass" : "is-kill"
-          }">
-            <span class="vote-feedback-bar__check" aria-hidden="true">✓</span>
-            ${isPass ? "Pass It" : "Kill It"}
-            <strong>${isPass ? pass : kill}%</strong>
-          </span>
-          <span class="vote-feedback-bar__other">
-            ${isPass ? `${kill}% Kill` : `${pass}% Pass`}
-          </span>
-          ${
-            showChange
-              ? `<button type="button" class="policy-engage__change vote-feedback-bar__change">Change</button>`
-              : ""
-          }
-        </div>
-      </div>
-    `;
+  /**
+   * Bottom Pass%/Kill%/Change results bar removed — thermometer owns Pass %.
+   * Kept as a no-op HTML builder for older call sites.
+   */
+  function buildPostVoteBarHtml() {
+    return "";
   }
 
   function mountPostVoteBar(container, options = {}) {
-    if (!container) return null;
-    container.hidden = false;
-    container.innerHTML = buildPostVoteBarHtml(options);
-    const bar = container.querySelector(".vote-feedback-bar");
-    if (bar && options.animate !== false) {
-      requestAnimationFrame(() => {
-        bar.classList.add("is-filled");
-      });
-    } else if (bar) {
-      bar.classList.add("is-filled", "is-settled");
+    if (container) {
+      container.hidden = true;
+      container.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+      container.innerHTML = "";
     }
-    return bar;
+    const card = findCardRoot(container);
+    if (card) {
+      mountOrUpdateSideGauge(card, options.passPct, {
+        animate: options.animate !== false,
+      });
+    }
+    return null;
   }
 
   /**
-   * Apply post-vote UI into engagement roots (hides action buttons).
+   * Apply post-vote UI: keep Pass/Kill buttons clean, drive the glass thermometer.
+   * Horizontal percentage results bar is intentionally omitted.
    */
   function applyPostVoteState(roots, item, stance, split, { animate = true } = {}) {
     if (!roots) return;
-    const stances = roots.stancesEl;
-    const panel = roots.loggedPanel;
-    if (stances) stances.hidden = true;
-    if (!panel) return;
 
     const passPct = split?.passPct ?? 62;
     const killPct = split?.killPct ?? 38;
@@ -320,24 +407,36 @@
       total: split?.total || 0,
     });
 
-    panel.hidden = false;
-    panel.classList.toggle("is-support", stance === "support");
-    panel.classList.toggle("is-oppose", stance === "oppose");
-    panel.classList.add("vote-feedback-panel");
-    mountPostVoteBar(panel, {
-      stance,
-      passPct,
-      killPct,
-      animate,
-      showChange: true,
-    });
+    const stances = roots.stancesEl;
+    const panel = roots.loggedPanel;
+    const supportBtn = roots.supportBtn;
+    const opposeBtn = roots.opposeBtn;
 
-    panel.querySelector(".policy-engage__change")?.addEventListener("click", () => {
-      roots.changeMode = true;
-      if (typeof roots.reapplyLoggedUI === "function") {
-        roots.reapplyLoggedUI(stance);
-      }
-    });
+    // Keep the Pass/Kill row visible and free of percentage overlays.
+    if (stances) stances.hidden = false;
+    if (panel) {
+      panel.hidden = true;
+      panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+      panel.innerHTML = "";
+    }
+
+    if (supportBtn) {
+      supportBtn.textContent =
+        supportBtn.dataset.liveLabel || roots.supportLabel || "👍 PASS IT";
+      supportBtn.classList.toggle("is-active", stance === "support");
+      supportBtn.classList.remove("is-logged", "is-dimmed");
+      supportBtn.setAttribute("aria-pressed", String(stance === "support"));
+    }
+    if (opposeBtn) {
+      opposeBtn.textContent =
+        opposeBtn.dataset.liveLabel || roots.opposeLabel || "👎 KILL IT";
+      opposeBtn.classList.toggle("is-active", stance === "oppose");
+      opposeBtn.classList.remove("is-logged", "is-dimmed");
+      opposeBtn.setAttribute("aria-pressed", String(stance === "oppose"));
+    }
+
+    const card = roots.root || roots.card || findCardRoot(stances || panel);
+    mountOrUpdateSideGauge(card, passPct, { animate });
   }
 
   return {
@@ -351,5 +450,8 @@
     mountPostVoteBar,
     applyPostVoteState,
     findCardRoot,
+    passPctToColor,
+    buildSideGaugeHtml,
+    mountOrUpdateSideGauge,
   };
 });
