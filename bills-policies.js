@@ -1906,8 +1906,8 @@ function applyFeedVoteRatioLabels(card, proof = {}) {
 }
 
 async function hydrateFeedSocialProof(card, item) {
-  const el = card?.querySelector(".feed-social-proof");
-  if (!el || !item?.id) return;
+  if (!card || !item?.id) return;
+  const el = card.querySelector(".feed-social-proof");
   let proof = buildFeedSocialProof(item);
   let community = null;
   try {
@@ -1918,7 +1918,9 @@ async function hydrateFeedSocialProof(card, item) {
   } catch (_) {
     /* keep roll-call / empty fallback */
   }
-  el.innerHTML = renderFeedSocialProofHtml(proof);
+  if (el) {
+    el.innerHTML = renderFeedSocialProofHtml(proof);
+  }
   applyFeedVoteRatioLabels(card, proof);
 
   // Keep local split + side gauge in sync with live community Pass %.
@@ -1927,15 +1929,20 @@ async function hydrateFeedSocialProof(card, item) {
     local?.stance ||
     window.PolicyEngagement?.getStance?.(item.id) ||
     null;
+
+  // Always paint the side gauge when we have a Pass % (story cards have no social-proof row).
+  if (proof.hasData && proof.supportPct != null) {
+    window.VoteFeedback?.mountOrUpdateSideGauge?.(card, proof.supportPct, {
+      animate: !stance,
+    });
+  }
+
   if (stance && window.VoteFeedback && proof.hasData) {
     window.VoteFeedback.setLocalVote(item, {
       stance,
       passPct: proof.supportPct,
       killPct: proof.opposePct,
       total: proof.total,
-    });
-    window.VoteFeedback.mountOrUpdateSideGauge?.(card, proof.supportPct, {
-      animate: false,
     });
     // Clear any legacy horizontal post-vote track if still present.
     const panel = card.querySelector(".policy-engage__logged-panel.vote-feedback-panel");
