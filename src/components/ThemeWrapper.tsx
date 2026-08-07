@@ -79,6 +79,8 @@ export type ThemeWrapperProps = {
   versusLeftLabel?: string;
   versusRightLabel?: string;
   metrics?: BillMetric[];
+  /** Anchored vote / Ask AI bar — themes place this under content, never over art. */
+  actionBar?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
 };
@@ -219,6 +221,7 @@ export function ThemeWrapper({
   versusLeftLabel,
   versusRightLabel,
   metrics,
+  actionBar,
   className = "",
   children,
 }: ThemeWrapperProps) {
@@ -322,65 +325,80 @@ export function ThemeWrapper({
       data-a1-shell="theme-wrapper"
     >
       {resolvedTheme === "versus" ? (
-        <VersusTheme
-          billId={resolvedBillId}
-          title={resolvedTitle}
-          category={resolvedCategory}
-          keyImpacts={resolvedKeyImpacts}
-          summary={resolvedWhatItDoes}
-          leftLabel={resolvedVersusLeft}
-          rightLabel={resolvedVersusRight}
-          clauses={resolvedVersusClauses}
-        >
-          {children}
-        </VersusTheme>
+        <>
+          <VersusTheme
+            billId={resolvedBillId}
+            title={resolvedTitle}
+            category={resolvedCategory}
+            keyImpacts={resolvedKeyImpacts}
+            summary={resolvedWhatItDoes}
+            leftLabel={resolvedVersusLeft}
+            rightLabel={resolvedVersusRight}
+            clauses={resolvedVersusClauses}
+          >
+            {children}
+          </VersusTheme>
+          {actionBar}
+        </>
       ) : resolvedTheme === "local" ? (
-        <LocalTheme
-          billId={resolvedBillId}
-          title={resolvedTitle}
-          category={resolvedCategory}
-          keyImpacts={resolvedKeyImpacts}
-          summary={resolvedWhatItDoes}
-          focusDistrict={resolvedFocusDistrict}
-          regionalImpact={resolvedRegionalImpact}
-          fundingLabel={resolvedFundingLabel}
-          districts={resolvedDistricts}
-        >
-          {children}
-        </LocalTheme>
+        <>
+          <LocalTheme
+            billId={resolvedBillId}
+            title={resolvedTitle}
+            category={resolvedCategory}
+            keyImpacts={resolvedKeyImpacts}
+            summary={resolvedWhatItDoes}
+            focusDistrict={resolvedFocusDistrict}
+            regionalImpact={resolvedRegionalImpact}
+            fundingLabel={resolvedFundingLabel}
+            districts={resolvedDistricts}
+          >
+            {children}
+          </LocalTheme>
+          {actionBar}
+        </>
       ) : resolvedTheme === "influence" ? (
-        <InfluenceTheme
-          billId={resolvedBillId}
-          title={resolvedTitle}
-          category={resolvedCategory}
-          keyImpacts={resolvedKeyImpacts}
-          summary={resolvedWhatItDoes}
-          stakeholders={resolvedStakeholders}
-        >
-          {children}
-        </InfluenceTheme>
+        <>
+          <InfluenceTheme
+            billId={resolvedBillId}
+            title={resolvedTitle}
+            category={resolvedCategory}
+            keyImpacts={resolvedKeyImpacts}
+            summary={resolvedWhatItDoes}
+            stakeholders={resolvedStakeholders}
+          >
+            {children}
+          </InfluenceTheme>
+          {actionBar}
+        </>
       ) : resolvedTheme === "pipeline" ? (
-        <PipelineTheme
-          billId={resolvedBillId}
-          title={resolvedTitle}
-          category={resolvedCategory}
-          keyImpacts={resolvedKeyImpacts}
-          whatItDoes={resolvedWhatItDoes}
-          pipelineSteps={resolvedPipelineSteps}
-        >
-          {children}
-        </PipelineTheme>
+        <>
+          <PipelineTheme
+            billId={resolvedBillId}
+            title={resolvedTitle}
+            category={resolvedCategory}
+            keyImpacts={resolvedKeyImpacts}
+            whatItDoes={resolvedWhatItDoes}
+            pipelineSteps={resolvedPipelineSteps}
+          >
+            {children}
+          </PipelineTheme>
+          {actionBar}
+        </>
       ) : resolvedTheme === "bento-grid" ? (
-        <BentoGridTheme
-          billId={resolvedBillId}
-          title={resolvedTitle}
-          category={resolvedCategory}
-          keyImpacts={resolvedKeyImpacts}
-          financialSummary={resolvedFinancialSummary}
-          metrics={resolvedMetrics}
-        >
-          {children}
-        </BentoGridTheme>
+        <>
+          <BentoGridTheme
+            billId={resolvedBillId}
+            title={resolvedTitle}
+            category={resolvedCategory}
+            keyImpacts={resolvedKeyImpacts}
+            financialSummary={resolvedFinancialSummary}
+            metrics={resolvedMetrics}
+          >
+            {children}
+          </BentoGridTheme>
+          {actionBar}
+        </>
       ) : (
         <EditorialCollageTheme
           billId={resolvedBillId}
@@ -391,6 +409,7 @@ export function ThemeWrapper({
           promptQuestion={resolvedPrompt}
           imageSrc={resolvedImageSrc}
           imageAlt={resolvedImageAlt}
+          actionBar={actionBar}
         >
           {children}
         </EditorialCollageTheme>

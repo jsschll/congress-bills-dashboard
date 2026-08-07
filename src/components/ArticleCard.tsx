@@ -196,19 +196,20 @@ export function ArticleCard({
         imageAlt={imageAlt || mapped?.imageAlt}
         financialSummary={financialSummary || mapped?.financialSummary}
         metrics={displayMetrics}
+        actionBar={
+          showReactionDock ? (
+            <ReactionDock
+              selectedReaction={selectedReaction}
+              disabled={false}
+              onReact={handleReact}
+              theme={resolvedTheme}
+            />
+          ) : null
+        }
       >
         {children}
         {reactionEcho}
       </ThemeWrapper>
-
-      {showReactionDock ? (
-        <ReactionDock
-          selectedReaction={selectedReaction}
-          disabled={false}
-          onReact={handleReact}
-          theme={resolvedTheme}
-        />
-      ) : null}
     </article>
   );
 }

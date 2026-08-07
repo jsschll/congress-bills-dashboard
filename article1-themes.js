@@ -158,18 +158,31 @@
           </div>
           ${microActionsHtml()}
         </header>
-        <div class="a1-editorial__frame" aria-hidden="true">
-          <div class="a1-editorial__frame-wash"></div>
-          <span class="a1-editorial__frame-label">Editorial frame</span>
+        <div class="a1-editorial__layout">
+          <div class="a1-editorial__art">
+            <div class="a1-editorial__frame" aria-hidden="true">
+              <div class="a1-editorial__frame-wash"></div>
+              <span class="a1-editorial__frame-label">Editorial frame</span>
+            </div>
+          </div>
+          <div class="a1-editorial__copy">
+            <div class="a1-editorial__sticker">
+              <p class="a1-section-label">Key Impacts</p>
+              <ul class="a1-editorial__impacts">${
+                bullets ||
+                `<li class="a1-editorial__impact"><span>${escapeHtml(
+                  summary || title
+                )}</span></li>`
+              }</ul>
+              <p class="a1-editorial__prompt">Should Congress pass this ${escapeHtml(
+                (category || "bill").toLowerCase()
+              )}?</p>
+            </div>
+            <footer class="a1-editorial__footer">
+              ${reactionDockHtml()}
+            </footer>
+          </div>
         </div>
-        <div class="a1-editorial__sticker">
-          <p class="a1-section-label">Key Impacts</p>
-          <ul class="a1-editorial__impacts">${bullets || `<li class="a1-editorial__impact"><span>${escapeHtml(summary || title)}</span></li>`}</ul>
-          <p class="a1-editorial__prompt">Should Congress pass this ${escapeHtml(
-            (category || "bill").toLowerCase()
-          )}?</p>
-        </div>
-        ${reactionDockHtml()}
       </div>
     `;
   }
