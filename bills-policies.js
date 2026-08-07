@@ -1368,12 +1368,27 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     "$0 / Policy change";
 
   return {
-    what: clampFeedImpactLine(whatRaw, 10),
+    what: clampFeedTldrText(whatRaw),
     impact: clampFeedImpactLine(impactRaw, 10),
     cost: clampFeedImpactLine(moneyRaw, 10),
     chips: buildFeedImpactChips(impactRaw, categoryLabel, summary),
     costPill: formatFeedCostPill(moneyRaw),
   };
+}
+
+/** Keep TL;DR human: up to ~2 short sentences, not a title echo. */
+function clampFeedTldrText(text = "") {
+  const cleaned = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "Updates a federal policy rule.";
+  const sentences = cleaned.match(/[^.!?]+[.!?]?/g) || [cleaned];
+  const joined = sentences
+    .slice(0, 2)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+  return clampFeedHeadlineWords(joined, 36) || "Updates a federal policy rule.";
 }
 
 function buildFeedImpactChips(impactText = "", categoryLabel = "", summary = "") {
@@ -1541,6 +1556,51 @@ function formatFeedSocialCount(n) {
   return String(num);
 }
 
+function formatFeedBillId(item = {}) {
+  const billNumber = String(
+    item.billNumber ||
+      item.bill_number ||
+      item.legislation_number ||
+      item.legislationNumber ||
+      ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+  const congress = String(item.congress || item.congress_number || "").trim();
+  const chamber = String(item.chamber || "").trim();
+  const roll = String(
+    item.roll_call_number || item.rollCallNumber || item.roll || ""
+  ).trim();
+  if (billNumber) {
+    return congress ? `${billNumber} · ${congress}th Congress` : billNumber;
+  }
+  if (roll) {
+    const place = chamber ? `${chamber} Roll Call` : "Roll Call";
+    return congress ? `${place} #${roll} · ${congress}th` : `${place} #${roll}`;
+  }
+  if (item.id) {
+    return String(item.id)
+      .replace(/^federal-/i, "")
+      .replace(/-/g, " ")
+      .toUpperCase();
+  }
+  return "Federal measure";
+}
+
+function formatFeedCardTimestamp(item = {}) {
+  const raw =
+    item.latestAction?.actionDate ||
+    item.action_date ||
+    item.vote_date ||
+    item.voteDate ||
+    item.updateDate ||
+    item.updated_at ||
+    item.introducedDate ||
+    item.date ||
+    "";
+  return formatRelativeDate(raw) || formatShortDate(raw) || "Just now";
+}
+
 /** Initial social-proof copy from roll-call margins when present. */
 function buildFeedSocialProof(item = {}) {
   const result = String(item.result || item.statusLabel || item.vote_result || "");
@@ -1551,31 +1611,46 @@ function buildFeedSocialProof(item = {}) {
     const total = yea + nay;
     if (total > 0) {
       return {
-        votedLabel: `🔥 ${formatFeedSocialCount(total)} Voted`,
+        votedLabel: `🔥 ${formatFeedSocialCount(total)} Citizens Voted`,
         supportPct: Math.round((yea / total) * 100),
         hasData: true,
       };
     }
   }
   return {
-    votedLabel: "🔥 Cast your vote",
+    votedLabel: "🔥 Be the first citizen",
     supportPct: null,
     hasData: false,
   };
 }
 
 function renderFeedSocialProofHtml(proof = {}) {
-  const support =
+  const pct =
     proof.hasData && proof.supportPct != null
-      ? `<span class="feed-social-proof__support">${escapePolicyHtml(
-          String(proof.supportPct)
-        )}% Support</span>`
-      : "";
+      ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
+      : 0;
+  const passPill =
+    proof.hasData && proof.supportPct != null
+      ? `<span class="feed-social-proof__pass">🟢 ${escapePolicyHtml(
+          String(pct)
+        )}% PASS RATE</span>`
+      : `<span class="feed-social-proof__pass is-empty">Awaiting votes</span>`;
   return `
-    <span class="feed-social-proof__votes">${escapePolicyHtml(
-      proof.votedLabel || "🔥 Cast your vote"
-    )}</span>
-    ${support}
+    <div class="feed-social-proof__row">
+      <span class="feed-social-proof__votes">${escapePolicyHtml(
+        proof.votedLabel || "🔥 Be the first citizen"
+      )}</span>
+      ${passPill}
+    </div>
+    <div
+      class="feed-story-meter"
+      role="img"
+      aria-label="${
+        proof.hasData ? `${pct}% pass rate` : "No community votes yet"
+      }"
+    >
+      <span class="feed-story-meter__fill" style="width:${pct}%"></span>
+    </div>
   `;
 }
 
@@ -1589,7 +1664,7 @@ async function hydrateFeedSocialProof(card, item) {
       const total = Number(stats.total);
       const support = Number(stats.support || 0);
       proof = {
-        votedLabel: `🔥 ${formatFeedSocialCount(total)} Voted`,
+        votedLabel: `🔥 ${formatFeedSocialCount(total)} Citizens Voted`,
         supportPct: Math.round((support / total) * 100),
         hasData: true,
       };
@@ -1602,8 +1677,8 @@ async function hydrateFeedSocialProof(card, item) {
 
 function mountFeedCardStanceButtons(card, item, options = {}) {
   const mountOpts = {
-    supportLabel: "👍 Support",
-    opposeLabel: "👎 Oppose",
+    supportLabel: "👍 PASS IT",
+    opposeLabel: "👎 KILL IT",
     prompt: "",
     compact: true,
     showFollow: false,
@@ -1620,7 +1695,7 @@ function mountFeedCardStanceButtons(card, item, options = {}) {
     window.PolicyEngagement.mount(card, item, mountOpts);
   }
 
-  // Mount Support/Oppose into the bottom action bar slot.
+  // Mount poll buttons into the story action slot.
   const slot = card.querySelector(".engagement-mount-point");
   const engage = card.querySelector(".policy-engage");
   if (slot && engage) slot.append(engage);
@@ -1641,17 +1716,16 @@ function wireFeedCardAskAi(card, item) {
 }
 
 /**
- * Visual-first social feed card: meta chips, TL;DR, impact pills, social proof.
+ * Instagram Story / sticker poll feed card.
  */
 function renderSocialFeedCardShell({
-  status,
   category,
   title,
+  billId,
+  timestamp,
   impacts,
   socialProof,
 }) {
-  const tone = String(status?.tone || "pending").replace(/[^a-z0-9_-]/gi, "");
-  const statusIcon = status?.icon || "🟡";
   const categoryLabel =
     typeof category === "string" ? category : category?.label || "";
   const categoryIcon =
@@ -1684,17 +1758,36 @@ function renderSocialFeedCardShell({
 
   return `
     <div class="feed-social-card__header">
-      <div class="feed-social-card__meta" aria-label="Bill meta">
-        <div class="category-pill" title="${escapePolicyHtml(
+      <div class="category-pill" title="${escapePolicyHtml(
+        categoryLabel || "Congress"
+      )}">
+        <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
+        <span class="category-pill__label">${escapePolicyHtml(
           categoryLabel || "Congress"
-        )}">
-          <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
-          <span class="category-pill__label">${escapePolicyHtml(
-            categoryLabel || "Congress"
-          )}</span>
+        )}</span>
+      </div>
+      <time class="feed-social-card__time">${escapePolicyHtml(
+        timestamp || "Just now"
+      )}</time>
+    </div>
+    <div class="feed-social-card__body">
+      <h3 class="feed-social-card__headline">${escapePolicyHtml(title)}</h3>
+      <p class="feed-social-card__bill-id">${escapePolicyHtml(
+        billId || "Federal measure"
+      )}</p>
+      <div class="feed-tldr" aria-label="The TL;DR">
+        <span class="feed-tldr__label" aria-hidden="true">⚡ THE TL;DR</span>
+        <p class="feed-tldr__text">${escapePolicyHtml(what)}</p>
+      </div>
+      <div class="feed-story-row" aria-label="Who is affected">
+        <span class="feed-story-row__label">Who's affected</span>
+        <div class="feed-impact-chips">
+          ${chipHtml}
         </div>
-        <span class="feed-meta-dot" aria-hidden="true">•</span>
-        <div class="feed-cost-pill is-${costTone}" aria-label="Cost or savings">
+      </div>
+      <div class="feed-story-row" aria-label="Fiscal impact">
+        <span class="feed-story-row__label">Fiscal impact</span>
+        <div class="feed-cost-pill is-${costTone}">
           <span class="feed-cost-pill__icon" aria-hidden="true">${
             costPill.icon || "🟢"
           }</span>
@@ -1702,54 +1795,35 @@ function renderSocialFeedCardShell({
             costPill.label || "$0 Net Cost"
           )}</span>
         </div>
-        <span class="feed-meta-dot" aria-hidden="true">•</span>
-        <span class="status-badge is-${tone}">
-          <span class="status-badge__icon" aria-hidden="true">${statusIcon}</span>
-          <span class="status-badge__label">${escapePolicyHtml(
-            status?.label || "Pending Vote"
-          )}</span>
-        </span>
-      </div>
-    </div>
-    <div class="feed-social-card__body">
-      <h3 class="feed-social-card__headline">${escapePolicyHtml(title)}</h3>
-      <div class="feed-tldr" aria-label="Bottom line">
-        <span class="feed-tldr__label" aria-hidden="true">🎯 TL;DR</span>
-        <p class="feed-tldr__text">${escapePolicyHtml(what)}</p>
-      </div>
-      <div class="feed-impact-chips" aria-label="Who it impacts">
-        ${chipHtml}
       </div>
     </div>
     <div class="feed-social-card__actions">
       <div class="feed-social-proof" aria-label="Community engagement">
         ${renderFeedSocialProofHtml(proof)}
       </div>
-      <div class="feed-social-card__action-row">
-        <button type="button" class="details-toggle-btn">
-          💬 Ask AI
-        </button>
-        <div class="engagement-mount-point" aria-label="Your stance"></div>
-      </div>
+      <div class="engagement-mount-point" aria-label="Your stance"></div>
+      <button type="button" class="details-toggle-btn">
+        💬 Ask AI / Deep Dive →
+      </button>
     </div>
   `;
 }
 
 function renderBillCard(item) {
   const card = document.createElement("article");
-  card.className = "policy-bill-card feed-social-card";
+  card.className = "policy-bill-card feed-social-card feed-story-card";
 
   const pitch = String(
     preferPlainSummaryText(item) || item.shortPitch || ""
   ).trim();
   const cardCopy = resolveFeedCardCopy(item, { summary: pitch });
-  const status = formatFeedStatusTag(item, { isVote: false });
   const category = formatFeedCategoryPill(item);
 
   card.innerHTML = renderSocialFeedCardShell({
-    status,
     category,
     title: cardCopy.displayTitle,
+    billId: formatFeedBillId(item),
+    timestamp: formatFeedCardTimestamp(item),
     impacts: cardCopy.impacts,
     socialProof: buildFeedSocialProof(item),
   });
@@ -1891,20 +1965,20 @@ function formatVoteResultBadge(result) {
 
 function renderVoteCard(item) {
   const card = document.createElement("article");
-  card.className = "feed-social-card vote-feed-card";
+  card.className = "feed-social-card vote-feed-card feed-story-card";
 
   const copy =
     typeof resolveVoteCardCopy === "function"
       ? resolveVoteCardCopy(item)
       : { yeaLabel: "Support", nayLabel: "Oppose" };
   const cardCopy = resolveFeedCardCopy(item, copy);
-  const status = formatFeedStatusTag(item, { isVote: true });
   const category = formatFeedCategoryPill(item);
 
   card.innerHTML = renderSocialFeedCardShell({
-    status,
     category,
     title: cardCopy.displayTitle,
+    billId: formatFeedBillId(item),
+    timestamp: formatFeedCardTimestamp(item),
     impacts: cardCopy.impacts,
     socialProof: buildFeedSocialProof(item),
   });
