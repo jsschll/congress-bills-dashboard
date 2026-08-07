@@ -108,13 +108,65 @@
     const fromItem = asList(
       item.key_impacts || item.keyImpacts || item.key_points || item.keyPoints
     );
-    if (fromItem.length) return fromItem.slice(0, 2);
+    if (fromItem.length) return fromItem.slice(0, 4);
     const chips = Array.isArray(impacts.chips)
       ? impacts.chips.map((c) => c.label).filter(Boolean)
       : [];
-    if (chips.length) return chips.slice(0, 2);
+    if (chips.length) return chips.slice(0, 4);
     const what = String(impacts.what || "").trim();
     return what ? [what] : [];
+  }
+
+  function normalizeCopyLine(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  /** Drop exact duplicate lines so summary + bullets never repeat the same text. */
+  function dedupeCopyLines(lines = [], exclude = []) {
+    const seen = new Set(
+      exclude.map((line) => normalizeCopyLine(line).toLowerCase()).filter(Boolean)
+    );
+    const out = [];
+    for (const raw of lines) {
+      const line = normalizeCopyLine(raw);
+      if (!line) continue;
+      const key = line.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(line);
+    }
+    return out;
+  }
+
+  function resolveCardCopy(item = {}, opts = {}) {
+    const impacts = opts.impacts || {};
+    const title = normalizeCopyLine(
+      opts.title || item.short_title || item.shortTitle || item.title || "Legislation"
+    );
+    const rawImpacts = keyImpacts(item, impacts);
+    const altSummaries = [
+      opts.summary,
+      item.whatItDoes,
+      item.what_it_does,
+      item.plain_summary,
+      item.plainSummary,
+      item.shortPitch,
+      item.short_pitch,
+      impacts.what,
+      title,
+    ].map(normalizeCopyLine).filter(Boolean);
+
+    // Prefer a summary that is not just a repeat of the first key impact.
+    let summary =
+      altSummaries.find(
+        (line) =>
+          !rawImpacts.some((impact) => impact.toLowerCase() === line.toLowerCase())
+      ) || altSummaries[0] || title;
+
+    const impactsList = dedupeCopyLines(rawImpacts, [summary, title]).slice(0, 2);
+    return { title, summary, impactsList };
   }
 
   function reactionDockHtml() {
@@ -135,7 +187,7 @@
     `;
   }
 
-  function renderEditorial({ billId, title, category, impactsList, summary }) {
+  function renderEditorial({ billId, title, category, impactsList, summary, item }) {
     const bullets = impactsList
       .map(
         (impact) => `
@@ -146,8 +198,26 @@
       )
       .join("");
 
+    const imageSrc = String(
+      item.imageSrc || item.image_src || item.imageUrl || item.image_url || ""
+    ).trim();
+    const imageAlt = String(item.imageAlt || item.image_alt || title).trim();
+
+    const artHtml = imageSrc
+      ? `
+          <div class="a1-editorial__art">
+            <div class="a1-editorial__frame">
+              <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(
+          imageAlt
+        )}" loading="lazy" decoding="async" />
+            </div>
+          </div>`
+      : "";
+
     return `
-      <div class="a1-theme a1-theme--editorial">
+      <div class="a1-theme a1-theme--editorial${
+        imageSrc ? "" : " a1-theme--editorial-copy-only"
+      }">
         <header class="a1-editorial__header">
           <div class="a1-editorial__header-main">
             <p class="a1-kicker">${escapeHtml(category)}</p>
@@ -158,13 +228,10 @@
           </div>
           ${microActionsHtml()}
         </header>
-        <div class="a1-editorial__layout">
-          <div class="a1-editorial__art">
-            <div class="a1-editorial__frame" aria-hidden="true">
-              <div class="a1-editorial__frame-wash"></div>
-              <span class="a1-editorial__frame-label">Editorial frame</span>
-            </div>
-          </div>
+        <div class="a1-editorial__layout${
+          imageSrc ? "" : " a1-editorial__layout--copy-only"
+        }">
+          ${artHtml}
           <div class="a1-editorial__copy">
             <div class="a1-editorial__sticker">
               <p class="a1-section-label">Key Impacts</p>
@@ -656,16 +723,9 @@
       typeof opts.category === "string"
         ? opts.category
         : opts.category?.label || item.primaryCategory || item.category || "Congress";
-    const title = opts.title || item.short_title || item.title || "Legislation";
     const billId = opts.billId || item.billNumber || item.id || "Bill";
     const impacts = opts.impacts || {};
-    const impactsList = keyImpacts(item, impacts);
-    const summary =
-      opts.summary ||
-      impacts.what ||
-      item.plain_summary ||
-      item.shortPitch ||
-      title;
+    const { title, summary, impactsList } = resolveCardCopy(item, opts);
     const payload = {
       billId,
       title,
@@ -689,10 +749,12 @@
       theme,
       themeLabel: themeLabel(theme),
       html: `
-        <div class="a1-theme-badge" data-theme="${escapeHtml(theme)}">
-          Theme · ${escapeHtml(themeLabel(theme))}
+        <div class="a1-card-shell" data-a1-theme="${escapeHtml(theme)}">
+          <div class="a1-theme-badge" data-theme="${escapeHtml(theme)}">
+            Theme · ${escapeHtml(themeLabel(theme))}
+          </div>
+          ${body}
         </div>
-        ${body}
       `,
     };
   }

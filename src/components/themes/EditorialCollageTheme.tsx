@@ -30,10 +30,26 @@ function defaultPrompt(category: string): string {
   return `Should Congress pass this ${topic.toLowerCase()}?`;
 }
 
+function dedupeImpacts(impacts: string[], exclude: string[] = []): string[] {
+  const seen = new Set(
+    exclude.map((line) => line.trim().toLowerCase()).filter(Boolean)
+  );
+  const out: string[] = [];
+  for (const raw of impacts) {
+    const line = String(raw || "").trim();
+    if (!line) continue;
+    const key = line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(line);
+  }
+  return out;
+}
+
 /**
  * Theme #1 — Editorial Collage
- * Portrait artwork frame (3:4) + TL;DR column. Mobile stacks art above copy;
- * desktop places art left and TL;DR / actions right. Vote bar never overlays art.
+ * When an image exists: portrait artwork + TL;DR column.
+ * When missing: copy-only layout (no empty "Editorial frame" placeholder).
  */
 export function EditorialCollageTheme({
   billId,
@@ -50,7 +66,8 @@ export function EditorialCollageTheme({
 }: EditorialCollageThemeProps) {
   const hook = (humanHook ?? title).trim();
   const prompt = (promptQuestion ?? defaultPrompt(category)).trim();
-  const impacts = keyImpacts.slice(0, 2);
+  const impacts = dedupeImpacts(keyImpacts, [hook, title]).slice(0, 2);
+  const hasImage = Boolean(imageSrc?.trim());
 
   return (
     <div
@@ -66,6 +83,7 @@ export function EditorialCollageTheme({
         .join(" ")}
       data-theme="editorial-collage"
       data-a1-theme="editorial-collage"
+      data-has-image={hasImage ? "true" : "false"}
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-70"
@@ -116,47 +134,31 @@ export function EditorialCollageTheme({
         </div>
       </header>
 
-      {/* Mobile: stack · Desktop: art left / TL;DR+actions right */}
-      <div className="editorial-collage__layout flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
-        <div className="editorial-collage__art w-full shrink-0 lg:w-[min(42%,20rem)]">
-          <div
-            className={[
-              "editorial-collage__frame",
-              "relative w-full overflow-hidden rounded-[1.25rem]",
-              "border-[3px] border-[#1C1410]",
-              "bg-[#1C1410] shadow-[0_18px_40px_rgba(28,20,16,0.18)]",
-              "aspect-[3/4]",
-            ].join(" ")}
-          >
-            {imageSrc ? (
+      <div
+        className={[
+          "editorial-collage__layout flex flex-col gap-4",
+          hasImage ? "lg:flex-row lg:items-stretch lg:gap-5" : "",
+        ].join(" ")}
+      >
+        {hasImage ? (
+          <div className="editorial-collage__art w-full shrink-0 lg:w-[min(42%,20rem)]">
+            <div
+              className={[
+                "editorial-collage__frame",
+                "relative w-full overflow-hidden rounded-[1.25rem]",
+                "border-[3px] border-[#1C1410]",
+                "bg-[#1C1410] shadow-[0_18px_40px_rgba(28,20,16,0.18)]",
+                "aspect-[3/4]",
+              ].join(" ")}
+            >
               <img
                 src={imageSrc}
                 alt={imageAlt ?? hook}
                 className="absolute inset-0 h-full w-full object-contain contrast-[1.08] saturate-[1.05]"
               />
-            ) : (
-              <div
-                className="editorial-collage__placeholder absolute inset-0"
-                aria-hidden
-              >
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      "linear-gradient(145deg, #2A221C 0%, #4A3428 42%, #1A1410 100%)",
-                  }}
-                />
-                <div className="absolute -right-6 top-8 h-40 w-40 rotate-12 rounded-[2rem] bg-[#D6A862]/35 blur-[1px]" />
-                <div className="absolute left-8 top-10 h-24 w-36 -rotate-6 rounded-full bg-[#FDF8F2]/12" />
-                <div className="absolute inset-0 flex items-start p-5 sm:p-6">
-                  <span className="max-w-[12rem] font-['Fraunces',Georgia,serif] text-lg font-semibold leading-snug text-[#FDF8F2]/90 sm:text-xl">
-                    Editorial frame
-                  </span>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="editorial-collage__copy flex min-w-0 flex-1 flex-col gap-3">
           <div

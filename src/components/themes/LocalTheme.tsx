@@ -71,7 +71,15 @@ export function LocalTheme({
   const rows =
     districts && districts.length > 0 ? districts : DEFAULT_DISTRICTS;
   const blurb = (summary || title).trim();
-  const impacts = keyImpacts.slice(0, 2);
+  const impacts = keyImpacts
+    .map((line) => String(line || "").trim())
+    .filter(Boolean)
+    .filter(
+      (line) =>
+        line.toLowerCase() !== blurb.toLowerCase() &&
+        line.toLowerCase() !== title.trim().toLowerCase()
+    )
+    .slice(0, 2);
 
   return (
     <div
