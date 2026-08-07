@@ -51,6 +51,11 @@
   color: inherit;
 }
 
+.a1-theme--pipeline {
+  background: transparent;
+  color: inherit;
+}
+
 .a1-reaction-dock {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);

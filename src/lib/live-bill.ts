@@ -60,6 +60,40 @@ export type LegislativeBill = {
   lastUpdated?: string;
   officialUrl?: string;
   official_url?: string;
+  /** Plain-English "what it does" / procedural summary fields. */
+  whatItDoes?: string;
+  what_it_does?: string;
+  plainSummary?: string;
+  plain_summary?: string;
+  statusLabel?: string;
+  status_label?: string;
+  voteKind?: string;
+  vote_kind?: string;
+  voteQuestion?: string;
+  vote_question?: string;
+  status?: {
+    stepNumber?: number;
+    totalSteps?: number;
+    stepName?: string;
+    isCompleted?: boolean;
+    isCurrent?: boolean;
+    date?: string;
+  } | null;
+  allSteps?: Array<{
+    stepNumber?: number;
+    totalSteps?: number;
+    stepName?: string;
+    isCompleted?: boolean;
+    isCurrent?: boolean;
+    date?: string;
+  }>;
+  pipelineSteps?: Array<{
+    id?: string;
+    label?: string;
+    description?: string;
+    status?: "complete" | "current" | "upcoming";
+    icon?: "gavel" | "mic" | "ballot" | "default";
+  }>;
 };
 
 export type ArticleBillViewModel = {
@@ -72,10 +106,21 @@ export type ArticleBillViewModel = {
   imageSrc?: string;
   imageAlt?: string;
   financialSummary?: string;
+  whatItDoes?: string;
   metrics: BillMetric[];
   themeVariant?: ThemeVariant;
   themeSignals: string;
+  pipelineSteps: PipelineStepView[];
+  isProcedural: boolean;
   isLiveLegislative: boolean;
+};
+
+export type PipelineStepView = {
+  id: string;
+  label: string;
+  description?: string;
+  status: "complete" | "current" | "upcoming";
+  icon?: "gavel" | "mic" | "ballot" | "default";
 };
 
 function asString(value: unknown): string {
@@ -126,6 +171,9 @@ export function collectBillThemeSignals(bill: LegislativeBill = {}): string {
     ...asStringList(bill.subjects),
     ...asStringList(bill.tags),
   ];
+  const stepNames = Array.isArray(bill.allSteps)
+    ? bill.allSteps.map((step) => asString(step?.stepName))
+    : [];
 
   return [
     bill.category,
@@ -137,11 +185,196 @@ export function collectBillThemeSignals(bill: LegislativeBill = {}): string {
     bill.type,
     bill.billType,
     bill.bill_type,
+    bill.statusLabel,
+    bill.status_label,
+    bill.voteKind,
+    bill.vote_kind,
+    bill.voteQuestion,
+    bill.vote_question,
+    bill.status?.stepName,
+    ...stepNames,
     ...subjectList,
   ]
     .map(asString)
     .filter(Boolean)
     .join(" ");
+}
+
+/** Stronger cues — avoids treating every bill with an "In Committee" step as Pipeline. */
+const STRONG_PROCEDURAL_SIGNAL_PATTERN =
+  /\b(floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|procedural|pipeline|tracking|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
+
+/**
+ * Signals used specifically for procedural / pipeline theme routing.
+ * Excludes the static allSteps list (every feed item includes "In Committee").
+ */
+export function collectProceduralSignals(bill: LegislativeBill = {}): string {
+  return [
+    bill.category,
+    bill.primaryCategory,
+    bill.primary_category,
+    bill.subjectCategory,
+    ...asStringList(bill.tags),
+    bill.statusLabel,
+    bill.status_label,
+    bill.voteKind,
+    bill.vote_kind,
+    bill.voteQuestion,
+    bill.vote_question,
+    bill.status?.stepName,
+  ]
+    .map(asString)
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * True when a bill carries procedural tracking signals or structured steps.
+ */
+export function isProceduralBill(bill: LegislativeBill = {}): boolean {
+  if (bill.themeVariant === "pipeline" || bill.theme_variant === "pipeline") {
+    return true;
+  }
+  if (Array.isArray(bill.pipelineSteps) && bill.pipelineSteps.length > 0) {
+    return true;
+  }
+
+  const voteKind = asString(bill.voteKind || bill.vote_kind).toLowerCase();
+  if (
+    voteKind === "final_passage" ||
+    voteKind === "procedural" ||
+    voteKind === "cloture"
+  ) {
+    return true;
+  }
+
+  const signals = collectProceduralSignals(bill);
+  return STRONG_PROCEDURAL_SIGNAL_PATTERN.test(signals);
+}
+
+function classifyPipelineStage(
+  label = ""
+): "committee" | "floor" | "final" | "other" {
+  const value = label.toLowerCase();
+  if (/final|passage|enact|law|veto|signed|became/.test(value)) return "final";
+  if (/floor|debate|chamber|vote|cloture|consideration/.test(value)) {
+    return "floor";
+  }
+  if (/committee|markup|hearing|subcommittee|introduced|referral/.test(value)) {
+    return "committee";
+  }
+  return "other";
+}
+
+/**
+ * Map live bill status / allSteps into the three-step procedural tracker.
+ */
+export function resolvePipelineStepsFromBill(
+  bill: LegislativeBill = {}
+): PipelineStepView[] {
+  if (Array.isArray(bill.pipelineSteps) && bill.pipelineSteps.length) {
+    return bill.pipelineSteps.map((step, index) => ({
+      id: asString(step.id) || `step-${index + 1}`,
+      label: asString(step.label) || `Step ${index + 1}`,
+      description: asString(step.description) || undefined,
+      status: step.status || "upcoming",
+      icon: step.icon || "default",
+    }));
+  }
+
+  const defaults: PipelineStepView[] = [
+    {
+      id: "committee",
+      label: "Committee",
+      description: "Markup & hearings",
+      status: "upcoming",
+      icon: "gavel",
+    },
+    {
+      id: "floor",
+      label: "Floor Debate",
+      description: "Chamber consideration",
+      status: "upcoming",
+      icon: "mic",
+    },
+    {
+      id: "final",
+      label: "Final Action",
+      description: "Passage or veto",
+      status: "upcoming",
+      icon: "ballot",
+    },
+  ];
+
+  const rawSteps =
+    Array.isArray(bill.allSteps) && bill.allSteps.length
+      ? bill.allSteps
+      : bill.status
+        ? [bill.status]
+        : [];
+
+  if (!rawSteps.length) {
+    const label = firstPresent(
+      bill.statusLabel,
+      bill.status_label,
+      bill.voteKind,
+      bill.vote_kind,
+      bill.voteQuestion,
+      bill.vote_question
+    );
+    const stage = classifyPipelineStage(label);
+    if (stage === "final") {
+      defaults[0].status = "complete";
+      defaults[1].status = "complete";
+      defaults[2].status = "current";
+    } else if (stage === "floor") {
+      defaults[0].status = "complete";
+      defaults[1].status = "current";
+    } else {
+      defaults[0].status = "current";
+    }
+    return defaults;
+  }
+
+  let currentStage: "committee" | "floor" | "final" = "committee";
+  for (const step of rawSteps) {
+    if (step?.isCurrent) {
+      const stage = classifyPipelineStage(asString(step.stepName));
+      if (stage !== "other") currentStage = stage;
+    }
+    if (step?.isCompleted) {
+      const stage = classifyPipelineStage(asString(step.stepName));
+      if (stage === "final") currentStage = "final";
+      else if (stage === "floor" && currentStage === "committee") {
+        currentStage = "floor";
+      }
+    }
+  }
+
+  // Prefer the last explicit current/completed cue from statusLabel too.
+  const statusCue = classifyPipelineStage(
+    firstPresent(
+      bill.status?.stepName,
+      bill.statusLabel,
+      bill.status_label,
+      bill.voteKind,
+      bill.vote_kind
+    )
+  );
+  if (statusCue !== "other") currentStage = statusCue;
+
+  if (currentStage === "final") {
+    defaults[0].status = "complete";
+    defaults[1].status = "complete";
+    defaults[2].status = "current";
+  } else if (currentStage === "floor") {
+    defaults[0].status = "complete";
+    defaults[1].status = "current";
+  } else {
+    defaults[0].status = "current";
+  }
+
+  return defaults;
 }
 
 export function resolveBillCategoryLabel(bill: LegislativeBill = {}): string {
@@ -288,6 +521,14 @@ export function mapLiveBillToArticleProps(
     shortPitch,
     title
   );
+  const whatItDoes = firstPresent(
+    bill.whatItDoes,
+    bill.what_it_does,
+    bill.plainSummary,
+    bill.plain_summary,
+    shortPitch,
+    title
+  );
 
   return {
     billId: resolveBillId(bill),
@@ -299,9 +540,12 @@ export function mapLiveBillToArticleProps(
     imageSrc: firstPresent(bill.imageSrc, bill.image_src) || undefined,
     imageAlt: firstPresent(bill.imageAlt, bill.image_alt) || undefined,
     financialSummary: financialSummary || undefined,
+    whatItDoes: whatItDoes || undefined,
     metrics: buildMetricsFromBill(bill),
     themeVariant: bill.themeVariant || bill.theme_variant,
     themeSignals: collectBillThemeSignals(bill),
+    pipelineSteps: resolvePipelineStepsFromBill(bill),
+    isProcedural: isProceduralBill(bill),
     isLiveLegislative: isLiveLegislativeBill(bill),
   };
 }

@@ -11,6 +11,7 @@ export {
   ThemeWrapper,
   isFinanceCategory,
   isHumanCenteredCategory,
+  isProceduralCategory,
   resolveArticleTheme,
 } from "./ThemeWrapper";
 export type {
@@ -20,17 +21,21 @@ export type {
 
 export {
   collectBillThemeSignals,
+  collectProceduralSignals,
   extractLiveBillsFromFeed,
   isLiveLegislativeBill,
+  isProceduralBill,
   mapLiveBillToArticleProps,
   resolveBillCategoryLabel,
   resolveBillId,
   resolveBillTitle,
+  resolvePipelineStepsFromBill,
 } from "../lib/live-bill";
 export type {
   ArticleBillViewModel,
   BillsFeedResponse,
   LegislativeBill,
+  PipelineStepView,
 } from "../lib/live-bill";
 
 export {
@@ -40,6 +45,13 @@ export type { EditorialCollageThemeProps } from "./themes/EditorialCollageTheme"
 
 export { BentoGridTheme } from "./themes/BentoGridTheme";
 export type { BentoGridThemeProps } from "./themes/BentoGridTheme";
+
+export { PipelineTheme } from "./themes/PipelineTheme";
+export type {
+  PipelineStep,
+  PipelineStepStatus,
+  PipelineThemeProps,
+} from "./themes/PipelineTheme";
 
 export {
   DEFAULT_REACTIONS,

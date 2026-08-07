@@ -16,16 +16,39 @@ const byTheme = {
       [item.category, item.primaryCategory, ...(item.tags || [])].join(" ")
     )
   ),
+  pipeline: items.filter((item) =>
+    /procedural|tracking|floor debate|final passage|cloture/i.test(
+      [
+        item.category,
+        item.primaryCategory,
+        item.statusLabel,
+        item.voteKind,
+        ...(item.tags || []),
+      ].join(" ")
+    )
+  ),
   editorial: items.filter(
     (item) =>
       !/finance|budget|economy|tax|appropriations/i.test(
         [item.category, item.primaryCategory, ...(item.tags || [])].join(" ")
+      ) &&
+      !/procedural|tracking|floor debate|final passage|cloture/i.test(
+        [
+          item.category,
+          item.primaryCategory,
+          item.statusLabel,
+          item.voteKind,
+          ...(item.tags || []),
+        ].join(" ")
       )
   ),
 };
 
 console.log(`Article 1 seed fallback: ${items.length} federal/state bills`);
 console.log(`  Bento (finance/budget): ${byTheme.bento.map((i) => i.billNumber).join(", ")}`);
+console.log(
+  `  Pipeline (procedural): ${byTheme.pipeline.map((i) => i.billNumber).join(", ")}`
+);
 console.log(
   `  Editorial (social/education/health): ${byTheme.editorial
     .map((i) => i.billNumber)
