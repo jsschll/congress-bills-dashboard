@@ -960,8 +960,9 @@ Sincerely,
     const panel = ensureLoggedPanel(roots);
     const stances = roots.stancesEl;
 
-    supportBtn.textContent = supportLabel;
-    opposeBtn.textContent = opposeLabel;
+    supportBtn.textContent =
+      supportBtn.dataset.liveLabel || supportLabel;
+    opposeBtn.textContent = opposeBtn.dataset.liveLabel || opposeLabel;
     supportBtn.classList.toggle("is-active", hasSupport && editing);
     opposeBtn.classList.toggle("is-active", hasOppose && editing);
     supportBtn.classList.remove("is-logged", "is-dimmed");

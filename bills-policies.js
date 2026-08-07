@@ -1353,7 +1353,7 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     whatRaw = cleaned;
     break;
   }
-  if (!whatRaw) whatRaw = "Updates a federal policy rule.";
+  if (!whatRaw) whatRaw = "";
 
   const impactRaw =
     keyPoints[1] ||
@@ -1368,7 +1368,12 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     "$0 / Policy change";
 
   return {
-    what: clampFeedTldrText(whatRaw),
+    what: ensureActionVerbTldr(whatRaw, {
+      categoryLabel,
+      summary,
+      headline,
+      item,
+    }),
     impact: clampFeedImpactLine(impactRaw, 10),
     cost: clampFeedImpactLine(moneyRaw, 10),
     chips: buildFeedImpactChips(impactRaw, categoryLabel, summary),
@@ -1381,14 +1386,144 @@ function clampFeedTldrText(text = "") {
   const cleaned = String(text || "")
     .replace(/\s+/g, " ")
     .trim();
-  if (!cleaned) return "Updates a federal policy rule.";
+  if (!cleaned) return "";
   const sentences = cleaned.match(/[^.!?]+[.!?]?/g) || [cleaned];
   const joined = sentences
     .slice(0, 2)
     .map((part) => part.trim())
     .filter(Boolean)
     .join(" ");
-  return clampFeedHeadlineWords(joined, 22) || "Updates a federal policy rule.";
+  return clampFeedHeadlineWords(joined, 22);
+}
+
+const FEED_ACTION_VERBS = [
+  "Increases",
+  "Cuts",
+  "Protects",
+  "Establishes",
+  "Expands",
+  "Bans",
+  "Creates",
+  "Funds",
+  "Requires",
+  "Limits",
+  "Strengthens",
+  "Removes",
+  "Blocks",
+  "Authorizes",
+  "Raises",
+  "Lowers",
+  "Restores",
+  "Ends",
+  "Boosts",
+  "Cracks",
+  "Changes",
+  "Shifts",
+  "Adjusts",
+  "Directs",
+  "Sets",
+];
+
+function startsWithFeedActionVerb(text = "") {
+  const first = String(text || "")
+    .trim()
+    .split(/\s+/)[0]
+    ?.replace(/[^a-z]/gi, "");
+  if (!first) return false;
+  return FEED_ACTION_VERBS.some(
+    (verb) => verb.toLowerCase() === first.toLowerCase()
+  );
+}
+
+function inferActionVerbTldr({ categoryLabel = "", summary = "", headline = "" } = {}) {
+  const hay = `${categoryLabel} ${summary} ${headline}`.toLowerCase();
+  if (/border|immigra|asylum/.test(hay)) {
+    return "Strengthens border and immigration enforcement.";
+  }
+  if (/tax|budget|deficit|spending/.test(hay)) {
+    return "Changes tax and budget rules for Americans.";
+  }
+  if (/health|medicare|medicaid|hospital|patient/.test(hay)) {
+    return "Changes healthcare coverage and patient rules.";
+  }
+  if (/energy|climate|oil|gas|epa/.test(hay)) {
+    return "Shifts energy and climate policy requirements.";
+  }
+  if (/defense|military|veteran|armed/.test(hay)) {
+    return "Adjusts defense funding and military authority.";
+  }
+  if (/student|school|college|education/.test(hay)) {
+    return "Changes education rules for students and schools.";
+  }
+  if (/housing|rent|homeowner/.test(hay)) {
+    return "Changes housing rules for renters and owners.";
+  }
+  if (/worker|labor|wage|employ/.test(hay)) {
+    return "Changes workplace rules for workers and employers.";
+  }
+  if (/foreign|sanction|diplomacy/.test(hay)) {
+    return "Shifts foreign policy and international commitments.";
+  }
+  return "Establishes new federal requirements for this policy.";
+}
+
+function pickActionVerbFromText(text = "") {
+  const hay = String(text || "").toLowerCase();
+  const rules = [
+    [/increas|rais|boost|expand|fund|appropriat/, "Increases"],
+    [/cut|reduc|slash|eliminat|\bend\b|repeal/, "Cuts"],
+    [/protect|safeguard|defend/, "Protects"],
+    [/establish|creat|authoriz|enact/, "Establishes"],
+    [/\bban\b|prohibit|block|bar\b/, "Bans"],
+    [/require|mandat|compel/, "Requires"],
+    [/limit|restrict|\bcap\b/, "Limits"],
+    [/strengthen|toughen/, "Strengthens"],
+    [/remov|repeal|strip/, "Removes"],
+    [/restor|reinstat/, "Restores"],
+    [/direct|order/, "Directs"],
+  ];
+  for (const [re, verb] of rules) {
+    if (re.test(hay)) return verb;
+  }
+  return "Establishes";
+}
+
+/** Force TL;DR to lead with an active outcome verb. */
+function ensureActionVerbTldr(text = "", context = {}) {
+  let out = clampFeedTldrText(text);
+  if (!out || /updates a federal policy rule/i.test(out)) {
+    return inferActionVerbTldr(context);
+  }
+  out = out
+    .replace(
+      /^(this (bill|resolution|amendment|measure)|the bill|a bill|an act)\s+/i,
+      ""
+    )
+    .replace(/^would\s+/i, "")
+    .replace(/^to\s+/i, "")
+    .trim();
+  if (!out) return inferActionVerbTldr(context);
+  if (startsWithFeedActionVerb(out)) {
+    return out.charAt(0).toUpperCase() + out.slice(1);
+  }
+  // Already verb-like stems (increase/cut/etc.) — normalize to action form.
+  const stemMatch = out.match(
+    /^(increase|cut|protect|establish|expand|ban|create|fund|require|limit|strengthen|remove|block|authorize|raise|lower|restore|end|boost|crack|change|shift|adjust|direct|set)s?\b/i
+  );
+  if (stemMatch) {
+    const stem = stemMatch[1].toLowerCase();
+    const canon =
+      FEED_ACTION_VERBS.find(
+        (verb) =>
+          verb.toLowerCase() === stem ||
+          verb.toLowerCase() === `${stem}s` ||
+          verb.toLowerCase().replace(/s$/, "") === stem.replace(/s$/, "")
+      ) || `${stem.charAt(0).toUpperCase()}${stem.slice(1)}s`;
+    return `${canon}${out.slice(stemMatch[0].length)}`.replace(/\s+/g, " ").trim();
+  }
+  const verb = pickActionVerbFromText(`${out} ${context.summary || ""}`);
+  const rest = out.charAt(0).toLowerCase() + out.slice(1);
+  return clampFeedTldrText(`${verb} ${rest}`) || inferActionVerbTldr(context);
 }
 
 function buildFeedImpactChips(impactText = "", categoryLabel = "", summary = "") {
@@ -1601,26 +1736,62 @@ function formatFeedCardTimestamp(item = {}) {
   return formatRelativeDate(raw) || formatShortDate(raw) || "Just now";
 }
 
-/** Initial social-proof copy from roll-call margins when present. */
-function buildFeedSocialProof(item = {}) {
-  const result = String(item.result || item.statusLabel || item.vote_result || "");
-  const roll = result.match(/(\d{1,4})\s*[-–—to]+\s*(\d{1,4})/i);
-  if (roll) {
-    const yea = Number(roll[1]);
-    const nay = Number(roll[2]);
-    const total = yea + nay;
-    if (total > 0) {
-      return {
-        votedLabel: `🔥 ${formatFeedSocialCount(total)} Citizens Voted`,
-        supportPct: Math.round((yea / total) * 100),
-        hasData: true,
-      };
+/** Build urgency social proof + pass/kill ratios. */
+function buildFeedSocialProof(item = {}, community = null) {
+  let total = 0;
+  let support = 0;
+  let hasData = false;
+
+  if (community && Number(community.total) > 0) {
+    total = Number(community.total) || 0;
+    support = Number(community.support) || 0;
+    hasData = total > 0;
+  } else {
+    const result = String(
+      item.result || item.statusLabel || item.vote_result || ""
+    );
+    const roll = result.match(/(\d{1,4})\s*[-–—to]+\s*(\d{1,4})/i);
+    if (roll) {
+      const yea = Number(roll[1]);
+      const nay = Number(roll[2]);
+      total = yea + nay;
+      support = yea;
+      hasData = total > 0;
     }
   }
+
+  if (!hasData || total <= 0) {
+    return {
+      urgency: "⚡ Be the 1st to Vote!",
+      tone: "first",
+      supportPct: null,
+      opposePct: null,
+      total: 0,
+      hasData: false,
+    };
+  }
+
+  const supportPct = Math.round((support / total) * 100);
+  const opposePct = Math.max(0, 100 - supportPct);
+  const gap = Math.abs(supportPct - opposePct);
+
+  let urgency = `🔥 ${formatFeedSocialCount(total)} Citizens Voted`;
+  let tone = "active";
+  if (gap <= 8) {
+    urgency = `🔥 ${supportPct}/${opposePct} Split • Tie Breaker Needed!`;
+    tone = "tie";
+  } else if (total >= 80) {
+    urgency = `📈 Trending Debate • ${formatFeedSocialCount(total)} Votes`;
+    tone = "trending";
+  }
+
   return {
-    votedLabel: "🔥 Be the first citizen",
-    supportPct: null,
-    hasData: false,
+    urgency,
+    tone,
+    supportPct,
+    opposePct,
+    total,
+    hasData: true,
   };
 }
 
@@ -1629,29 +1800,43 @@ function renderFeedSocialProofHtml(proof = {}) {
     proof.hasData && proof.supportPct != null
       ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
       : 0;
-  const passPill =
-    proof.hasData && proof.supportPct != null
-      ? `<span class="feed-social-proof__pass">🟢 ${escapePolicyHtml(
-          String(pct)
-        )}% PASS RATE</span>`
-      : `<span class="feed-social-proof__pass is-empty">Awaiting votes</span>`;
+  const tone = String(proof.tone || "first").replace(/[^a-z0-9_-]/gi, "");
   return `
     <div class="feed-social-proof__row">
-      <span class="feed-social-proof__votes">${escapePolicyHtml(
-        proof.votedLabel || "🔥 Be the first citizen"
+      <span class="feed-social-proof__urgency is-${tone}">${escapePolicyHtml(
+        proof.urgency || "⚡ Be the 1st to Vote!"
       )}</span>
-      ${passPill}
     </div>
     <div
       class="feed-story-meter"
       role="img"
       aria-label="${
-        proof.hasData ? `${pct}% pass rate` : "No community votes yet"
+        proof.hasData ? `${pct}% leaning Pass` : "No community votes yet"
       }"
     >
       <span class="feed-story-meter__fill" style="width:${pct}%"></span>
     </div>
   `;
+}
+
+function applyFeedVoteRatioLabels(card, proof = {}) {
+  const supportBtn = card?.querySelector?.('[data-stance="support"]');
+  const opposeBtn = card?.querySelector?.('[data-stance="oppose"]');
+  if (!supportBtn || !opposeBtn) return;
+  const hasRatio =
+    proof.hasData &&
+    proof.supportPct != null &&
+    proof.opposePct != null;
+  const passLabel = hasRatio
+    ? `👍 PASS IT • ${proof.supportPct}%`
+    : "👍 PASS IT";
+  const killLabel = hasRatio
+    ? `👎 KILL IT • ${proof.opposePct}%`
+    : "👎 KILL IT";
+  supportBtn.dataset.liveLabel = passLabel;
+  opposeBtn.dataset.liveLabel = killLabel;
+  supportBtn.textContent = passLabel;
+  opposeBtn.textContent = killLabel;
 }
 
 async function hydrateFeedSocialProof(card, item) {
@@ -1661,18 +1846,13 @@ async function hydrateFeedSocialProof(card, item) {
   try {
     const stats = await window.PolicyEngagement?.fetchCommunityStats?.(item.id);
     if (stats && Number(stats.total) > 0) {
-      const total = Number(stats.total);
-      const support = Number(stats.support || 0);
-      proof = {
-        votedLabel: `🔥 ${formatFeedSocialCount(total)} Citizens Voted`,
-        supportPct: Math.round((support / total) * 100),
-        hasData: true,
-      };
+      proof = buildFeedSocialProof(item, stats);
     }
   } catch (_) {
     /* keep roll-call / empty fallback */
   }
   el.innerHTML = renderFeedSocialProofHtml(proof);
+  applyFeedVoteRatioLabels(card, proof);
 }
 
 function mountFeedCardStanceButtons(card, item, options = {}) {
@@ -1715,6 +1895,72 @@ function wireFeedCardAskAi(card, item) {
     });
 }
 
+function syncFeedBookmarkButton(button, item) {
+  if (!button) return;
+  const following = Boolean(
+    window.PolicyEngagement?.isFollowingItem?.(item) ||
+      window.PolicyEngagement?.isFollowingBill?.(item?.id)
+  );
+  button.classList.toggle("is-active", following);
+  button.setAttribute("aria-pressed", String(following));
+  button.setAttribute(
+    "aria-label",
+    following ? "Remove bookmark" : "Bookmark this bill"
+  );
+  button.title = following ? "Bookmarked" : "Bookmark";
+}
+
+function wireFeedCardMicroActions(card, item) {
+  const bookmark = card.querySelector(".feed-card-bookmark");
+  const share = card.querySelector(".feed-card-share");
+  syncFeedBookmarkButton(bookmark, item);
+
+  bookmark?.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    try {
+      if (!window.PolicyEngagement?.toggleFollowBill) return;
+      bookmark.disabled = true;
+      await window.PolicyEngagement.toggleFollowBill(item);
+      syncFeedBookmarkButton(bookmark, item);
+    } catch (error) {
+      alert(error?.message || "Could not update bookmark.");
+    } finally {
+      bookmark.disabled = false;
+    }
+  });
+
+  share?.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const title =
+      item.title || item.short_title || item.billNumber || "Legislation";
+    const url =
+      item.official_url ||
+      item.clerk_url ||
+      item.url ||
+      item.source_url ||
+      window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: String(title), url: String(url) });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(String(url));
+        share.classList.add("is-copied");
+        share.setAttribute("aria-label", "Link copied");
+        setTimeout(() => {
+          share.classList.remove("is-copied");
+          share.setAttribute("aria-label", "Share");
+        }, 1200);
+      }
+    } catch (_) {
+      /* user cancelled share */
+    }
+  });
+}
+
 /**
  * Instagram Story / sticker poll feed card.
  */
@@ -1722,7 +1968,6 @@ function renderSocialFeedCardShell({
   category,
   title,
   billId,
-  timestamp,
   impacts,
   socialProof,
 }) {
@@ -1731,7 +1976,9 @@ function renderSocialFeedCardShell({
   const categoryIcon =
     (typeof category === "object" && category?.icon) ||
     feedCategoryIcon(categoryLabel);
-  const what = impacts?.what || "Updates a federal policy rule.";
+  const what =
+    impacts?.what ||
+    ensureActionVerbTldr("", { categoryLabel });
   const chips = Array.isArray(impacts?.chips) && impacts.chips.length
     ? impacts.chips
     : [{ icon: "👤", label: "Public" }];
@@ -1777,9 +2024,10 @@ function renderSocialFeedCardShell({
           )}</span>
         </div>
       </div>
-      <time class="feed-social-card__time">${escapePolicyHtml(
-        timestamp || "Just now"
-      )}</time>
+      <div class="feed-social-card__micro" aria-label="Card actions">
+        <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="Bookmark this bill" aria-pressed="false" title="Bookmark">🔖</button>
+        <button type="button" class="feed-card-icon-btn feed-card-share" aria-label="Share" title="Share">📤</button>
+      </div>
     </div>
     <div class="feed-social-card__body">
       <h3 class="feed-social-card__headline">${escapePolicyHtml(title)}</h3>
@@ -1803,7 +2051,7 @@ function renderSocialFeedCardShell({
       </div>
       <div class="engagement-mount-point" aria-label="Your stance"></div>
       <button type="button" class="details-toggle-btn">
-        💬 Ask AI / Deep Dive →
+        ✨ Ask AI
       </button>
     </div>
   `;
@@ -1823,12 +2071,12 @@ function renderBillCard(item) {
     category,
     title: cardCopy.displayTitle,
     billId: formatFeedBillId(item),
-    timestamp: formatFeedCardTimestamp(item),
     impacts: cardCopy.impacts,
     socialProof: buildFeedSocialProof(item),
   });
 
   wireFeedCardAskAi(card, item);
+  wireFeedCardMicroActions(card, item);
   mountFeedCardStanceButtons(card, item, { useVoteMount: false });
   return card;
 }
@@ -1978,12 +2226,12 @@ function renderVoteCard(item) {
     category,
     title: cardCopy.displayTitle,
     billId: formatFeedBillId(item),
-    timestamp: formatFeedCardTimestamp(item),
     impacts: cardCopy.impacts,
     socialProof: buildFeedSocialProof(item),
   });
 
   wireFeedCardAskAi(card, item);
+  wireFeedCardMicroActions(card, item);
   mountFeedCardStanceButtons(card, item, { useVoteMount: true });
   return card;
 }
