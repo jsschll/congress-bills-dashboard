@@ -63,6 +63,12 @@ function mergeCounts(seed?: Partial<VoteCounts>): VoteCounts {
   return { ...EMPTY_VOTE_COUNTS, ...seed };
 }
 
+/** Pass % → fill color: Red (0°) → Yellow (60°) → Green (120°). */
+function passPctToGaugeColor(passPct: number): string {
+  const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+  return `hsl(${(t * 120).toFixed(1)} 84% 52%)`;
+}
+
 /**
  * Master container for Article 1 bill content.
  * Owns universal interaction state (reaction + vote counts).
@@ -232,8 +238,13 @@ export function ArticleCard({
         aria-label={`${passSplit.passPct}% Pass, ${passSplit.killPct}% Kill`}
       >
         <div
-          className="absolute bottom-0 left-0 w-full bg-emerald-500 transition-[height] duration-700 ease-out"
-          style={{ height: `${passSplit.passPct}%` }}
+          className="absolute bottom-0 left-0 w-full"
+          style={{
+            height: `${passSplit.passPct}%`,
+            backgroundColor: passPctToGaugeColor(passSplit.passPct),
+            transition:
+              "background-color 700ms ease-out, height 700ms ease-out",
+          }}
         />
       </div>
       <ThemeWrapper
