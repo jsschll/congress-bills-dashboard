@@ -1843,7 +1843,8 @@ body.feed-breakdown-open {
 .vote-side-gauge {
   position: absolute;
   top: 9%;
-  bottom: calc(5.5rem + 6%);
+  /* Leave room for the circular bulb inside overflow:hidden cards */
+  bottom: calc(5.75rem + 8%);
   right: 0.4rem;
   z-index: 6;
   width: 1.15rem;
@@ -1953,9 +1954,9 @@ body.feed-breakdown-open {
 .vote-side-gauge__bulb {
   position: relative;
   z-index: 1;
-  width: 1.08rem;
-  height: 1.08rem;
-  margin-top: -0.22rem;
+  width: 1.02rem;
+  height: 1.02rem;
+  margin-top: -0.18rem;
   flex: 0 0 auto;
   border-radius: 50%;
   background:
@@ -1970,7 +1971,7 @@ body.feed-breakdown-open {
   box-shadow:
     inset 1px 1px 0 rgba(255, 255, 255, 0.4),
     inset -1px -1px 0 rgba(15, 23, 42, 0.18),
-    0 4px 12px rgba(0, 0, 0, 0.24);
+    0 3px 10px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -1999,19 +2000,19 @@ body.feed-breakdown-open {
 
 .a1-story-card .vote-side-gauge {
   top: 9%;
-  bottom: calc(5.5rem + 6%);
+  bottom: calc(5.75rem + 8%);
   right: 0.4rem;
 }
 
 .a1-article-card > .vote-side-gauge {
   top: 0.7rem;
-  bottom: 4.75rem;
+  bottom: 5.1rem;
   right: 0.4rem;
 }
 
 .feed-social-card:not(.a1-story-feed) .vote-side-gauge {
   top: 0.65rem;
-  bottom: 4.25rem;
+  bottom: 4.6rem;
   right: 0.35rem;
 }
 
