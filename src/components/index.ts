@@ -46,9 +46,13 @@ export {
   EditorialCollageTheme,
 } from "./themes/EditorialCollageTheme";
 export type { EditorialCollageThemeProps } from "./themes/EditorialCollageTheme";
+/** Alias matching the Article 1 design-system name for Theme #1. */
+export { EditorialCollageTheme as EditorialTheme } from "./themes/EditorialCollageTheme";
 
 export { BentoGridTheme } from "./themes/BentoGridTheme";
 export type { BentoGridThemeProps } from "./themes/BentoGridTheme";
+/** Alias matching the Article 1 design-system name for Theme #2. */
+export { BentoGridTheme as BentoTheme } from "./themes/BentoGridTheme";
 
 export { PipelineTheme } from "./themes/PipelineTheme";
 export type {
@@ -79,4 +83,10 @@ export type {
   ThemeVariant,
   VoteCounts,
 } from "./types";
+
+export {
+  ARTICLE1_PRODUCTION_BUILD_ID,
+  ARTICLE1_THEME_EXPORTS,
+  ARTICLE1_THEME_ROUTES,
+} from "./article1-production";
 

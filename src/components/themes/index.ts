@@ -1,8 +1,12 @@
 export { EditorialCollageTheme } from "./EditorialCollageTheme";
 export type { EditorialCollageThemeProps } from "./EditorialCollageTheme";
+/** Alias matching the Article 1 design-system name for Theme #1. */
+export { EditorialCollageTheme as EditorialTheme } from "./EditorialCollageTheme";
 
 export { BentoGridTheme } from "./BentoGridTheme";
 export type { BentoGridThemeProps } from "./BentoGridTheme";
+/** Alias matching the Article 1 design-system name for Theme #2. */
+export { BentoGridTheme as BentoTheme } from "./BentoGridTheme";
 
 export { PipelineTheme } from "./PipelineTheme";
 export type {
