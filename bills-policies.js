@@ -1266,6 +1266,11 @@ function mountFeedCardStanceButtons(card, item, options = {}) {
   } else if (window.PolicyEngagement?.mount) {
     window.PolicyEngagement.mount(card, item, mountOpts);
   }
+
+  // Keep Support/Oppose inside the action row (not a second wide column).
+  const slot = card.querySelector(".feed-social-card__stances");
+  const engage = card.querySelector(".policy-engage");
+  if (slot && engage) slot.append(engage);
 }
 
 function wireFeedCardAskAi(card, item) {
@@ -1281,17 +1286,22 @@ function wireFeedCardAskAi(card, item) {
     });
 }
 
+/**
+ * Tight single-column social card shell:
+ * status/category → headline → Bill ID • Date → Ask AI + Support/Oppose
+ */
 function renderSocialFeedCardShell({
   status,
   category,
   headline,
   subtext,
 }) {
+  const tone = String(status?.tone || "pending").replace(/[^a-z0-9_-]/gi, "");
   return `
-    <div class="feed-social-card__top">
-      <span class="feed-social-card__status is-${escapePolicyHtml(
-        status.tone || "pending"
-      )}">${escapePolicyHtml(status.label || "Pending Vote")}</span>
+    <div class="feed-social-card__header">
+      <span class="feed-social-card__status is-${tone}">${escapePolicyHtml(
+        status?.label || "Pending Vote"
+      )}</span>
       ${
         category
           ? `<span class="feed-social-card__category">${escapePolicyHtml(
@@ -1306,10 +1316,11 @@ function renderSocialFeedCardShell({
         ? `<p class="feed-social-card__sub">${escapePolicyHtml(subtext)}</p>`
         : ""
     }
-    <div class="feed-social-card__bar">
+    <div class="feed-social-card__actions">
       <button type="button" class="feed-social-card__ask">
         Ask AI / Details
       </button>
+      <div class="feed-social-card__stances" aria-label="Your stance"></div>
     </div>
   `;
 }
