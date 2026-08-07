@@ -280,7 +280,9 @@
   function glassThermometerHtml(passPct = null) {
     const hasPct = passPct != null && Number.isFinite(Number(passPct));
     const pct = hasPct ? clampThermoPct(passPct) : 0;
-    const color = passPctToThermoColor(hasPct ? pct : 50);
+    const color = hasPct
+      ? passPctToThermoColor(pct)
+      : "rgba(248, 250, 252, 0.35)";
     const ticks = [0, 25, 50, 75, 100]
       .map(
         (tick) => `
@@ -294,7 +296,7 @@
 
     return `
       <div
-        class="a1-glass-thermo"
+        class="a1-glass-thermo${hasPct ? " is-ready is-settled" : ""}"
         role="img"
         aria-label="${hasPct ? `${pct}% Pass` : "Pass percentage"}"
         data-pass-pct="${hasPct ? pct : ""}"
