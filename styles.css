@@ -7678,6 +7678,7 @@ body.politician-notes-modal-open {
   max-height: 300px;
   color: #e8eef7;
   overflow: hidden;
+  position: relative;
   transition:
     border-color 0.3s ease,
     box-shadow 0.3s ease,

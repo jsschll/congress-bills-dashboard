@@ -2001,7 +2001,7 @@ body.feed-breakdown-open {
     animation: none;
   }
 
-  .vote-feedback-bar__fill {
+  .vote-side-gauge__fill {
     transition: none;
   }
 }
