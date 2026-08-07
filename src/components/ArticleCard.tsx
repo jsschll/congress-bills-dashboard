@@ -1,10 +1,19 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import type { BillMetricsProps } from "./BillMetrics";
 import { ReactionDock } from "./ReactionDock";
 import {
   resolveArticleTheme,
   ThemeWrapper,
 } from "./ThemeWrapper";
+import {
+  VoteFeedback,
+  VoteStampOverlay,
+  reactionIdToFeedbackStance,
+  readLocalFeedVote,
+  splitFromCounts,
+  writeLocalFeedVote,
+  type VoteFeedbackStance,
+} from "./VoteFeedback";
 import {
   DEFAULT_REACTIONS,
   EMPTY_VOTE_COUNTS,
@@ -111,9 +120,31 @@ export function ArticleCard({
   const [voteCounts, setVoteCounts] = useState<VoteCounts>(() =>
     mergeCounts(initialVoteCounts)
   );
+  const [motionStance, setMotionStance] = useState<VoteFeedbackStance | null>(
+    null
+  );
+  const [stampStance, setStampStance] = useState<VoteFeedbackStance | null>(
+    null
+  );
+
+  // Restore Pass/Kill from localStorage so remounted cards stay in voted state.
+  useEffect(() => {
+    const local = readLocalFeedVote(resolvedBillId);
+    if (!local) return;
+    setSelectedReaction(local.stance);
+    setHasSubmitted(true);
+    setVoteCounts((prev) => {
+      if (prev.pass + prev.kill > 0) return prev;
+      const pass = Math.max(1, Math.round((local.passPct / 100) * Math.max(local.total, 10)));
+      const kill = Math.max(0, Math.max(local.total, 10) - pass);
+      return { ...prev, pass, kill };
+    });
+  }, [resolvedBillId]);
 
   const handleReact = useCallback(
     (reactionId: ReactionId) => {
+      const feedbackStance = reactionIdToFeedbackStance(reactionId);
+
       setVoteCounts((prev) => {
         const next = { ...prev };
 
@@ -122,6 +153,16 @@ export function ArticleCard({
         }
         if (selectedReaction !== reactionId) {
           next[reactionId] = next[reactionId] + 1;
+        }
+
+        if (feedbackStance) {
+          const split = splitFromCounts(next, feedbackStance);
+          writeLocalFeedVote(resolvedBillId, {
+            stance: feedbackStance,
+            passPct: split.passPct,
+            killPct: split.killPct,
+            total: split.total,
+          });
         }
 
         onReactionSubmit?.({
@@ -133,11 +174,21 @@ export function ArticleCard({
       });
       setSelectedReaction(reactionId);
       setHasSubmitted(true);
+
+      if (feedbackStance) {
+        setMotionStance(feedbackStance);
+        setStampStance(feedbackStance);
+        window.setTimeout(() => setMotionStance(null), 720);
+        window.setTimeout(() => setStampStance(null), 900);
+      }
     },
     [onReactionSubmit, resolvedBillId, selectedReaction]
   );
 
   const totalVotes = Object.values(voteCounts).reduce((sum, n) => sum + n, 0);
+  const feedbackStance = reactionIdToFeedbackStance(selectedReaction);
+  const showPostVote =
+    hasSubmitted && (feedbackStance === "pass" || feedbackStance === "kill");
 
   const displayMetrics =
     resolvedMetrics.length > 0
@@ -151,31 +202,20 @@ export function ArticleCard({
           },
         ];
 
-  const reactionLabel =
-    hasSubmitted && selectedReaction
-      ? DEFAULT_REACTIONS.find((r) => r.id === selectedReaction)?.label ??
-        selectedReaction
-      : null;
-
-  const reactionEcho =
-    reactionLabel !== null ? (
-      <p
-        className={
-          resolvedTheme === "editorial-collage"
-            ? "text-xs font-medium text-[#8A6A45]"
-            : "text-xs font-medium text-slate-500"
-        }
-        aria-live="polite"
-      >
-        You reacted: {reactionLabel}
-        {" · "}
-        {totalVotes} total reaction{totalVotes === 1 ? "" : "s"}
-      </p>
-    ) : null;
+  const motionClass =
+    motionStance === "pass"
+      ? "vote-motion vote-motion--pass is-vote-burst"
+      : motionStance === "kill"
+        ? "vote-motion vote-motion--kill is-vote-burst"
+        : "";
 
   return (
     <article
-      className={["a1-article-card relative flex flex-col", className]
+      className={[
+        "a1-article-card relative flex flex-col",
+        motionClass,
+        className,
+      ]
         .filter(Boolean)
         .join(" ")}
       data-bill-id={resolvedBillId}
@@ -198,17 +238,29 @@ export function ArticleCard({
         metrics={displayMetrics}
         actionBar={
           showReactionDock ? (
-            <ReactionDock
-              selectedReaction={selectedReaction}
-              disabled={false}
-              onReact={handleReact}
-              theme={resolvedTheme}
-            />
+            showPostVote && feedbackStance ? (
+              <VoteFeedback
+                stance={feedbackStance}
+                voteCounts={voteCounts}
+                animate
+                onChange={() => {
+                  setHasSubmitted(false);
+                  setSelectedReaction(null);
+                }}
+              />
+            ) : (
+              <ReactionDock
+                selectedReaction={selectedReaction}
+                disabled={false}
+                onReact={handleReact}
+                theme={resolvedTheme}
+              />
+            )
           ) : null
         }
       >
         {children}
-        {reactionEcho}
+        <VoteStampOverlay stance={stampStance} />
       </ThemeWrapper>
     </article>
   );

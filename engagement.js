@@ -259,11 +259,15 @@
     const id = String(item?.id || "");
     if (id && state.stances.has(id)) return state.stances.get(id);
     const key = legislationKeyFromBillId(id, item);
-    if (!key) return null;
+    if (!key) {
+      const localOnly = global.VoteFeedback?.getLocalVote?.(item);
+      return localOnly?.stance || null;
+    }
     for (const [billId, stance] of state.stances.entries()) {
       if (legislationKeyFromBillId(billId) === key) return stance;
     }
-    return null;
+    const local = global.VoteFeedback?.getLocalVote?.(item);
+    return local?.stance || null;
   }
 
   function isFollowingItem(item) {
@@ -854,11 +858,63 @@ Sincerely,
   async function setStance(item, nextStance, roots) {
     const client = getSupabase();
     const user = await getUser();
-    if (!client || !user) {
+    const allowLocalGuest = Boolean(roots?.allowLocalGuestVote);
+
+    if ((!client || !user) && !allowLocalGuest) {
       redirectToAuth("stance");
       return;
     }
     if (!item?.id) return;
+
+    // Guest / offline: persist locally and play Phase 1 feedback without auth.
+    if (!client || !user) {
+      const current = getStanceForItem(item);
+      let activeStance = null;
+      if (current === nextStance) {
+        global.VoteFeedback?.clearLocalVote?.(item);
+        activeStance = null;
+      } else {
+        activeStance = nextStance;
+        state.stances.set(item.id, nextStance);
+      }
+      roots.changeMode = false;
+      if (activeStance && global.VoteFeedback) {
+        const split = global.VoteFeedback.resolveSplit(item, null, activeStance);
+        global.VoteFeedback.setLocalVote(item, {
+          stance: activeStance,
+          passPct: split.passPct,
+          killPct: split.killPct,
+          total: split.total,
+        });
+        global.VoteFeedback.playVoteMotion(roots.root || roots.card, activeStance);
+        if (roots.voteFeedbackMode) {
+          global.VoteFeedback.applyPostVoteState(
+            roots,
+            item,
+            activeStance,
+            split,
+            { animate: true }
+          );
+        } else {
+          applyLoggedStanceUI(roots, activeStance);
+        }
+      } else {
+        applyLoggedStanceUI(roots, null);
+      }
+      if (typeof roots.onStanceChange === "function") {
+        try {
+          await roots.onStanceChange({
+            item,
+            stance: activeStance,
+            votePayload: null,
+            localOnly: true,
+          });
+        } catch (error) {
+          console.warn(error);
+        }
+      }
+      return;
+    }
 
     await upsertBillItem(client, item);
     if (!state.geo && state.homeAddress) await refreshGeoAndReps();
@@ -873,6 +929,7 @@ Sincerely,
         .eq("bill_id", item.id);
       if (error) throw error;
       state.stances.delete(item.id);
+      global.VoteFeedback?.clearLocalVote?.(item);
       await client
         .from("stance_vote_matches")
         .delete()
@@ -898,7 +955,40 @@ Sincerely,
 
     // Show logged vote immediately — don't wait for roll-call comparison.
     roots.changeMode = false;
-    applyLoggedStanceUI(roots, activeStance);
+
+    if (activeStance && global.VoteFeedback) {
+      let community = null;
+      try {
+        community = await fetchCommunity(item.id);
+      } catch (_) {
+        community = null;
+      }
+      const split = global.VoteFeedback.resolveSplit(
+        item,
+        community,
+        activeStance
+      );
+      global.VoteFeedback.setLocalVote(item, {
+        stance: activeStance,
+        passPct: split.passPct,
+        killPct: split.killPct,
+        total: split.total,
+      });
+      global.VoteFeedback.playVoteMotion(roots.root || roots.card, activeStance);
+      if (roots.voteFeedbackMode) {
+        global.VoteFeedback.applyPostVoteState(
+          roots,
+          item,
+          activeStance,
+          split,
+          { animate: true }
+        );
+      } else {
+        applyLoggedStanceUI(roots, activeStance);
+      }
+    } else {
+      applyLoggedStanceUI(roots, activeStance);
+    }
 
     await loadAlignment(client);
     let votePayload = null;
@@ -914,7 +1004,14 @@ Sincerely,
     } else {
       await loadMatchScores(client);
     }
-    await refreshMountedCard(item, roots, votePayload);
+    // Keep Phase 1 post-vote bar; only refresh who-voted / community extras.
+    if (!roots.voteFeedbackMode) {
+      await refreshMountedCard(item, roots, votePayload);
+    } else if (roots.voteBody) {
+      if (votePayload) {
+        roots.voteBody.innerHTML = renderWhoVotedHtml(activeStance, votePayload);
+      }
+    }
     if (typeof roots.onStanceChange === "function") {
       try {
         await roots.onStanceChange({
@@ -971,12 +1068,37 @@ Sincerely,
     opposeBtn.setAttribute("aria-pressed", String(hasOppose));
 
     if (hasVote && !editing) {
+      if (roots.voteFeedbackMode && global.VoteFeedback) {
+        if (stances) stances.hidden = true;
+        const local = global.VoteFeedback.getLocalVote(roots.item || {}) || {};
+        const split = {
+          passPct: local.passPct,
+          killPct: local.killPct,
+          total: local.total,
+        };
+        if (split.passPct == null) {
+          const resolved = global.VoteFeedback.resolveSplit(
+            roots.item || {},
+            null,
+            mine
+          );
+          split.passPct = resolved.passPct;
+          split.killPct = resolved.killPct;
+          split.total = resolved.total;
+        }
+        global.VoteFeedback.applyPostVoteState(roots, roots.item, mine, split, {
+          animate: false,
+        });
+        return;
+      }
+
       // Replace buttons with a clear logged message + Change option.
       if (stances) stances.hidden = true;
       if (panel) {
         panel.hidden = false;
         panel.classList.toggle("is-support", hasSupport);
         panel.classList.toggle("is-oppose", hasOppose);
+        panel.classList.remove("vote-feedback-panel");
         panel.innerHTML = `
           <p class="policy-engage__logged-message">
             ${hasSupport ? "You supported this" : "You opposed this"}
@@ -999,15 +1121,15 @@ Sincerely,
     if (panel) {
       if (editing && hasVote) {
         panel.hidden = false;
-        panel.classList.remove("is-support", "is-oppose");
+        panel.classList.remove("is-support", "is-oppose", "vote-feedback-panel");
         panel.innerHTML = `
           <p class="policy-engage__logged-hint">
-            Choose Support or Oppose to update your vote.
+            Choose Pass It or Kill It to update your vote.
           </p>
         `;
       } else {
         panel.hidden = true;
-        panel.classList.remove("is-support", "is-oppose");
+        panel.classList.remove("is-support", "is-oppose", "vote-feedback-panel");
         panel.innerHTML = "";
       }
     }
@@ -1135,6 +1257,8 @@ Sincerely,
     const followBtn = wrap.querySelector(".policy-engage__follow");
     const roots = {
       root: wrap,
+      card,
+      item,
       supportBtn: wrap.querySelector('[data-stance="support"]'),
       opposeBtn: wrap.querySelector('[data-stance="oppose"]'),
       stancesEl: wrap.querySelector(".policy-engage__stances"),
@@ -1148,7 +1272,18 @@ Sincerely,
       supportLabel,
       opposeLabel,
       changeMode: false,
+      voteFeedbackMode: Boolean(options.voteFeedbackMode),
+      allowLocalGuestVote: Boolean(options.allowLocalGuestVote),
+      reapplyLoggedUI(stance) {
+        applyLoggedStanceUI(roots, stance);
+      },
     };
+
+    // Hydrate server stance into memory from local cache when needed.
+    const localVote = global.VoteFeedback?.getLocalVote?.(item);
+    if (localVote?.stance && !state.stances.has(item.id)) {
+      state.stances.set(item.id, localVote.stance);
+    }
 
     const mine = getStanceForItem(item);
     applyLoggedStanceUI(roots, mine);

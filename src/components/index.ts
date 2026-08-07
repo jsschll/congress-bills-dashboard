@@ -4,6 +4,20 @@ export type { ArticleCardProps } from "./ArticleCard";
 export { ReactionDock } from "./ReactionDock";
 export type { ReactionDockProps } from "./ReactionDock";
 
+export {
+  VoteFeedback,
+  VoteStampOverlay,
+  reactionIdToFeedbackStance,
+  readLocalFeedVote,
+  splitFromCounts,
+  writeLocalFeedVote,
+} from "./VoteFeedback";
+export type {
+  VoteFeedbackProps,
+  VoteFeedbackStance,
+  VoteStampOverlayProps,
+} from "./VoteFeedback";
+
 export { BillMetrics } from "./BillMetrics";
 export type { BillMetricsProps } from "./BillMetrics";
 
