@@ -2,7 +2,11 @@ const { createClient } = require("@supabase/supabase-js");
 const {
   fetchProcessedVotesMatchingBills,
   applyProcessedSummariesToBillItems,
+  mapProcessedVoteToFeedItem,
+  PROCESSED_VOTES_SELECT,
+  PROCESSED_VOTES_SELECT_LEGACY,
 } = require("../lib/processed-votes-feed");
+const { seedFederalAndStateBills } = require("../lib/bills-feed-seed");
 
 const API_BASE = "https://api.congress.gov/v3";
 const OPENSTATES_BASE = "https://v3.openstates.org";
@@ -727,6 +731,57 @@ async function enrichFederalItemsWithProcessedVotes(items = []) {
   return items;
 }
 
+/**
+ * Pull recent federal bill cards from Supabase when Congress.gov is empty
+ * or unavailable (common when CONGRESS_API_KEY is unset on the host).
+ */
+async function fetchFederalBillsFromProcessedVotes(limit = DEFAULT_LIMIT) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return [];
+
+  const fetchLimit = Math.min(80, Math.max(limit * 3, limit));
+  let result = await supabase
+    .from("processed_votes")
+    .select(PROCESSED_VOTES_SELECT)
+    .not("summary", "eq", "")
+    .order("vote_date", { ascending: false, nullsFirst: false })
+    .limit(fetchLimit);
+
+  if (
+    result.error &&
+    /key_points|primary_category|takeaway|short_title|plain_summary|what_it_does|yea_impact|nay_impact|is_key_vote/i.test(
+      result.error.message || ""
+    )
+  ) {
+    result = await supabase
+      .from("processed_votes")
+      .select(PROCESSED_VOTES_SELECT_LEGACY)
+      .not("summary", "eq", "")
+      .order("vote_date", { ascending: false, nullsFirst: false })
+      .limit(fetchLimit);
+  }
+
+  if (result.error) {
+    console.warn(
+      "processed_votes bills-feed fallback failed:",
+      result.error.message || result.error
+    );
+    return [];
+  }
+
+  const seen = new Set();
+  const items = [];
+  for (const row of result.data || []) {
+    const item = mapProcessedVoteToFeedItem(row);
+    const key = String(item.id || item.billId || "").toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    items.push(item);
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   if (req.method !== "GET") return json(res, 405, { error: "Method not allowed" });
@@ -739,14 +794,29 @@ module.exports = async function handler(req, res) {
 
   const limit = Math.max(4, Math.min(24, Number(req.query.limit || DEFAULT_LIMIT) || DEFAULT_LIMIT));
   const stateFilter = normalizeStateCode(req.query.state);
+  const allowSeed =
+    String(req.query.seed || "1").trim() !== "0" &&
+    String(req.query.seed || "1").toLowerCase() !== "false";
 
   try {
     let federalItems = [];
     let federalCoverage = "coming soon";
     if (apiKey) {
-      federalItems = await fetchFederalBills(apiKey, limit);
-      await enrichFederalItemsWithProcessedVotes(federalItems);
-      federalCoverage = "live";
+      try {
+        federalItems = await fetchFederalBills(apiKey, limit);
+        await enrichFederalItemsWithProcessedVotes(federalItems);
+        federalCoverage = federalItems.length ? "live" : "empty";
+      } catch (error) {
+        console.warn("Congress.gov bills-feed failed:", error.message || error);
+        federalCoverage = "error";
+      }
+    }
+
+    if (!federalItems.length) {
+      federalItems = await fetchFederalBillsFromProcessedVotes(limit);
+      if (federalItems.length) {
+        federalCoverage = "processed_votes";
+      }
     }
 
     let jurisdictions = PRIORITY_STATE_JURISDICTIONS;
@@ -755,15 +825,52 @@ module.exports = async function handler(req, res) {
       jurisdictions = name ? [name] : [];
     }
 
-    const stateItems = openStatesKey
-      ? await fetchOpenStatesBillsForJurisdictions(openStatesKey, jurisdictions, 2)
-      : [];
+    let stateItems = [];
+    let stateCoverage = "coming soon";
+    if (openStatesKey) {
+      try {
+        stateItems = await fetchOpenStatesBillsForJurisdictions(
+          openStatesKey,
+          jurisdictions,
+          2
+        );
+        stateCoverage = stateFilter
+          ? `live (${jurisdictionNameForStateCode(stateFilter) || stateFilter})`
+          : "live (selected jurisdictions)";
+      } catch (error) {
+        console.warn("OpenStates bills-feed failed:", error.message || error);
+        stateCoverage = "error";
+      }
+    }
+
     let localItems = curatedCityAndDistrictItems();
     if (stateFilter) {
       localItems = localItems.filter((item) => item.stateCode === stateFilter);
     }
 
-    const merged = [...federalItems, ...stateItems, ...localItems].sort(
+    let seedItems = [];
+    const liveLegislativeCount = federalItems.length + stateItems.length;
+    if (allowSeed && liveLegislativeCount === 0) {
+      seedItems = seedFederalAndStateBills().filter((item) => {
+        if (!stateFilter) return true;
+        return String(item.stateCode || "").toUpperCase() === stateFilter;
+      });
+      if (seedItems.length) {
+        federalCoverage =
+          federalCoverage === "coming soon" || federalCoverage === "empty"
+            ? "seed fallback"
+            : federalCoverage;
+        stateCoverage =
+          stateCoverage === "coming soon" ? "seed fallback" : stateCoverage;
+      }
+    }
+
+    const merged = [
+      ...federalItems,
+      ...stateItems,
+      ...seedItems,
+      ...localItems,
+    ].sort(
       (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
     );
 
@@ -780,14 +887,16 @@ module.exports = async function handler(req, res) {
       stateFilter: stateFilter || null,
       coverage: {
         Federal: federalCoverage,
-        State: openStatesKey
-          ? stateFilter
-            ? `live (${jurisdictionNameForStateCode(stateFilter) || stateFilter})`
-            : "live (selected jurisdictions)"
-          : "coming soon",
+        State: stateCoverage,
         County: "sample (curated)",
         City: "sample (curated)",
         District: "sample (curated)",
+      },
+      sources: {
+        congressGov: Boolean(apiKey),
+        openStates: Boolean(openStatesKey),
+        processedVotes: federalCoverage === "processed_votes",
+        seedFallback: seedItems.length > 0,
       },
       items: merged,
     });
