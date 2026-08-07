@@ -1,22 +1,32 @@
 import React from "react";
 import { BentoGridTheme } from "./themes/BentoGridTheme";
 import { EditorialCollageTheme } from "./themes/EditorialCollageTheme";
+import { PipelineTheme } from "./themes/PipelineTheme";
 import type { BillMetric, ThemeVariant } from "./types";
 import {
   collectBillThemeSignals,
+  collectProceduralSignals,
+  isProceduralBill,
   mapLiveBillToArticleProps,
   resolveBillCategoryLabel,
   type LegislativeBill,
+  type PipelineStepView,
 } from "../lib/live-bill";
 
 /** Visual themes ThemeWrapper can dynamically select between. */
-export type ResolvedArticleTheme = "editorial-collage" | "bento-grid";
+export type ResolvedArticleTheme =
+  | "editorial-collage"
+  | "bento-grid"
+  | "pipeline";
 
 const FINANCE_SIGNAL_PATTERN =
   /\b(finance|financial|budget|budgets|economy|economic|fiscal|trade|appropriations?|treasury|tax|taxes|revenue|deficit|debt|commerce|banking|securities)\b/i;
 
 const HUMAN_CENTERED_SIGNAL_PATTERN =
   /\b(education|health|healthcare|housing|social|civil rights|labor|immigration|family|children|veterans|disability|welfare|nutrition|public health)\b/i;
+
+const PROCEDURAL_SIGNAL_PATTERN =
+  /\b(floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|procedural|pipeline|tracking|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
 
 export type ThemeWrapperProps = {
   /** Live / structured bill object — preferred source for routing + copy. */
@@ -26,8 +36,8 @@ export type ThemeWrapperProps = {
   category?: string;
   keyImpacts?: string[];
   /**
-   * Explicit theme override. When omitted, real bill category / subject / type
-   * (and tags) decide between Bento Grid and Editorial Collage.
+   * Explicit theme override. When omitted, real bill category / subject / type /
+   * procedural tracking signals decide among Pipeline, Bento, and Editorial.
    */
   themeVariant?: ThemeVariant;
   humanHook?: string;
@@ -35,6 +45,8 @@ export type ThemeWrapperProps = {
   imageSrc?: string;
   imageAlt?: string;
   financialSummary?: string;
+  whatItDoes?: string;
+  pipelineSteps?: PipelineStepView[];
   metrics?: BillMetric[];
   className?: string;
   children?: React.ReactNode;
@@ -55,15 +67,25 @@ export function isHumanCenteredCategory(signals = ""): boolean {
 }
 
 /**
+ * True when signals describe procedural legislative tracking.
+ */
+export function isProceduralCategory(signals = ""): boolean {
+  return PROCEDURAL_SIGNAL_PATTERN.test(signals);
+}
+
+/**
  * Resolve which Article 1 visual theme to render from real bill properties.
- * Explicit `bento-grid` / `editorial-collage` (and `fiscal`) win;
- * otherwise finance-like signals → Bento, everything else → Editorial.
+ * Explicit theme variants win; then procedural tracking → Pipeline,
+ * finance → Bento, everything else → Editorial.
  */
 export function resolveArticleTheme(
   categoryOrSignals = "",
   themeVariant?: ThemeVariant,
   bill?: LegislativeBill
 ): ResolvedArticleTheme {
+  if (themeVariant === "pipeline" || themeVariant === "urgent") {
+    return "pipeline";
+  }
   if (themeVariant === "bento-grid" || themeVariant === "fiscal") {
     return "bento-grid";
   }
@@ -73,10 +95,19 @@ export function resolveArticleTheme(
 
   const signals = [
     categoryOrSignals,
+    bill ? collectProceduralSignals(bill) : "",
     bill ? collectBillThemeSignals(bill) : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  if (bill && isProceduralBill(bill)) {
+    return "pipeline";
+  }
+
+  if (isProceduralCategory(signals)) {
+    return "pipeline";
+  }
 
   if (isFinanceCategory(signals)) {
     return "bento-grid";
@@ -88,8 +119,8 @@ export function resolveArticleTheme(
 
 /**
  * Dynamic theme router for Article 1.
- * Prefers a live `bill` object's category / subject / type / tags, then
- * falls back to explicit props. Vote state stays outside this wrapper.
+ * Prefers a live `bill` object's category / subject / type / procedural status,
+ * then falls back to explicit props. Vote state stays outside this wrapper.
  */
 export function ThemeWrapper({
   bill,
@@ -103,6 +134,8 @@ export function ThemeWrapper({
   imageSrc,
   imageAlt,
   financialSummary,
+  whatItDoes,
+  pipelineSteps,
   metrics,
   className = "",
   children,
@@ -129,6 +162,11 @@ export function ThemeWrapper({
   const resolvedImageAlt = imageAlt || mapped?.imageAlt;
   const resolvedFinancialSummary =
     financialSummary || mapped?.financialSummary;
+  const resolvedWhatItDoes = whatItDoes || mapped?.whatItDoes || resolvedTitle;
+  const resolvedPipelineSteps =
+    pipelineSteps && pipelineSteps.length > 0
+      ? pipelineSteps
+      : mapped?.pipelineSteps || [];
 
   const themeSignals = [
     resolvedCategory,
@@ -160,7 +198,18 @@ export function ThemeWrapper({
       data-bill-id={resolvedBillId}
       data-a1-shell="theme-wrapper"
     >
-      {resolvedTheme === "bento-grid" ? (
+      {resolvedTheme === "pipeline" ? (
+        <PipelineTheme
+          billId={resolvedBillId}
+          title={resolvedTitle}
+          category={resolvedCategory}
+          keyImpacts={resolvedKeyImpacts}
+          whatItDoes={resolvedWhatItDoes}
+          pipelineSteps={resolvedPipelineSteps}
+        >
+          {children}
+        </PipelineTheme>
+      ) : resolvedTheme === "bento-grid" ? (
         <BentoGridTheme
           billId={resolvedBillId}
           title={resolvedTitle}
