@@ -126,10 +126,9 @@
   text-overflow: ellipsis;
 }
 
+/* Theme-name badge permanently removed from story peeks. */
 .a1-story-card__pill--theme {
-  color: #fff7ed;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  display: none !important;
 }
 
 .a1-story-card__pill--cat {
@@ -295,8 +294,126 @@
 }
 
 /* Hide legacy theme badge when using story shell */
-.a1-card-shell--story > .a1-theme-badge {
-  display: none;
+.a1-card-shell--story > .a1-theme-badge,
+.a1-theme-badge {
+  display: none !important;
+}
+
+/* ── Glass Pass% thermometer (right inner edge) ─────────────────────── */
+
+.a1-glass-thermo {
+  position: absolute;
+  top: 12%;
+  bottom: 10%;
+  right: 0.55rem;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 1.25rem;
+  pointer-events: none;
+  --thermo-pct: 50%;
+  --thermo-color: hsl(60 90% 50%);
+}
+
+.a1-glass-thermo__tube {
+  position: relative;
+  flex: 1 1 auto;
+  width: 0.7rem;
+  min-height: 0;
+  border-radius: 999px;
+  overflow: visible;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.16) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 3px rgba(0, 0, 0, 0.22),
+    0 2px 8px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.a1-glass-thermo__ticks {
+  position: absolute;
+  inset: 0.35rem -0.2rem 0.35rem auto;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.a1-glass-thermo__tick {
+  position: absolute;
+  right: 0;
+  display: block;
+  width: 0.28rem;
+  height: 1px;
+  background: rgba(226, 232, 240, 0.45);
+}
+
+.a1-glass-thermo__tick.is-major {
+  width: 0.45rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.a1-glass-thermo__mercury {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 0;
+  z-index: 1;
+  height: var(--thermo-pct, 50%);
+  border-radius: inherit;
+  background-color: var(--thermo-color, hsl(60 90% 50%));
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--thermo-color) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    height 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.7s ease-out,
+    box-shadow 0.7s ease-out;
+}
+
+.a1-glass-thermo:not(.is-ready) .a1-glass-thermo__mercury {
+  height: 0% !important;
+}
+
+.a1-glass-thermo.is-settled .a1-glass-thermo__mercury,
+.a1-glass-thermo.is-settled .a1-glass-thermo__bulb {
+  transition: none;
+}
+
+.a1-glass-thermo__bulb {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: -0.2rem;
+  border-radius: 999px;
+  background-color: var(--thermo-color, hsl(60 90% 50%));
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.35),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2),
+    0 0 12px color-mix(in srgb, var(--thermo-color) 45%, transparent);
+  transition: background-color 0.7s ease-out, box-shadow 0.7s ease-out;
+}
+
+/* Horizontal vote % bar removed — thermometer owns Pass% visualization */
+.a1-story-card .vote-feedback-bar__track,
+.a1-story-feed .vote-feedback-bar__track,
+.feed-story-card .vote-feedback-bar__track,
+.a1-themed-card .vote-feedback-bar__track {
+  display: none !important;
+}
+
+.a1-story-card .vote-feedback-bar__fill,
+.a1-story-feed .vote-feedback-bar__fill,
+.feed-story-card .vote-feedback-bar__fill {
+  display: none !important;
 }
 
 /* ── Full Breakdown bottom sheet ────────────────────────────────────── */

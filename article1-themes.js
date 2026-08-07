@@ -261,6 +261,222 @@
     });
   }
 
+  /** Pass % → mercury color: Red (0°) → Yellow (60°) → Green (120°). */
+  function passPctToThermoColor(passPct) {
+    const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+    return `hsl(${(t * 120).toFixed(1)} 90% 50%)`;
+  }
+
+  function clampThermoPct(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 50;
+    return Math.max(0, Math.min(100, Math.round(n)));
+  }
+
+  /**
+   * Glass thermometer markup for the story card’s right inner edge.
+   * Fill is driven by --thermo-pct / --thermo-color (synced after votes).
+   */
+  function glassThermometerHtml(passPct = null) {
+    const hasPct = passPct != null && Number.isFinite(Number(passPct));
+    const pct = hasPct ? clampThermoPct(passPct) : 0;
+    const color = passPctToThermoColor(hasPct ? pct : 50);
+    const ticks = [0, 25, 50, 75, 100]
+      .map(
+        (tick) => `
+          <span
+            class="a1-glass-thermo__tick${tick % 50 === 0 ? " is-major" : ""}"
+            style="bottom:${tick}%"
+            aria-hidden="true"
+          ></span>`
+      )
+      .join("");
+
+    return `
+      <div
+        class="a1-glass-thermo"
+        role="img"
+        aria-label="${hasPct ? `${pct}% Pass` : "Pass percentage"}"
+        data-pass-pct="${hasPct ? pct : ""}"
+        style="--thermo-pct:${pct}%; --thermo-color:${color};"
+      >
+        <div class="a1-glass-thermo__tube">
+          <div class="a1-glass-thermo__ticks">${ticks}</div>
+          <span class="a1-glass-thermo__mercury" style="height:${pct}%; background-color:${color};"></span>
+        </div>
+        <span class="a1-glass-thermo__bulb" style="background-color:${color};" aria-hidden="true"></span>
+      </div>
+    `;
+  }
+
+  function applyGlassThermoFill(gauge, passPct, { animate = true } = {}) {
+    if (!gauge) return;
+    const pct = clampThermoPct(passPct);
+    const color = passPctToThermoColor(pct);
+    const mercury = gauge.querySelector(".a1-glass-thermo__mercury");
+    const bulb = gauge.querySelector(".a1-glass-thermo__bulb");
+
+    gauge.setAttribute("aria-label", `${pct}% Pass`);
+    gauge.dataset.passPct = String(pct);
+
+    const paint = () => {
+      gauge.style.setProperty("--thermo-pct", `${pct}%`);
+      gauge.style.setProperty("--thermo-color", color);
+      if (mercury) {
+        mercury.style.height = `${pct}%`;
+        mercury.style.backgroundColor = color;
+      }
+      if (bulb) bulb.style.backgroundColor = color;
+      gauge.classList.add("is-ready");
+    };
+
+    if (!animate) {
+      paint();
+      gauge.classList.add("is-settled");
+      return;
+    }
+
+    if (!gauge.classList.contains("is-ready")) {
+      gauge.classList.remove("is-ready");
+      gauge.style.setProperty("--thermo-pct", "0%");
+      if (mercury) mercury.style.height = "0%";
+      void gauge.offsetWidth;
+      requestAnimationFrame(paint);
+      return;
+    }
+
+    requestAnimationFrame(paint);
+  }
+
+  function findStoryCardRoot(fromEl) {
+    if (!fromEl) return null;
+    return (
+      fromEl.closest?.(".a1-themed-card") ||
+      fromEl.closest?.(".feed-story-card") ||
+      fromEl.closest?.(".feed-social-card") ||
+      fromEl.closest?.(".a1-story-card") ||
+      fromEl
+    );
+  }
+
+  function readPassPctFromCard(card) {
+    if (!card) return null;
+    const root = findStoryCardRoot(card) || card;
+    const local =
+      global.VoteFeedback?.getLocalVote?.(root) ||
+      global.VoteFeedback?.getLocalVote?.(
+        root.getAttribute?.("data-bill-id") ||
+          root.getAttribute?.("data-id") ||
+          root.id ||
+          ""
+      );
+    if (local && local.passPct != null) return clampThermoPct(local.passPct);
+
+    const track = root.querySelector?.(".vote-feedback-bar__track[aria-label]");
+    const label = track?.getAttribute("aria-label") || "";
+    const match = label.match(/(\d+)\s*%\s*Pass/i);
+    if (match) return clampThermoPct(match[1]);
+
+    const passFill = root.querySelector?.(
+      ".vote-feedback-bar__fill--pass"
+    );
+    if (passFill) {
+      const width = String(
+        passFill.style.getPropertyValue("--target-width") || ""
+      )
+        .replace("%", "")
+        .trim();
+      if (width) return clampThermoPct(width);
+    }
+    return null;
+  }
+
+  function syncGlassThermoOnCard(card, { animate = true } = {}) {
+    if (!card) return;
+    const root = findStoryCardRoot(card) || card;
+    const host =
+      root.querySelector?.(".a1-story-card") ||
+      root.querySelector?.(".a1-card-shell--story") ||
+      root;
+    const gauge = host.querySelector?.(".a1-glass-thermo");
+    if (!gauge) return;
+    const pct = readPassPctFromCard(root);
+    if (pct == null) return;
+    applyGlassThermoFill(gauge, pct, { animate });
+  }
+
+  let thermoObserverStarted = false;
+  function ensureGlassThermoObserver() {
+    if (thermoObserverStarted || typeof document === "undefined") return;
+    thermoObserverStarted = true;
+
+    const refresh = (root) => {
+      const cards = (root || document).querySelectorAll?.(
+        ".a1-story-card, .a1-themed-card, .feed-story-card"
+      );
+      cards?.forEach((card) => {
+        const host = card.classList?.contains("a1-story-card")
+          ? card
+          : card.querySelector?.(".a1-story-card") || card;
+        syncGlassThermoOnCard(host.closest?.(".a1-themed-card") || host, {
+          animate: true,
+        });
+      });
+    };
+
+    document.addEventListener(
+      "click",
+      (event) => {
+        const btn = event.target?.closest?.(
+          ".policy-engage__stance, .policy-engage__change, .vote-feedback-bar__change"
+        );
+        if (!btn) return;
+        const card =
+          btn.closest(".a1-themed-card") ||
+          btn.closest(".feed-social-card") ||
+          btn.closest(".a1-story-card");
+        if (!card) return;
+        window.setTimeout(() => syncGlassThermoOnCard(card, { animate: true }), 40);
+        window.setTimeout(() => syncGlassThermoOnCard(card, { animate: true }), 320);
+      },
+      true
+    );
+
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        const node = mutation.target;
+        if (!(node instanceof Element)) continue;
+        if (
+          node.classList?.contains("vote-feedback-bar") ||
+          node.classList?.contains("vote-feedback-panel") ||
+          node.querySelector?.(".vote-feedback-bar, .a1-glass-thermo")
+        ) {
+          const card =
+            node.closest(".a1-themed-card") ||
+            node.closest(".feed-social-card") ||
+            node.closest(".a1-story-card");
+          if (card) syncGlassThermoOnCard(card, { animate: true });
+        }
+      }
+    });
+
+    const start = () => {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style", "class", "aria-label", "hidden"],
+      });
+      refresh(document);
+    };
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", start, { once: true });
+    } else {
+      start();
+    }
+  }
+
   /**
    * Instagram/TikTok-style story peek: fixed-height hero + overlay type + vote dock.
    * Dense theme layouts live in the breakdown drawer template.
@@ -279,6 +495,10 @@
         ? normalizeCopyLine(impactsList[1])
         : "";
 
+    // Theme name badge intentionally omitted — category + bill id only.
+    void label;
+    ensureGlassThermoObserver();
+
     return `
       <div class="a1-story-card" data-theme="${escapeHtml(theme)}">
         <div class="a1-story-card__media a1-story-card__frame">
@@ -294,9 +514,6 @@
           <div class="a1-story-card__scrim" aria-hidden="true"></div>
           <div class="a1-story-card__top">
             <div class="a1-story-card__pills">
-              <span class="a1-story-card__pill a1-story-card__pill--theme">${escapeHtml(
-                label
-              )}</span>
               <span class="a1-story-card__pill a1-story-card__pill--cat">${escapeHtml(
                 category || "Congress"
               )}</span>
@@ -317,6 +534,7 @@
                 : ""
             }
           </div>
+          ${glassThermometerHtml(null)}
         </div>
         <div class="a1-story-card__footer">
           <button type="button" class="a1-story-card__breakdown" data-feed-breakdown="1">
@@ -920,7 +1138,11 @@
     resolveTheme,
     themeLabel,
     renderThemedCardHtml,
+    syncGlassThermoOnCard,
+    passPctToThermoColor,
     SUPPORT,
     OPPOSE,
   };
+
+  ensureGlassThermoObserver();
 })(typeof window !== "undefined" ? window : globalThis);
