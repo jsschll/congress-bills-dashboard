@@ -296,13 +296,13 @@
 
     return `
       <div
-        class="a1-glass-thermo${hasPct ? " is-ready is-settled" : ""}"
+        class="a1-glass-thermo bg-black/60 border border-white/40 shadow-lg${hasPct ? " is-ready is-settled" : ""}"
         role="img"
         aria-label="${hasPct ? `${pct}% Pass` : "Pass percentage"}"
         data-pass-pct="${hasPct ? pct : ""}"
         style="--thermo-pct:${pct}%; --thermo-color:${color};"
       >
-        <div class="a1-glass-thermo__tube bg-black/60 border border-white/40 shadow-lg">
+        <div class="a1-glass-thermo__tube">
           <div class="a1-glass-thermo__ticks">${ticks}</div>
           <span class="a1-glass-thermo__mercury" style="height:${pct}%; background-color:${color};"></span>
         </div>
