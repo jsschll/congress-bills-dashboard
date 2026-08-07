@@ -2133,7 +2133,8 @@ function renderSocialFeedCardShell({
 
 function renderBillCard(item) {
   const card = document.createElement("article");
-  card.className = "policy-bill-card feed-social-card feed-story-card";
+  card.className =
+    "policy-bill-card feed-social-card feed-story-card a1-themed-card";
 
   const pitch = String(
     preferPlainSummaryText(item) || item.shortPitch || ""
@@ -2141,13 +2142,25 @@ function renderBillCard(item) {
   const cardCopy = resolveFeedCardCopy(item, { summary: pitch });
   const category = formatFeedCategoryPill(item);
 
-  card.innerHTML = renderSocialFeedCardShell({
-    category,
-    title: cardCopy.displayTitle,
-    billId: formatFeedBillId(item),
-    impacts: cardCopy.impacts,
-    socialProof: buildFeedSocialProof(item),
-  });
+  if (window.Article1Themes?.renderThemedCardHtml) {
+    const themed = window.Article1Themes.renderThemedCardHtml(item, {
+      category,
+      title: cardCopy.displayTitle,
+      billId: formatFeedBillId(item),
+      impacts: cardCopy.impacts,
+      summary: cardCopy.impacts?.what || pitch,
+    });
+    card.dataset.a1Theme = themed.theme;
+    card.innerHTML = themed.html;
+  } else {
+    card.innerHTML = renderSocialFeedCardShell({
+      category,
+      title: cardCopy.displayTitle,
+      billId: formatFeedBillId(item),
+      impacts: cardCopy.impacts,
+      socialProof: buildFeedSocialProof(item),
+    });
+  }
 
   wireFeedCardAskAi(card, item);
   wireFeedCardMicroActions(card, item);
@@ -2287,7 +2300,7 @@ function formatVoteResultBadge(result) {
 
 function renderVoteCard(item) {
   const card = document.createElement("article");
-  card.className = "feed-social-card vote-feed-card feed-story-card";
+  card.className = "feed-social-card vote-feed-card feed-story-card a1-themed-card";
 
   const copy =
     typeof resolveVoteCardCopy === "function"
@@ -2296,13 +2309,25 @@ function renderVoteCard(item) {
   const cardCopy = resolveFeedCardCopy(item, copy);
   const category = formatFeedCategoryPill(item);
 
-  card.innerHTML = renderSocialFeedCardShell({
-    category,
-    title: cardCopy.displayTitle,
-    billId: formatFeedBillId(item),
-    impacts: cardCopy.impacts,
-    socialProof: buildFeedSocialProof(item),
-  });
+  if (window.Article1Themes?.renderThemedCardHtml) {
+    const themed = window.Article1Themes.renderThemedCardHtml(item, {
+      category,
+      title: cardCopy.displayTitle,
+      billId: formatFeedBillId(item),
+      impacts: cardCopy.impacts,
+      summary: cardCopy.impacts?.what || preferPlainSummaryText(item),
+    });
+    card.dataset.a1Theme = themed.theme;
+    card.innerHTML = themed.html;
+  } else {
+    card.innerHTML = renderSocialFeedCardShell({
+      category,
+      title: cardCopy.displayTitle,
+      billId: formatFeedBillId(item),
+      impacts: cardCopy.impacts,
+      socialProof: buildFeedSocialProof(item),
+    });
+  }
 
   wireFeedCardAskAi(card, item);
   wireFeedCardMicroActions(card, item);
