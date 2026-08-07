@@ -200,11 +200,19 @@ function friendlyCoverageLabel(level, status) {
 }
 
 function renderCoverageBadges(coverage = {}) {
+  const entries = Object.entries(coverage || {});
+  if (!entries.length) {
+    policyFeedCoverage.replaceChildren();
+    policyFeedCoverage.hidden = true;
+    return;
+  }
+  policyFeedCoverage.hidden = false;
   policyFeedCoverage.replaceChildren(
-    ...Object.entries(coverage).map(([level, status]) => {
+    ...entries.map(([level, status]) => {
       const badge = document.createElement("span");
       badge.className = `policy-feed-coverage__badge ${coverageTone(level, status)}`;
       badge.textContent = `${level}: ${friendlyCoverageLabel(level, status)}`;
+      badge.title = coverageSummaryText({ [level]: status });
       return badge;
     })
   );
@@ -1204,6 +1212,7 @@ function resolveFeedCardCopy(item = {}, copy = {}) {
     summary: summary || "",
     impacts: buildFeedImpactBullets(item, copy, {
       title: cleanTitle,
+      displayTitle: displayTitle || cleanTitle,
       headline,
       summary,
     }),
@@ -1270,18 +1279,15 @@ function extractFeedDollarFootprint(text = "") {
 }
 
 function inferFeedImpactAudience(item = {}, categoryLabel = "", summary = "") {
-  const haystack = [
-    categoryLabel,
-    item.primaryCategory,
-    item.category,
-    summary,
-    item.short_title,
-    item.title,
-  ]
+  // Ground audience inference in bill title + summary only (never category alone).
+  const haystack = [summary, item.short_title, item.title, item.shortPitch]
     .join(" ")
     .toLowerCase();
-  if (/immigra|border|asylum|deport|visa/.test(haystack)) return "Border security & immigrants";
-  if (/veteran|armed|troop|military|defense/.test(haystack)) return "Service members & defense";
+  if (!haystack.trim()) return "";
+  if (/immigra|border|asylum|deport|visa/.test(haystack))
+    return "Border security & immigrants";
+  if (/veteran|armed|troop|military|defense/.test(haystack))
+    return "Service members & defense";
   if (/small business|employer|worker|wage|labor/.test(haystack))
     return "Workers & small businesses";
   if (/tax|irs|taxpayer|budget|appropriat/.test(haystack)) return "Local taxpayers";
@@ -1291,11 +1297,12 @@ function inferFeedImpactAudience(item = {}, categoryLabel = "", summary = "") {
     return "Energy consumers & communities";
   if (/student|school|education|college/.test(haystack)) return "Students & schools";
   if (/housing|rent|mortgage|homeowner/.test(haystack)) return "Renters & homeowners";
-  return "People affected by this policy";
+  return "";
 }
 
 /**
  * Build visual impact face data: TL;DR, target chips, cost pill.
+ * Strictly grounded in the current bill's own title/summary fields.
  */
 function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
   const summary = String(resolved.summary || copy.summary || "").trim();
@@ -1303,7 +1310,7 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
   const title = String(resolved.title || item.title || item.short_title || "")
     .replace(/\s+/g, " ")
     .trim();
-  const categoryLabel = formatFeedCategoryPill(item).label;
+  const displayTitle = String(resolved.displayTitle || "").trim();
   const keyPoints = parseFeedKeyPointList(item.key_points || item.keyPoints);
   const yea = String(
     copy.yeaMeans || item.yea_impact || item.yeaImpact || item.yeaMeans || ""
@@ -1314,69 +1321,74 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     .replace(/\s+/g, " ")
     .trim();
 
+  // Prefer bill-owned prose; do not invent from category templates.
   const whatCandidates = [
     keyPoints[0],
     yea,
     takeaway,
-    firstCompleteSentence(summary, 90),
+    firstCompleteSentence(summary, 110),
     headline,
+    firstCompleteSentence(title, 110),
   ];
   let whatRaw = "";
   for (const candidate of whatCandidates) {
-    let cleaned = stripTitleFromWhatItDoes(candidate, title);
-    cleaned = stripTitleFromWhatItDoes(cleaned, headline);
-    cleaned = stripTitleFromWhatItDoes(
-      cleaned,
-      clampFeedHeadlineWords(headline || title, 8)
-    );
+    let cleaned = String(candidate || "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!cleaned) continue;
-    if (looksLikeOfficialBillTitle(cleaned)) continue;
-    // Skip near-duplicates of the scannable title (avoid TL;DR echoing headline).
-    const titleWords = new Set(
-      String(title || "")
-        .toLowerCase()
-        .split(/\s+/)
-        .filter(Boolean)
-    );
-    const cleanedWords = cleaned
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean);
+    // Drop exact title echoes only (keep high-overlap explanatory titles).
     if (
-      cleanedWords.length &&
-      cleanedWords.filter((w) => titleWords.has(w)).length /
-        cleanedWords.length >=
-        0.7
+      cleaned.toLowerCase() === title.toLowerCase() &&
+      looksLikeOfficialBillTitle(cleaned)
     ) {
       continue;
+    }
+    cleaned = stripTitleFromWhatItDoes(cleaned, displayTitle);
+    if (!cleaned) {
+      cleaned = String(candidate || "")
+        .replace(/\s+/g, " ")
+        .trim();
     }
     whatRaw = cleaned;
     break;
   }
-  if (!whatRaw) whatRaw = "";
+  if (!whatRaw) {
+    whatRaw =
+      firstCompleteSentence(summary, 110) ||
+      firstCompleteSentence(headline, 90) ||
+      firstCompleteSentence(title, 90) ||
+      "";
+  }
 
   const impactRaw =
     keyPoints[1] ||
-    yea ||
-    takeaway ||
-    inferFeedImpactAudience(item, categoryLabel, summary);
+    inferFeedImpactAudience(item, "", summary) ||
+    firstCompleteSentence(summary, 64) ||
+    "";
+
   const moneyRaw =
     extractFeedDollarFootprint(
-      [summary, takeaway, yea, keyPoints.join(" "), item.shortPitch].join(" ")
+      [summary, takeaway, yea, keyPoints.join(" "), item.shortPitch, title].join(
+        " "
+      )
     ) ||
     keyPoints[2] ||
     "$0 / Policy change";
 
   return {
     what: ensureActionVerbTldr(whatRaw, {
-      categoryLabel,
       summary,
       headline,
-      item,
+      title,
+      displayTitle,
     }),
-    impact: clampFeedImpactLine(impactRaw, 10),
+    impact: clampFeedImpactLine(impactRaw || summary || title, 10),
     cost: clampFeedImpactLine(moneyRaw, 10),
-    chips: buildFeedImpactChips(impactRaw, categoryLabel, summary),
+    chips: buildFeedImpactChips({
+      title,
+      summary,
+      impactText: impactRaw,
+    }),
     costPill: formatFeedCostPill(moneyRaw),
   };
 }
@@ -1435,38 +1447,6 @@ function startsWithFeedActionVerb(text = "") {
   );
 }
 
-function inferActionVerbTldr({ categoryLabel = "", summary = "", headline = "" } = {}) {
-  const hay = `${categoryLabel} ${summary} ${headline}`.toLowerCase();
-  if (/border|immigra|asylum/.test(hay)) {
-    return "Strengthens border and immigration enforcement.";
-  }
-  if (/tax|budget|deficit|spending/.test(hay)) {
-    return "Changes tax and budget rules for Americans.";
-  }
-  if (/health|medicare|medicaid|hospital|patient/.test(hay)) {
-    return "Changes healthcare coverage and patient rules.";
-  }
-  if (/energy|climate|oil|gas|epa/.test(hay)) {
-    return "Shifts energy and climate policy requirements.";
-  }
-  if (/defense|military|veteran|armed/.test(hay)) {
-    return "Adjusts defense funding and military authority.";
-  }
-  if (/student|school|college|education/.test(hay)) {
-    return "Changes education rules for students and schools.";
-  }
-  if (/housing|rent|homeowner/.test(hay)) {
-    return "Changes housing rules for renters and owners.";
-  }
-  if (/worker|labor|wage|employ/.test(hay)) {
-    return "Changes workplace rules for workers and employers.";
-  }
-  if (/foreign|sanction|diplomacy/.test(hay)) {
-    return "Shifts foreign policy and international commitments.";
-  }
-  return "Establishes new federal requirements for this policy.";
-}
-
 function pickActionVerbFromText(text = "") {
   const hay = String(text || "").toLowerCase();
   const rules = [
@@ -1480,15 +1460,73 @@ function pickActionVerbFromText(text = "") {
     [/strengthen|toughen/, "Strengthens"],
     [/remov|repeal|strip/, "Removes"],
     [/restor|reinstat/, "Restores"],
+    [/recogniz/, "Recognizes"],
+    [/support|encourage|promote/, "Supports"],
     [/direct|order/, "Directs"],
   ];
   for (const [re, verb] of rules) {
     if (re.test(hay)) return verb;
   }
-  return "Establishes";
+  return "Addresses";
 }
 
-/** Force TL;DR to lead with an active outcome verb. */
+function inferActionVerbTldr({
+  summary = "",
+  title = "",
+  headline = "",
+  displayTitle = "",
+} = {}) {
+  // Always ground fallback in this bill's own wording — never category invent.
+  const excerpt =
+    firstCompleteSentence(summary, 110) ||
+    firstCompleteSentence(headline, 90) ||
+    firstCompleteSentence(title, 90) ||
+    firstCompleteSentence(displayTitle, 90) ||
+    "";
+  if (!excerpt) return "Addresses this measure now before Congress.";
+  const cleaned = excerpt
+    .replace(
+      /^(this (bill|resolution|amendment|measure)|the bill|a bill|an act)\s+/i,
+      ""
+    )
+    .replace(/^would\s+/i, "")
+    .replace(/^to\s+/i, "")
+    .trim();
+  if (!cleaned) return "Addresses this measure now before Congress.";
+  if (startsWithFeedActionVerb(cleaned)) {
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
+  const stemMatch = cleaned.match(
+    /^(increase|cut|protect|establish|expand|ban|create|fund|require|limit|strengthen|remove|block|authorize|raise|lower|restore|end|boost|crack|change|shift|adjust|direct|set|recognize|support|encourage|promote|express)s?\b/i
+  );
+  if (stemMatch) {
+    const stem = stemMatch[1].toLowerCase();
+    const canon =
+      FEED_ACTION_VERBS.find(
+        (verb) =>
+          verb.toLowerCase() === stem ||
+          verb.toLowerCase() === `${stem}s` ||
+          verb.toLowerCase().replace(/s$/, "") === stem.replace(/s$/, "")
+      ) || `${stem.charAt(0).toUpperCase()}${stem.slice(1)}${stem.endsWith("e") || stem.endsWith("s") ? "" : "s"}`;
+    // special-case recognize/support/etc.
+    const lead =
+      {
+        recognize: "Recognizes",
+        support: "Supports",
+        encourage: "Encourages",
+        promote: "Promotes",
+        express: "Expresses",
+      }[stem] || canon;
+    return `${lead}${cleaned.slice(stemMatch[0].length)}`
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  const verb = pickActionVerbFromText(cleaned);
+  const rest = cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+  return clampFeedTldrText(`${verb} ${rest}`) || `Addresses ${clampFeedHeadlineWords(cleaned, 16)}`;
+}
+
+/** Force TL;DR to lead with an active outcome verb, grounded in bill text. */
 function ensureActionVerbTldr(text = "", context = {}) {
   let out = clampFeedTldrText(text);
   if (!out || /updates a federal policy rule/i.test(out)) {
@@ -1508,17 +1546,26 @@ function ensureActionVerbTldr(text = "", context = {}) {
   }
   // Already verb-like stems (increase/cut/etc.) — normalize to action form.
   const stemMatch = out.match(
-    /^(increase|cut|protect|establish|expand|ban|create|fund|require|limit|strengthen|remove|block|authorize|raise|lower|restore|end|boost|crack|change|shift|adjust|direct|set)s?\b/i
+    /^(increase|cut|protect|establish|expand|ban|create|fund|require|limit|strengthen|remove|block|authorize|raise|lower|restore|end|boost|crack|change|shift|adjust|direct|set|recognize|support|encourage|promote|express)s?\b/i
   );
   if (stemMatch) {
     const stem = stemMatch[1].toLowerCase();
+    const special = {
+      recognize: "Recognizes",
+      support: "Supports",
+      encourage: "Encourages",
+      promote: "Promotes",
+      express: "Expresses",
+    };
     const canon =
+      special[stem] ||
       FEED_ACTION_VERBS.find(
         (verb) =>
           verb.toLowerCase() === stem ||
           verb.toLowerCase() === `${stem}s` ||
           verb.toLowerCase().replace(/s$/, "") === stem.replace(/s$/, "")
-      ) || `${stem.charAt(0).toUpperCase()}${stem.slice(1)}s`;
+      ) ||
+      `${stem.charAt(0).toUpperCase()}${stem.slice(1)}s`;
     return `${canon}${out.slice(stemMatch[0].length)}`.replace(/\s+/g, " ").trim();
   }
   const verb = pickActionVerbFromText(`${out} ${context.summary || ""}`);
@@ -1526,43 +1573,69 @@ function ensureActionVerbTldr(text = "", context = {}) {
   return clampFeedTldrText(`${verb} ${rest}`) || inferActionVerbTldr(context);
 }
 
-function buildFeedImpactChips(impactText = "", categoryLabel = "", summary = "") {
-  const haystack = `${impactText} ${categoryLabel} ${summary}`.toLowerCase();
+/**
+ * Who's-affected chips from the current bill text only.
+ * Never invent static audience tags from category alone.
+ */
+function buildFeedImpactChips({
+  title = "",
+  summary = "",
+  impactText = "",
+} = {}) {
+  const billText = `${title} ${summary} ${impactText}`.replace(/\s+/g, " ").trim();
+  const haystack = billText.toLowerCase();
   const chips = [];
   const push = (icon, label) => {
-    if (!label) return;
-    if (chips.some((chip) => chip.label.toLowerCase() === label.toLowerCase())) {
+    const clean = String(label || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!clean) return;
+    if (chips.some((chip) => chip.label.toLowerCase() === clean.toLowerCase())) {
       return;
     }
-    chips.push({ icon, label });
+    chips.push({ icon, label: clean });
   };
-  const rules = [
-    [/renter|tenant|housing|homeowner/, "🏡", "Renters"],
-    [/small business|small biz|employer/, "💼", "Small Biz"],
-    [/taxpayer/, "🧾", "Taxpayers"],
-    [/border|immigra|asylum/, "🛂", "Border security"],
-    [/veteran|troop|military|service member|defense/, "🪖", "Service members"],
-    [/patient|health|hospital|medicare|medicaid/, "🏥", "Patients"],
-    [/student|school|college|education/, "🎓", "Students"],
-    [/worker|labor|wage/, "👷", "Workers"],
-    [/energy|climate|consumer/, "⚡", "Energy users"],
-    [/farmer|agriculture|rural/, "🌾", "Farmers"],
-  ];
-  for (const [re, icon, label] of rules) {
-    if (re.test(haystack)) push(icon, label);
-    if (chips.length >= 3) break;
-  }
-  if (!chips.length) {
-    // Split free-text impact into short chips when possible.
-    const parts = String(impactText || "")
-      .split(/\s*(?:&|\/|,| and )\s*/i)
-      .map((part) => part.replace(/\s+/g, " ").trim())
-      .filter((part) => part && part.length <= 28);
-    for (const part of parts.slice(0, 3)) {
-      push("👤", clampFeedImpactLine(part, 4));
+  if (haystack) {
+    const rules = [
+      [/renter|tenant|housing|homeowner/, "🏡", "Renters"],
+      [/small business|small biz/, "💼", "Small Biz"],
+      [/taxpayer/, "🧾", "Taxpayers"],
+      [/border|immigra|asylum/, "🛂", "Border security"],
+      [/veteran|troop|military|service member/, "🪖", "Service members"],
+      [/patient|hospital|medicare|medicaid/, "🏥", "Patients"],
+      [/student|school|college|education/, "🎓", "Students"],
+      [/worker|labor|wage|employer/, "👷", "Workers"],
+      [/energy|climate|\boil\b|\bgas\b|epa|environment/, "⚡", "Energy users"],
+      [/farmer|agriculture|rural/, "🌾", "Farmers"],
+      [/trademark|patent|copyright|intellectual property/, "™️", "IP holders"],
+      [/consumer protection|consumers?\b/, "🛒", "Consumers"],
+    ];
+    for (const [re, icon, label] of rules) {
+      if (re.test(haystack)) push(icon, label);
+      if (chips.length >= 3) break;
     }
   }
-  if (!chips.length) push("👤", "Public");
+  if (!chips.length) {
+    // Fall back to short excerpt chips from this bill's summary/title.
+    const excerptSource =
+      firstCompleteSentence(summary, 72) ||
+      firstCompleteSentence(impactText, 64) ||
+      firstCompleteSentence(title, 64) ||
+      "";
+    const parts = String(excerptSource || "")
+      .split(/\s*(?:&|\/|,|;| and |\.|:)\s*/i)
+      .map((part) => part.replace(/\s+/g, " ").trim())
+      .filter((part) => part && part.length >= 3 && part.length <= 36);
+    for (const part of parts.slice(0, 2)) {
+      push("📌", clampFeedImpactLine(part, 5));
+    }
+    if (!chips.length && excerptSource) {
+      push("📌", clampFeedImpactLine(excerptSource, 6));
+    }
+  }
+  if (!chips.length && title) {
+    push("📌", clampFeedImpactLine(title, 6));
+  }
   return chips.slice(0, 3);
 }
 
@@ -1977,8 +2050,7 @@ function renderSocialFeedCardShell({
     (typeof category === "object" && category?.icon) ||
     feedCategoryIcon(categoryLabel);
   const what =
-    impacts?.what ||
-    ensureActionVerbTldr("", { categoryLabel });
+    impacts?.what || ensureActionVerbTldr("", { title: title || "" });
   const chips = Array.isArray(impacts?.chips) && impacts.chips.length
     ? impacts.chips
     : [{ icon: "👤", label: "Public" }];
@@ -2836,7 +2908,7 @@ async function loadBillsPoliciesPage() {
   rawItems = payload.items || [];
   recomputeVisibleItems();
   renderCoverageBadges(payload.coverage || {});
-  setPolicyFeedStatus(coverageSummaryText(payload.coverage || {}), "success");
+  setPolicyFeedStatus("", "success");
   renderActiveTab();
 }
 
@@ -2860,7 +2932,7 @@ async function refreshWithFilters({ resolveLocation = false } = {}) {
     rawItems = payload.items || [];
     recomputeVisibleItems();
     renderCoverageBadges(payload.coverage || {});
-    setPolicyFeedStatus(coverageSummaryText(payload.coverage || {}), "success");
+    setPolicyFeedStatus("", "success");
     renderActiveTab();
   } catch (error) {
     console.error(error);
