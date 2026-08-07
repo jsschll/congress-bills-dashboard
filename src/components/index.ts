@@ -15,6 +15,9 @@ export {
 } from "./themes/EditorialCollageTheme";
 export type { EditorialCollageThemeProps } from "./themes/EditorialCollageTheme";
 
+export { BentoGridTheme } from "./themes/BentoGridTheme";
+export type { BentoGridThemeProps } from "./themes/BentoGridTheme";
+
 export {
   DEFAULT_REACTIONS,
   EMPTY_VOTE_COUNTS,

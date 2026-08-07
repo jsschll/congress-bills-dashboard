@@ -9,7 +9,8 @@ export type ThemeVariant =
   | "urgent"
   | "fiscal"
   | "compact"
-  | "editorial-collage";
+  | "editorial-collage"
+  | "bento-grid";
 
 export type ReactionId =
   | "pass"
