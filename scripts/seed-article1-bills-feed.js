@@ -1,59 +1,26 @@
 #!/usr/bin/env node
 /**
- * Quick verification / documentation for Article 1 bills-feed seed fallback.
+ * Quick verification for Article 1 bills-feed theme seeds.
  * Usage: node scripts/seed-article1-bills-feed.js
- *
- * When Congress.gov / OpenStates keys are missing and processed_votes is empty,
- * /api/bills-feed automatically returns these federal/state examples so Bento
- * Grid (finance/budget) and Editorial Collage (education/health) can be verified.
  */
 const { seedFederalAndStateBills } = require("../lib/bills-feed-seed");
 
 const items = seedFederalAndStateBills();
-const byTheme = {
-  bento: items.filter((item) =>
-    /finance|budget|economy|tax|appropriations/i.test(
-      [item.category, item.primaryCategory, ...(item.tags || [])].join(" ")
-    )
-  ),
-  pipeline: items.filter((item) =>
-    /procedural|tracking|floor debate|final passage|cloture/i.test(
-      [
-        item.category,
-        item.primaryCategory,
-        item.statusLabel,
-        item.voteKind,
-        ...(item.tags || []),
-      ].join(" ")
-    )
-  ),
-  editorial: items.filter(
-    (item) =>
-      !/finance|budget|economy|tax|appropriations/i.test(
-        [item.category, item.primaryCategory, ...(item.tags || [])].join(" ")
-      ) &&
-      !/procedural|tracking|floor debate|final passage|cloture/i.test(
-        [
-          item.category,
-          item.primaryCategory,
-          item.statusLabel,
-          item.voteKind,
-          ...(item.tags || []),
-        ].join(" ")
-      )
-  ),
-};
+const byRoute = items.reduce((acc, item) => {
+  const route = item.themeRoute || "unknown";
+  acc[route] = acc[route] || [];
+  acc[route].push(item.billNumber);
+  return acc;
+}, {});
 
-console.log(`Article 1 seed fallback: ${items.length} federal/state bills`);
-console.log(`  Bento (finance/budget): ${byTheme.bento.map((i) => i.billNumber).join(", ")}`);
+console.log(`Article 1 theme seeds: ${items.length} federal/state bills`);
+for (const [route, bills] of Object.entries(byRoute)) {
+  console.log(`  ${route}: ${bills.join(", ")}`);
+}
 console.log(
-  `  Pipeline (procedural): ${byTheme.pipeline.map((i) => i.billNumber).join(", ")}`
+  "Types: Finance → Bento, Judiciary → Editorial, Authorization → Pipeline, Regulation → Editorial"
 );
 console.log(
-  `  Editorial (social/education/health): ${byTheme.editorial
-    .map((i) => i.billNumber)
-    .join(", ")}`
+  "API: /api/bills-feed always merges these theme seeds (disable with ?seed=0)."
 );
-console.log(
-  "API behavior: /api/bills-feed serves these automatically when live federal/state sources are empty (disable with ?seed=0)."
-);
+console.log("DB: npm run seed:article1-db upserts the same rows into processed_votes.");

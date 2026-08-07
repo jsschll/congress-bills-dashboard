@@ -202,7 +202,7 @@ export function collectBillThemeSignals(bill: LegislativeBill = {}): string {
 
 /** Stronger cues — avoids treating every bill with an "In Committee" step as Pipeline. */
 const STRONG_PROCEDURAL_SIGNAL_PATTERN =
-  /\b(floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|procedural|pipeline|tracking|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
+  /\b(floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|procedural|pipeline|tracking|authorization|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
 
 /**
  * Signals used specifically for procedural / pipeline theme routing.

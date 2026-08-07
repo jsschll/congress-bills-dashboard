@@ -26,7 +26,7 @@ const HUMAN_CENTERED_SIGNAL_PATTERN =
   /\b(education|health|healthcare|housing|social|civil rights|labor|immigration|family|children|veterans|disability|welfare|nutrition|public health)\b/i;
 
 const PROCEDURAL_SIGNAL_PATTERN =
-  /\b(floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|procedural|pipeline|tracking|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
+  /\b(floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|procedural|pipeline|tracking|authorization|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
 
 export type ThemeWrapperProps = {
   /** Live / structured bill object — preferred source for routing + copy. */

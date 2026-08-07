@@ -21,7 +21,7 @@ export type Article1PageProps = {
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
-const DEFAULT_FEED_URL = "/api/bills-feed";
+const DEFAULT_FEED_URL = "/api/bills-feed?seed=1";
 
 /**
  * Article 1 home surface.
