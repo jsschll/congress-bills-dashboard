@@ -1,0 +1,71 @@
+/**
+ * Article 1 core shell — companion styles.
+ * Components prefer Tailwind utility classes; these rules cover glass chrome,
+ * theme surfaces, and micro-interactions when a full Tailwind build is not yet wired.
+ */
+
+.a1-theme {
+  background: linear-gradient(
+    165deg,
+    rgba(18, 28, 48, 0.92) 0%,
+    rgba(12, 20, 36, 0.96) 100%
+  );
+  color: #f5f7fb;
+}
+
+.a1-theme--civic {
+  background: linear-gradient(
+    160deg,
+    rgba(16, 42, 72, 0.95) 0%,
+    rgba(10, 24, 48, 0.98) 100%
+  );
+}
+
+.a1-theme--urgent {
+  background: linear-gradient(
+    160deg,
+    rgba(48, 28, 12, 0.95) 0%,
+    rgba(28, 16, 8, 0.98) 100%
+  );
+}
+
+.a1-theme--fiscal {
+  background: linear-gradient(
+    160deg,
+    rgba(12, 40, 32, 0.95) 0%,
+    rgba(8, 24, 20, 0.98) 100%
+  );
+}
+
+.a1-theme--compact {
+  background: rgba(16, 22, 34, 0.94);
+}
+
+.a1-reaction-dock {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.a1-reaction-btn--pulse {
+  animation: a1-reaction-pulse 280ms ease-out;
+}
+
+@keyframes a1-reaction-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a1-reaction-btn--pulse {
+    animation: none;
+  }
+}
