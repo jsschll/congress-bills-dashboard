@@ -29,6 +29,11 @@
   max-height: none;
 }
 
+.a1-themed-card .a1-theme--compact {
+  max-height: 280px;
+}
+
+
 .a1-theme {
   position: relative;
   display: flex;
