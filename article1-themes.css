@@ -15,7 +15,7 @@
   text-transform: uppercase;
 }
 
-/* Ensure themed feed cards can grow with portrait artwork */
+/* Ensure themed feed cards use Story shell sizing (no internal scroll) */
 .policy-bill-card.a1-themed-card,
 .vote-feed-card.a1-themed-card,
 .feed-social-card.a1-themed-card {
@@ -27,6 +27,426 @@
   height: auto;
   min-height: 0;
   max-height: none;
+}
+
+.a1-themed-card.a1-story-feed,
+.feed-story-card.a1-themed-card,
+.feed-social-card.a1-themed-card.a1-story-feed {
+  width: min(100%, 420px);
+  margin-inline: auto;
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* ── Story / TikTok-style feed card ─────────────────────────────────── */
+
+.a1-card-shell--story {
+  position: relative;
+}
+
+.a1-story-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: min(600px, 85vh);
+  max-height: 85vh;
+  border-radius: 1.35rem;
+  overflow: hidden;
+  background: #1c1410;
+  box-shadow: 0 18px 48px rgba(16, 12, 8, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.a1-story-card__media,
+.a1-story-card__frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.a1-story-card__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.a1-story-card__photo.is-broken {
+  display: none;
+}
+
+.a1-story-card__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(12, 10, 8, 0.55) 0%, rgba(12, 10, 8, 0.12) 32%, rgba(12, 10, 8, 0.2) 55%, rgba(12, 10, 8, 0.88) 100%);
+  pointer-events: none;
+}
+
+.a1-story-card__top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.8rem 0;
+}
+
+.a1-story-card__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.a1-story-card__pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.a1-story-card__pill--theme {
+  color: #fff7ed;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.a1-story-card__pill--cat {
+  color: #ecfdf5;
+  background: rgba(6, 95, 70, 0.55);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+}
+
+.a1-story-card__pill--id {
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.a1-story-card__top .a1-micro-actions {
+  flex-shrink: 0;
+}
+
+.a1-story-card__top .feed-card-icon-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(12, 10, 8, 0.45);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+
+.a1-story-card__copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: 1.1rem 1rem 1rem;
+  pointer-events: none;
+}
+
+.a1-story-card__title {
+  margin: 0 0 0.45rem;
+  color: #fffdf8;
+  font-family: "Fraunces", Georgia, "Times New Roman", serif;
+  font-size: clamp(1.35rem, 4.6vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.a1-story-card__punch {
+  margin: 0;
+  max-width: 36ch;
+  color: rgba(255, 250, 240, 0.92);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+}
+
+.a1-story-card__punch--secondary {
+  margin-top: 0.28rem;
+  color: rgba(255, 250, 240, 0.72);
+  font-size: 0.82rem;
+  -webkit-line-clamp: 1;
+}
+
+.a1-story-card__footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem 0.75rem 0.8rem;
+  background: linear-gradient(180deg, #1a1410 0%, #120e0b 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.a1-story-card__breakdown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 248, 240, 0.88);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.a1-story-card__breakdown:hover,
+.a1-story-card__breakdown:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+  outline: none;
+}
+
+.a1-story-card .a1-reaction-dock {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.a1-story-card .a1-reaction-dock .engagement-mount-point,
+.a1-story-card .policy-engage,
+.a1-story-card .policy-engage__actions,
+.a1-story-card .policy-engage__stances {
+  width: 100%;
+}
+
+.a1-story-card .policy-engage__stances {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.a1-story-card .policy-engage__stance {
+  min-height: 2.75rem;
+  border-radius: 0.95rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.a1-story-card .policy-engage__stance--support,
+.a1-story-card .policy-engage__stance--support:hover,
+.a1-story-card .policy-engage__stance--support:focus-visible,
+.a1-story-card .policy-engage__stance--support.is-active {
+  background: linear-gradient(180deg, #10b981, #059669);
+  border-color: #34d399;
+  color: #ecfdf5;
+  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.28);
+}
+
+.a1-story-card .policy-engage__stance--oppose,
+.a1-story-card .policy-engage__stance--oppose:hover,
+.a1-story-card .policy-engage__stance--oppose:focus-visible,
+.a1-story-card .policy-engage__stance--oppose.is-active {
+  background: linear-gradient(180deg, #f43f5e, #e11d48);
+  border-color: #fb7185;
+  color: #fff1f2;
+  box-shadow: 0 8px 22px rgba(244, 63, 94, 0.28);
+}
+
+.a1-story-card .policy-engage__logged-panel.vote-feedback-panel {
+  background: rgba(255, 252, 247, 0.96);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Hide legacy theme badge when using story shell */
+.a1-card-shell--story > .a1-theme-badge {
+  display: none;
+}
+
+/* ── Full Breakdown bottom sheet ────────────────────────────────────── */
+
+.feed-breakdown-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+}
+
+.feed-breakdown-drawer[hidden] {
+  display: none !important;
+}
+
+.feed-breakdown-drawer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 6, 5, 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.feed-breakdown-drawer__panel {
+  position: relative;
+  z-index: 1;
+  width: min(36rem, 100%);
+  max-height: min(88vh, 44rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: 1.25rem 1.25rem 0 0;
+  background: #fffaf3;
+  color: #1c1410;
+  box-shadow: 0 -18px 48px rgba(8, 6, 5, 0.35);
+  transform: translateY(110%);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+.feed-breakdown-drawer.is-open .feed-breakdown-drawer__panel {
+  transform: translateY(0);
+}
+
+.feed-breakdown-drawer__handle {
+  width: 2.75rem;
+  height: 0.28rem;
+  margin: 0.55rem auto 0.15rem;
+  border-radius: 999px;
+  background: rgba(28, 20, 16, 0.18);
+}
+
+.feed-breakdown-drawer__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem 0.65rem;
+  border-bottom: 1px solid rgba(28, 20, 16, 0.08);
+}
+
+.feed-breakdown-drawer__eyebrow {
+  margin: 0 0 0.15rem;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8a6a45;
+}
+
+.feed-breakdown-drawer__header h2 {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.feed-breakdown-drawer__close {
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(28, 20, 16, 0.12);
+  background: #fff;
+  color: #1c1410;
+  cursor: pointer;
+}
+
+.feed-breakdown-drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.85rem 1rem 1.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.a1-story-detail__intro {
+  margin-bottom: 0.85rem;
+}
+
+.a1-story-detail__eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8a6a45;
+}
+
+.a1-story-detail__title {
+  margin: 0 0 0.25rem;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.a1-story-detail__bill {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(28, 20, 16, 0.62);
+}
+
+.a1-story-detail .a1-theme {
+  box-shadow: none;
+}
+
+.a1-story-detail__ai {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(28, 20, 16, 0.08);
+}
+
+.a1-story-detail__ask {
+  width: 100%;
+}
+
+body.feed-breakdown-open {
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .a1-story-card {
+    height: min(640px, 85vh);
+    border-radius: 1.1rem;
+  }
+
+  .a1-themed-card.a1-story-feed,
+  .feed-story-card.a1-themed-card {
+    width: 100%;
+  }
 }
 
 .a1-theme {
@@ -1553,7 +1973,9 @@
 
 @media (min-width: 860px) {
   .policy-feed-list:has(.a1-theme--editorial),
-  .votes-feed-list:has(.a1-theme--editorial) {
-    max-width: 720px;
+  .votes-feed-list:has(.a1-theme--editorial),
+  .policy-feed-list:has(.a1-story-card),
+  .votes-feed-list:has(.a1-story-card) {
+    max-width: 440px;
   }
 }

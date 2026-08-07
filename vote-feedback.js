@@ -184,6 +184,8 @@
   function findStampHost(card) {
     if (!card) return null;
     return (
+      card.querySelector(".a1-story-card__frame") ||
+      card.querySelector(".a1-story-card__media") ||
       card.querySelector(".a1-editorial__frame") ||
       card.querySelector(".a1-theme") ||
       card.querySelector(".a1-card-shell") ||
