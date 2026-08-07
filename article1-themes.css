@@ -400,37 +400,59 @@
   box-shadow: 0 18px 40px rgba(28, 20, 16, 0.18);
 }
 
+.a1-editorial__photo,
 .a1-editorial__frame img {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
-  background: #1c1410;
+  background: transparent;
+}
+
+.a1-editorial__photo.is-broken {
+  display: none;
 }
 
 .a1-editorial__frame-wash {
   position: absolute;
   inset: 0;
+  z-index: 0;
   background:
-    radial-gradient(circle at 80% 20%, rgba(214, 168, 98, 0.35), transparent 45%),
+    radial-gradient(circle at 78% 18%, rgba(214, 168, 98, 0.42), transparent 42%),
+    radial-gradient(circle at 18% 78%, rgba(120, 80, 48, 0.35), transparent 48%),
     linear-gradient(145deg, #2a221c 0%, #4a3428 42%, #1a1410 100%);
 }
 
-.a1-editorial__frame-label {
-  position: absolute;
-  left: 1rem;
-  top: 1rem;
-  bottom: auto;
+.a1-editorial__frame-wash--fallback {
   z-index: 1;
-  color: rgba(253, 248, 242, 0.92);
-  font-family: Georgia, serif;
-  font-size: 1rem;
-  font-weight: 650;
-  max-width: calc(100% - 2rem);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.a1-editorial__frame:has(.a1-editorial__photo.is-broken) .a1-editorial__frame-wash--fallback,
+.a1-editorial__frame[data-has-photo="false"] .a1-editorial__frame-wash {
+  opacity: 1;
+}
+
+.a1-editorial__frame-blur {
+  position: absolute;
+  inset: -12%;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(253, 248, 242, 0.16), transparent 36%),
+    radial-gradient(circle at 70% 60%, rgba(214, 168, 98, 0.28), transparent 40%);
+  filter: blur(18px);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.a1-editorial__frame-label {
+  display: none;
 }
 
 .a1-editorial__sticker {
