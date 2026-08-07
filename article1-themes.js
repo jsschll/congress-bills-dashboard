@@ -1,7 +1,7 @@
 /**
  * Article 1 theme engine for the live vanilla feed.
- * Mirrors ThemeWrapper routing + Themes 1–4 visuals so production cards
- * actually show Editorial / Bento / Pipeline / Influence layouts.
+ * Mirrors ThemeWrapper routing + Themes 1–6 visuals so production cards
+ * show Editorial / Bento / Pipeline / Influence / Local / Versus layouts.
  */
 (function (global) {
   const FINANCE_RE =
@@ -10,6 +10,10 @@
     /\b(procedural|authorization|tracker|tracking|floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|pipeline|conference\s*report|veto\s*override)\b/i;
   const INFLUENCE_RE =
     /\b(regulatory|regulation|lobbying|lobbyist|stakeholder(\s+map)?|influence(\s+network)?|donor|pac)\b/i;
+  const LOCAL_RE =
+    /\b(local|district[-\s]?specific|infrastructure|district\s+impact|regional\s+impact|katy|tx[-\s]?22)\b/i;
+  const VERSUS_RE =
+    /\b(comparison|amendment|versus|vs\.?|side[-\s]?by[-\s]?side|original\s+text)\b/i;
 
   const SUPPORT = "#059669";
   const OPPOSE = "#e11d48";
@@ -59,17 +63,32 @@
   }
 
   function resolveTheme(item = {}) {
-    const explicit = String(item.themeVariant || item.theme_variant || "").trim();
+    const explicit = String(
+      item.themeVariant || item.theme_variant || item.themeRoute || ""
+    ).trim();
+    if (explicit === "versus") return "versus";
+    if (explicit === "local") return "local";
     if (explicit === "influence") return "influence";
     if (explicit === "pipeline" || explicit === "urgent") return "pipeline";
     if (explicit === "bento-grid" || explicit === "fiscal") return "bento-grid";
     if (explicit === "editorial-collage") return "editorial-collage";
 
+    if (
+      (Array.isArray(item.versusClauses) && item.versusClauses.length) ||
+      (Array.isArray(item.versus_clauses) && item.versus_clauses.length)
+    ) {
+      return "versus";
+    }
+    if (Array.isArray(item.districts) && item.districts.length) {
+      return "local";
+    }
     if (Array.isArray(item.stakeholders) && item.stakeholders.length) {
       return "influence";
     }
 
     const signals = collectSignals(item);
+    if (VERSUS_RE.test(signals)) return "versus";
+    if (LOCAL_RE.test(signals)) return "local";
     if (INFLUENCE_RE.test(signals)) return "influence";
     if (PROCEDURAL_RE.test(signals)) return "pipeline";
     if (FINANCE_RE.test(signals)) return "bento-grid";
@@ -80,6 +99,8 @@
     if (theme === "bento-grid") return "Bento Grid";
     if (theme === "pipeline") return "Procedural Pipeline";
     if (theme === "influence") return "Influence Network";
+    if (theme === "local") return "Local Impact";
+    if (theme === "versus") return "Versus Comparison";
     return "Editorial Collage";
   }
 
@@ -98,7 +119,7 @@
 
   function reactionDockHtml() {
     return `
-      <div class="a1-reaction-dock" role="toolbar" aria-label="Bill reactions">
+      <div class="a1-reaction-dock a1-reaction-dock--anchored" role="toolbar" aria-label="Bill reactions">
         <div class="engagement-mount-point" aria-label="Your stance"></div>
         <button type="button" class="details-toggle-btn a1-ask-ai-btn">✨ Ask AI</button>
       </div>
@@ -137,18 +158,31 @@
           </div>
           ${microActionsHtml()}
         </header>
-        <div class="a1-editorial__frame" aria-hidden="true">
-          <div class="a1-editorial__frame-wash"></div>
-          <span class="a1-editorial__frame-label">Editorial frame</span>
+        <div class="a1-editorial__layout">
+          <div class="a1-editorial__art">
+            <div class="a1-editorial__frame" aria-hidden="true">
+              <div class="a1-editorial__frame-wash"></div>
+              <span class="a1-editorial__frame-label">Editorial frame</span>
+            </div>
+          </div>
+          <div class="a1-editorial__copy">
+            <div class="a1-editorial__sticker">
+              <p class="a1-section-label">Key Impacts</p>
+              <ul class="a1-editorial__impacts">${
+                bullets ||
+                `<li class="a1-editorial__impact"><span>${escapeHtml(
+                  summary || title
+                )}</span></li>`
+              }</ul>
+              <p class="a1-editorial__prompt">Should Congress pass this ${escapeHtml(
+                (category || "bill").toLowerCase()
+              )}?</p>
+            </div>
+            <footer class="a1-editorial__footer">
+              ${reactionDockHtml()}
+            </footer>
+          </div>
         </div>
-        <div class="a1-editorial__sticker">
-          <p class="a1-section-label">Key Impacts</p>
-          <ul class="a1-editorial__impacts">${bullets || `<li class="a1-editorial__impact"><span>${escapeHtml(summary || title)}</span></li>`}</ul>
-          <p class="a1-editorial__prompt">Should Congress pass this ${escapeHtml(
-            (category || "bill").toLowerCase()
-          )}?</p>
-        </div>
-        ${reactionDockHtml()}
       </div>
     `;
   }
@@ -356,7 +390,238 @@
     `;
   }
 
+  function defaultDistricts() {
+    return [
+      {
+        id: "tx-22",
+        label: "TX-22",
+        detail: "Katy / Fort Bend corridor",
+        amount: "$184M",
+        emphasis: true,
+      },
+      {
+        id: "tx-07",
+        label: "TX-07",
+        detail: "West Houston suburbs",
+        amount: "$96M",
+      },
+      {
+        id: "tx-09",
+        label: "TX-09",
+        detail: "Southeast metro",
+        amount: "$72M",
+      },
+    ];
+  }
+
+  function renderLocal({ billId, title, category, impactsList, summary, item }) {
+    const districts =
+      Array.isArray(item.districts) && item.districts.length
+        ? item.districts
+        : defaultDistricts();
+    const focus =
+      item.focusDistrict ||
+      item.focus_district ||
+      "TX-22 · Katy area";
+    const funding =
+      item.fundingLabel ||
+      item.funding_label ||
+      item.fundingAllocation ||
+      item.funding_allocation ||
+      "$352M regional";
+    const regional =
+      item.regionalImpact || item.regional_impact || "High";
+
+    const districtHtml = districts
+      .map((row) => {
+        const emphasis = Boolean(row.emphasis);
+        return `
+        <li class="a1-local__district ${emphasis ? "is-emphasis" : ""}">
+          <div>
+            <p class="a1-local__district-label">${escapeHtml(row.label || "District")}</p>
+            <p class="a1-local__district-detail">${escapeHtml(
+              row.detail || "District impact"
+            )}</p>
+          </div>
+          ${
+            row.amount
+              ? `<span class="a1-local__district-amount">${escapeHtml(
+                  row.amount
+                )}</span>`
+              : ""
+          }
+        </li>`;
+      })
+      .join("");
+
+    const impactHtml = impactsList
+      .map((impact) => `<li>${escapeHtml(impact)}</li>`)
+      .join("");
+
+    return `
+      <div class="a1-theme a1-theme--local">
+        <header class="a1-local__header">
+          <div class="a1-bento__badges">
+            <span class="a1-badge a1-badge--dark">${escapeHtml(
+              category || "Local"
+            )}</span>
+            <span class="a1-badge a1-badge--soft">District impact</span>
+          </div>
+          <span class="a1-mono-pill">${escapeHtml(billId)}</span>
+          ${microActionsHtml()}
+        </header>
+        <div class="a1-local__grid">
+          <section class="a1-local__panel" aria-label="District breakdown">
+            <p class="a1-section-label">District breakdown</p>
+            <ul class="a1-local__districts">${districtHtml}</ul>
+          </section>
+          <section class="a1-local__map" aria-label="Regional map">
+            <p class="a1-section-label">Regional map</p>
+            <div class="a1-local__map-canvas" aria-hidden="true">
+              <span class="a1-local__map-block a1-local__map-block--a">TX-07</span>
+              <span class="a1-local__map-block a1-local__map-block--focus">TX-22 ★</span>
+              <span class="a1-local__map-block a1-local__map-block--c">TX-09</span>
+            </div>
+            <p class="a1-local__map-caption">${escapeHtml(focus)}</p>
+          </section>
+        </div>
+        <section class="a1-local__metrics" aria-label="Localized metrics">
+          <div class="a1-local__metric">
+            <p class="a1-section-label">Funding allocation</p>
+            <p class="a1-local__metric-value">${escapeHtml(funding)}</p>
+          </div>
+          <div class="a1-local__metric">
+            <p class="a1-section-label">Focus district</p>
+            <p class="a1-local__metric-value">${escapeHtml(focus)}</p>
+          </div>
+          <div class="a1-local__metric">
+            <p class="a1-section-label">Regional impact</p>
+            <p class="a1-local__metric-value a1-local__metric-value--good">${escapeHtml(
+              regional
+            )}</p>
+          </div>
+        </section>
+        <section class="a1-local__summary">
+          <p class="a1-section-label">Localized impact</p>
+          <h3>${escapeHtml(summary || title)}</h3>
+          ${impactHtml ? `<ul>${impactHtml}</ul>` : ""}
+        </section>
+        ${reactionDockHtml()}
+      </div>
+    `;
+  }
+
+  function defaultVersusClauses() {
+    return [
+      {
+        id: "scope",
+        label: "Scope",
+        left: "Applies to new federal contracts over $25M.",
+        right: "Applies to new and renewed contracts over $10M.",
+        tone: "oppose",
+      },
+      {
+        id: "timeline",
+        label: "Timeline",
+        left: "Phase-in over three fiscal years.",
+        right: "Phase-in over three fiscal years.",
+        tone: "agree",
+      },
+      {
+        id: "oversight",
+        label: "Oversight",
+        left: "Annual GAO report to Congress.",
+        right: "Semiannual inspector-general audits plus GAO report.",
+        tone: "oppose",
+      },
+      {
+        id: "funding",
+        label: "Funding",
+        left: "No new discretionary outlays authorized.",
+        right: "Authorizes $180M for implementation grants.",
+        tone: "oppose",
+      },
+    ];
+  }
+
+  function renderVersus({ billId, title, category, impactsList, summary, item }) {
+    const clauses =
+      (Array.isArray(item.versusClauses) && item.versusClauses.length
+        ? item.versusClauses
+        : null) ||
+      (Array.isArray(item.versus_clauses) && item.versus_clauses.length
+        ? item.versus_clauses
+        : null) ||
+      defaultVersusClauses();
+    const leftLabel =
+      item.versusLeftLabel || item.versus_left_label || "Bill A · Original";
+    const rightLabel =
+      item.versusRightLabel || item.versus_right_label || "Bill B · Amendment";
+
+    const clauseHtml = clauses
+      .map((clause) => {
+        const tone = String(clause.tone || "neutral").toLowerCase();
+        const color =
+          tone === "agree" ? SUPPORT : tone === "oppose" ? OPPOSE : "#64748b";
+        const toneText =
+          tone === "agree" ? "Agree" : tone === "oppose" ? "Oppose" : "Note";
+        return `
+        <li class="a1-versus__clause is-${escapeHtml(tone)}">
+          <div class="a1-versus__clause-head">
+            <p class="a1-section-label">${escapeHtml(clause.label || "Clause")}</p>
+            <span class="a1-versus__tone" style="color:${color};border-color:${color}55;background:${color}12">${toneText}</span>
+          </div>
+          <div class="a1-versus__cols">
+            <div class="a1-versus__col a1-versus__col--left">
+              <p>${escapeHtml(clause.left || "—")}</p>
+            </div>
+            <div class="a1-versus__col a1-versus__col--right" style="box-shadow: inset 3px 0 0 ${color}">
+              <p>${escapeHtml(clause.right || "—")}</p>
+            </div>
+          </div>
+        </li>`;
+      })
+      .join("");
+
+    const impactHtml = impactsList
+      .map((impact) => `<li>${escapeHtml(impact)}</li>`)
+      .join("");
+
+    return `
+      <div class="a1-theme a1-theme--versus">
+        <header class="a1-versus__header">
+          <div class="a1-bento__badges">
+            <span class="a1-badge a1-badge--dark">${escapeHtml(
+              category || "Comparison"
+            )}</span>
+            <span class="a1-badge a1-badge--soft">Versus</span>
+          </div>
+          <span class="a1-mono-pill">${escapeHtml(billId)}</span>
+          ${microActionsHtml()}
+        </header>
+        <div class="a1-versus__labels">
+          <div class="a1-versus__label a1-versus__label--left">${escapeHtml(
+            leftLabel
+          )}</div>
+          <div class="a1-versus__label a1-versus__label--right">${escapeHtml(
+            rightLabel
+          )}</div>
+        </div>
+        <section class="a1-versus__compare" aria-label="Clause comparison">
+          <ul>${clauseHtml}</ul>
+        </section>
+        <section class="a1-versus__summary">
+          <p class="a1-section-label">What changed</p>
+          <h3>${escapeHtml(summary || title)}</h3>
+          ${impactHtml ? `<ul>${impactHtml}</ul>` : ""}
+        </section>
+        ${reactionDockHtml()}
+      </div>
+    `;
+  }
+
   function buildMetrics(item = {}, impacts = {}) {
+
     const metrics = [];
     const cost = impacts?.costPill?.label;
     if (cost) metrics.push({ label: "Net Cost", value: cost });
@@ -413,7 +678,9 @@
     };
 
     let body = "";
-    if (theme === "bento-grid") body = renderBento(payload);
+    if (theme === "versus") body = renderVersus(payload);
+    else if (theme === "local") body = renderLocal(payload);
+    else if (theme === "bento-grid") body = renderBento(payload);
     else if (theme === "pipeline") body = renderPipeline(payload);
     else if (theme === "influence") body = renderInfluence(payload);
     else body = renderEditorial(payload);

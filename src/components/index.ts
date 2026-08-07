@@ -12,7 +12,9 @@ export {
   isFinanceCategory,
   isHumanCenteredCategory,
   isInfluenceCategory,
+  isLocalCategory,
   isProceduralCategory,
+  isVersusCategory,
   resolveArticleTheme,
 } from "./ThemeWrapper";
 export type {
@@ -26,20 +28,26 @@ export {
   extractLiveBillsFromFeed,
   isInfluenceBill,
   isLiveLegislativeBill,
+  isLocalBill,
   isProceduralBill,
+  isVersusBill,
   mapLiveBillToArticleProps,
   resolveBillCategoryLabel,
   resolveBillId,
   resolveBillTitle,
+  resolveLocalImpactFromBill,
   resolvePipelineStepsFromBill,
   resolveStakeholdersFromBill,
+  resolveVersusClausesFromBill,
 } from "../lib/live-bill";
 export type {
   ArticleBillViewModel,
   BillsFeedResponse,
   InfluenceStakeholderView,
   LegislativeBill,
+  LocalDistrictView,
   PipelineStepView,
+  VersusClauseView,
 } from "../lib/live-bill";
 
 export {
@@ -72,6 +80,20 @@ export {
   INFLUENCE_SUPPORT,
 } from "./themes/InfluenceTheme";
 
+export { LocalTheme } from "./themes/LocalTheme";
+export type {
+  LocalDistrictRow,
+  LocalThemeProps,
+} from "./themes/LocalTheme";
+
+export { VersusTheme } from "./themes/VersusTheme";
+export type {
+  VersusClause,
+  VersusClauseTone,
+  VersusThemeProps,
+} from "./themes/VersusTheme";
+export { VERSUS_AGREE, VERSUS_OPPOSE } from "./themes/VersusTheme";
+
 export {
   DEFAULT_REACTIONS,
   EMPTY_VOTE_COUNTS,
@@ -89,4 +111,3 @@ export {
   ARTICLE1_THEME_EXPORTS,
   ARTICLE1_THEME_ROUTES,
 } from "./article1-production";
-

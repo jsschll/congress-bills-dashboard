@@ -12,7 +12,9 @@ export type ThemeVariant =
   | "editorial-collage"
   | "bento-grid"
   | "pipeline"
-  | "influence";
+  | "influence"
+  | "local"
+  | "versus";
 
 export type ReactionId =
   | "pass"

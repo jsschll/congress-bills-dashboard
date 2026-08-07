@@ -6,8 +6,8 @@
  *   node scripts/seed-article1-processed-votes.js
  *
  * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (or ANON key with write access).
- * Seeds Finance, Judiciary, Authorization, and Regulation examples so
- * /api/bills-feed can serve them for Bento / Editorial / Pipeline routing.
+ * Seeds Finance, Judiciary, Authorization, Regulation, Local, and Versus
+ * examples so /api/bills-feed can serve them for all six Article 1 themes.
  */
 const { createClient } = require("@supabase/supabase-js");
 const {

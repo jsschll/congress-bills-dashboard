@@ -19,6 +19,8 @@ export type EditorialCollageThemeProps = {
   /** Optional editorial photograph / media URL. */
   imageSrc?: string;
   imageAlt?: string;
+  /** Anchored vote / Ask AI bar — rendered under TL;DR, never over artwork. */
+  actionBar?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
 };
@@ -30,9 +32,8 @@ function defaultPrompt(category: string): string {
 
 /**
  * Theme #1 — Editorial Collage
- * Artful magazine layout: warm canvas, punchy hook, photo frame,
- * and a layered sticker capsule for KEY IMPACTS + prompt.
- * Interaction state stays in ArticleCard; this theme is presentation only.
+ * Portrait artwork frame (3:4) + TL;DR column. Mobile stacks art above copy;
+ * desktop places art left and TL;DR / actions right. Vote bar never overlays art.
  */
 export function EditorialCollageTheme({
   billId,
@@ -43,6 +44,7 @@ export function EditorialCollageTheme({
   promptQuestion,
   imageSrc,
   imageAlt,
+  actionBar,
   children,
   className = "",
 }: EditorialCollageThemeProps) {
@@ -56,7 +58,7 @@ export function EditorialCollageTheme({
         "editorial-collage",
         "relative isolate overflow-hidden rounded-[1.75rem]",
         "bg-[#FDF8F2] text-[#1C1410]",
-        "px-4 pb-28 pt-5 sm:px-6 sm:pt-7 md:px-8",
+        "px-4 pb-5 pt-5 sm:px-6 sm:pt-7 md:px-8",
         "font-['Source_Sans_3','Avenir_Next','Segoe_UI',sans-serif]",
         className,
       ]
@@ -65,7 +67,6 @@ export function EditorialCollageTheme({
       data-theme="editorial-collage"
       data-a1-theme="editorial-collage"
     >
-      {/* Soft organic wash */}
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-70"
         aria-hidden
@@ -75,7 +76,6 @@ export function EditorialCollageTheme({
         }}
       />
 
-      {/* Human Hook Header */}
       <header className="editorial-collage__header relative mb-5 flex items-start gap-3 sm:mb-6 sm:gap-4">
         <div className="min-w-0 flex-1">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8A6A45]">
@@ -94,7 +94,6 @@ export function EditorialCollageTheme({
           </h2>
         </div>
 
-        {/* Circular bill-ID stamp */}
         <div
           className={[
             "editorial-collage__stamp",
@@ -117,91 +116,97 @@ export function EditorialCollageTheme({
         </div>
       </header>
 
-      {/* Editorial Image Frame + overlapping sticker */}
-      <div className="editorial-collage__media relative">
-        <div
-          className={[
-            "editorial-collage__frame",
-            "relative overflow-hidden rounded-[1.25rem]",
-            "border-[3px] border-[#1C1410]",
-            "bg-[#1C1410] shadow-[0_18px_40px_rgba(28,20,16,0.18)]",
-            "aspect-[16/11] sm:aspect-[16/10]",
-          ].join(" ")}
-        >
-          {imageSrc ? (
-            <img
-              src={imageSrc}
-              alt={imageAlt ?? hook}
-              className="h-full w-full object-cover contrast-[1.08] saturate-[1.05]"
-            />
-          ) : (
-            <div
-              className="editorial-collage__placeholder relative h-full w-full"
-              aria-hidden
-            >
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(145deg, #2A221C 0%, #4A3428 42%, #1A1410 100%)",
-                }}
-              />
-              <div className="absolute -right-6 top-8 h-40 w-40 rotate-12 rounded-[2rem] bg-[#D6A862]/35 blur-[1px]" />
-              <div className="absolute bottom-10 left-8 h-24 w-36 -rotate-6 rounded-full bg-[#FDF8F2]/12" />
-              <div className="absolute inset-0 flex items-end p-5 sm:p-6">
-                <span className="max-w-[14rem] font-['Fraunces',Georgia,serif] text-lg font-semibold leading-snug text-[#FDF8F2]/90 sm:text-xl">
-                  Editorial frame
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Layered Sticker Capsule */}
-        <div
-          className={[
-            "editorial-collage__sticker",
-            "relative z-10 mx-3 -mt-14 sm:mx-6 sm:-mt-16 md:mx-8",
-            "rounded-[1.5rem] border border-[#E8D9C6] bg-[#FFFCF7]",
-            "px-4 py-4 shadow-[0_12px_32px_rgba(28,20,16,0.12)]",
-            "sm:px-5 sm:py-5",
-          ].join(" ")}
-        >
-          {impacts.length > 0 ? (
-            <section aria-label="Key impacts" className="mb-4">
-              <h3 className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A6A45]">
-                Key Impacts
-              </h3>
-              <ul className="flex flex-col gap-2.5">
-                {impacts.map((impact, index) => (
-                  <li
-                    key={`${billId}-editorial-impact-${index}`}
-                    className="flex gap-2.5 text-[0.95rem] leading-snug text-[#2A2118]"
-                  >
-                    <span
-                      className="mt-[0.35em] h-1.5 w-1.5 shrink-0 rounded-full bg-[#C47A3A]"
-                      aria-hidden
-                    />
-                    <span className="font-medium">{impact}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          <p
+      {/* Mobile: stack · Desktop: art left / TL;DR+actions right */}
+      <div className="editorial-collage__layout flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+        <div className="editorial-collage__art w-full shrink-0 lg:w-[min(42%,20rem)]">
+          <div
             className={[
-              "editorial-collage__prompt",
-              "font-['Fraunces','Libre_Baskerville',Georgia,serif]",
-              "text-base font-semibold leading-snug text-[#1C1410]",
-              "sm:text-lg",
+              "editorial-collage__frame",
+              "relative w-full overflow-hidden rounded-[1.25rem]",
+              "border-[3px] border-[#1C1410]",
+              "bg-[#1C1410] shadow-[0_18px_40px_rgba(28,20,16,0.18)]",
+              "aspect-[3/4]",
             ].join(" ")}
           >
-            {prompt}
-          </p>
+            {imageSrc ? (
+              <img
+                src={imageSrc}
+                alt={imageAlt ?? hook}
+                className="absolute inset-0 h-full w-full object-contain contrast-[1.08] saturate-[1.05]"
+              />
+            ) : (
+              <div
+                className="editorial-collage__placeholder absolute inset-0"
+                aria-hidden
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(145deg, #2A221C 0%, #4A3428 42%, #1A1410 100%)",
+                  }}
+                />
+                <div className="absolute -right-6 top-8 h-40 w-40 rotate-12 rounded-[2rem] bg-[#D6A862]/35 blur-[1px]" />
+                <div className="absolute left-8 top-10 h-24 w-36 -rotate-6 rounded-full bg-[#FDF8F2]/12" />
+                <div className="absolute inset-0 flex items-start p-5 sm:p-6">
+                  <span className="max-w-[12rem] font-['Fraunces',Georgia,serif] text-lg font-semibold leading-snug text-[#FDF8F2]/90 sm:text-xl">
+                    Editorial frame
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
-          {children ? (
-            <div className="editorial-collage__slot mt-4">{children}</div>
+        <div className="editorial-collage__copy flex min-w-0 flex-1 flex-col gap-3">
+          <div
+            className={[
+              "editorial-collage__sticker",
+              "relative z-10 rounded-[1.5rem] border border-[#E8D9C6] bg-[#FFFCF7]",
+              "px-4 py-4 shadow-[0_12px_32px_rgba(28,20,16,0.12)]",
+              "sm:px-5 sm:py-5",
+            ].join(" ")}
+          >
+            {impacts.length > 0 ? (
+              <section aria-label="Key impacts" className="mb-4">
+                <h3 className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8A6A45]">
+                  Key Impacts
+                </h3>
+                <ul className="flex flex-col gap-2.5">
+                  {impacts.map((impact, index) => (
+                    <li
+                      key={`${billId}-editorial-impact-${index}`}
+                      className="flex gap-2.5 text-[0.95rem] leading-snug text-[#2A2118]"
+                    >
+                      <span
+                        className="mt-[0.35em] h-1.5 w-1.5 shrink-0 rounded-full bg-[#C47A3A]"
+                        aria-hidden
+                      />
+                      <span className="font-medium">{impact}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <p
+              className={[
+                "editorial-collage__prompt",
+                "font-['Fraunces','Libre_Baskerville',Georgia,serif]",
+                "text-base font-semibold leading-snug text-[#1C1410]",
+                "sm:text-lg",
+              ].join(" ")}
+            >
+              {prompt}
+            </p>
+
+            {children ? (
+              <div className="editorial-collage__slot mt-4">{children}</div>
+            ) : null}
+          </div>
+
+          {actionBar ? (
+            <footer className="editorial-collage__footer mt-auto">{actionBar}</footer>
           ) : null}
         </div>
       </div>

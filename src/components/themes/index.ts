@@ -25,3 +25,17 @@ export {
   INFLUENCE_OPPOSE,
   INFLUENCE_SUPPORT,
 } from "./InfluenceTheme";
+
+export { LocalTheme } from "./LocalTheme";
+export type {
+  LocalDistrictRow,
+  LocalThemeProps,
+} from "./LocalTheme";
+
+export { VersusTheme } from "./VersusTheme";
+export type {
+  VersusClause,
+  VersusClauseTone,
+  VersusThemeProps,
+} from "./VersusTheme";
+export { VERSUS_AGREE, VERSUS_OPPOSE } from "./VersusTheme";

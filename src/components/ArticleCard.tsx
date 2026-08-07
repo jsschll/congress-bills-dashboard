@@ -48,7 +48,7 @@ export type ArticleCardProps = {
   /** Optional bill body slot — keeps themes from owning content. */
   children?: React.ReactNode;
   className?: string;
-  /** Show the floating ReactionDock (default true). */
+  /** Show the anchored ReactionDock below the theme body (default true). */
   showReactionDock?: boolean;
 };
 
@@ -175,7 +175,7 @@ export function ArticleCard({
 
   return (
     <article
-      className={["a1-article-card relative", className]
+      className={["a1-article-card relative flex flex-col", className]
         .filter(Boolean)
         .join(" ")}
       data-bill-id={resolvedBillId}
@@ -196,18 +196,20 @@ export function ArticleCard({
         imageAlt={imageAlt || mapped?.imageAlt}
         financialSummary={financialSummary || mapped?.financialSummary}
         metrics={displayMetrics}
+        actionBar={
+          showReactionDock ? (
+            <ReactionDock
+              selectedReaction={selectedReaction}
+              disabled={false}
+              onReact={handleReact}
+              theme={resolvedTheme}
+            />
+          ) : null
+        }
       >
         {children}
         {reactionEcho}
       </ThemeWrapper>
-
-      {showReactionDock ? (
-        <ReactionDock
-          selectedReaction={selectedReaction}
-          disabled={false}
-          onReact={handleReact}
-        />
-      ) : null}
     </article>
   );
 }

@@ -102,6 +102,57 @@ export type LegislativeBill = {
     spendLabel?: string;
     spend_label?: string;
   }>;
+  /** Local Impact theme — district rows + regional metrics. */
+  districts?: Array<{
+    id?: string;
+    label?: string;
+    detail?: string;
+    amount?: string;
+    emphasis?: boolean;
+  }>;
+  focusDistrict?: string;
+  focus_district?: string;
+  regionalImpact?: string;
+  regional_impact?: string;
+  fundingLabel?: string;
+  funding_label?: string;
+  fundingAllocation?: string;
+  funding_allocation?: string;
+  /** Versus theme — clause-by-clause comparison. */
+  versusClauses?: Array<{
+    id?: string;
+    label?: string;
+    left?: string;
+    right?: string;
+    tone?: "agree" | "oppose" | "neutral";
+  }>;
+  versus_clauses?: Array<{
+    id?: string;
+    label?: string;
+    left?: string;
+    right?: string;
+    tone?: "agree" | "oppose" | "neutral";
+  }>;
+  versusLeftLabel?: string;
+  versus_left_label?: string;
+  versusRightLabel?: string;
+  versus_right_label?: string;
+};
+
+export type LocalDistrictView = {
+  id: string;
+  label: string;
+  detail: string;
+  amount?: string;
+  emphasis?: boolean;
+};
+
+export type VersusClauseView = {
+  id: string;
+  label: string;
+  left: string;
+  right: string;
+  tone?: "agree" | "oppose" | "neutral";
 };
 
 export type ArticleBillViewModel = {
@@ -120,8 +171,17 @@ export type ArticleBillViewModel = {
   themeSignals: string;
   pipelineSteps: PipelineStepView[];
   stakeholders: InfluenceStakeholderView[];
+  districts: LocalDistrictView[];
+  focusDistrict?: string;
+  regionalImpact?: string;
+  fundingLabel?: string;
+  versusClauses: VersusClauseView[];
+  versusLeftLabel?: string;
+  versusRightLabel?: string;
   isProcedural: boolean;
   isInfluence: boolean;
+  isLocal: boolean;
+  isVersus: boolean;
   isLiveLegislative: boolean;
 };
 
@@ -265,6 +325,136 @@ export function isInfluenceBill(bill: LegislativeBill = {}): boolean {
   return /\b(regulatory|regulation|lobbying|lobbyist|stakeholder(\s+map)?|influence\s+network|donor|pac)\b/i.test(
     signals
   );
+}
+
+/**
+ * True when a bill carries local / district / infrastructure impact signals.
+ */
+export function isLocalBill(bill: LegislativeBill = {}): boolean {
+  if (bill.themeVariant === "local" || bill.theme_variant === "local") {
+    return true;
+  }
+  if (Array.isArray(bill.districts) && bill.districts.length > 0) {
+    return true;
+  }
+  if (
+    firstPresent(
+      bill.focusDistrict,
+      bill.focus_district,
+      bill.regionalImpact,
+      bill.regional_impact,
+      bill.fundingLabel,
+      bill.funding_label,
+      bill.fundingAllocation,
+      bill.funding_allocation
+    )
+  ) {
+    return true;
+  }
+  const signals = collectBillThemeSignals(bill);
+  return /\b(local|district[-\s]?specific|infrastructure|district\s+impact|regional\s+impact|katy|tx[-\s]?22)\b/i.test(
+    signals
+  );
+}
+
+/**
+ * Normalize district rows for the Local Impact theme.
+ */
+export function resolveLocalImpactFromBill(bill: LegislativeBill = {}): {
+  districts: LocalDistrictView[];
+  focusDistrict?: string;
+  regionalImpact?: string;
+  fundingLabel?: string;
+} {
+  const districts = Array.isArray(bill.districts)
+    ? (bill.districts
+        .map((entry, index) => {
+          const label = asString(entry?.label);
+          if (!label) return null;
+          return {
+            id: asString(entry?.id) || `district-${index + 1}`,
+            label,
+            detail: asString(entry?.detail) || "District impact",
+            amount: asString(entry?.amount) || undefined,
+            emphasis: Boolean(entry?.emphasis),
+          };
+        })
+        .filter(Boolean) as LocalDistrictView[])
+    : [];
+
+  return {
+    districts,
+    focusDistrict:
+      firstPresent(bill.focusDistrict, bill.focus_district) || undefined,
+    regionalImpact:
+      firstPresent(bill.regionalImpact, bill.regional_impact) || undefined,
+    fundingLabel:
+      firstPresent(
+        bill.fundingLabel,
+        bill.funding_label,
+        bill.fundingAllocation,
+        bill.funding_allocation
+      ) || undefined,
+  };
+}
+
+/**
+ * True when a bill carries comparison / amendment / versus signals.
+ */
+export function isVersusBill(bill: LegislativeBill = {}): boolean {
+  if (bill.themeVariant === "versus" || bill.theme_variant === "versus") {
+    return true;
+  }
+  const clauses = bill.versusClauses || bill.versus_clauses;
+  if (Array.isArray(clauses) && clauses.length > 0) {
+    return true;
+  }
+  const signals = collectBillThemeSignals(bill);
+  return /\b(comparison|amendment|versus|vs\.?|side[-\s]?by[-\s]?side|original\s+text)\b/i.test(
+    signals
+  );
+}
+
+/**
+ * Normalize clause rows for the Versus comparison theme.
+ */
+export function resolveVersusClausesFromBill(bill: LegislativeBill = {}): {
+  clauses: VersusClauseView[];
+  leftLabel?: string;
+  rightLabel?: string;
+} {
+  const raw = bill.versusClauses || bill.versus_clauses;
+  const clauses = Array.isArray(raw)
+    ? (raw
+        .map((entry, index) => {
+          const left = asString(entry?.left);
+          const right = asString(entry?.right);
+          if (!left && !right) return null;
+          const toneRaw = asString(entry?.tone).toLowerCase();
+          const tone: VersusClauseView["tone"] =
+            toneRaw === "agree" || toneRaw === "oppose" || toneRaw === "neutral"
+              ? toneRaw
+              : left && right && left === right
+                ? "agree"
+                : "oppose";
+          return {
+            id: asString(entry?.id) || `clause-${index + 1}`,
+            label: asString(entry?.label) || `Clause ${index + 1}`,
+            left: left || "—",
+            right: right || "—",
+            tone,
+          };
+        })
+        .filter(Boolean) as VersusClauseView[])
+    : [];
+
+  return {
+    clauses,
+    leftLabel:
+      firstPresent(bill.versusLeftLabel, bill.versus_left_label) || undefined,
+    rightLabel:
+      firstPresent(bill.versusRightLabel, bill.versus_right_label) || undefined,
+  };
 }
 
 /**
@@ -619,8 +809,27 @@ export function mapLiveBillToArticleProps(
     themeSignals: collectBillThemeSignals(bill),
     pipelineSteps: resolvePipelineStepsFromBill(bill),
     stakeholders: resolveStakeholdersFromBill(bill),
+    ...(() => {
+      const local = resolveLocalImpactFromBill(bill);
+      return {
+        districts: local.districts,
+        focusDistrict: local.focusDistrict,
+        regionalImpact: local.regionalImpact,
+        fundingLabel: local.fundingLabel,
+      };
+    })(),
+    ...(() => {
+      const versus = resolveVersusClausesFromBill(bill);
+      return {
+        versusClauses: versus.clauses,
+        versusLeftLabel: versus.leftLabel,
+        versusRightLabel: versus.rightLabel,
+      };
+    })(),
     isProcedural: isProceduralBill(bill),
     isInfluence: isInfluenceBill(bill),
+    isLocal: isLocalBill(bill),
+    isVersus: isVersusBill(bill),
     isLiveLegislative: isLiveLegislativeBill(bill),
   };
 }

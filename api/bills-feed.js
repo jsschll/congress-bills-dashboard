@@ -868,8 +868,8 @@ module.exports = async function handler(req, res) {
         stateCoverage =
           stateCoverage === "coming soon" ? "seed fallback" : stateCoverage;
       } else {
-        // Ensure Finance / Judiciary / Authorization / Regulation theme paths
-        // remain visible even when processed_votes is sparse.
+        // Ensure all six Article 1 theme paths remain visible even when
+        // processed_votes is sparse.
         const existingKeys = new Set();
         for (const item of [...federalItems, ...stateItems]) {
           const id = String(item.id || item.billId || "")
