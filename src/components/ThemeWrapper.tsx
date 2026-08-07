@@ -1,14 +1,17 @@
 import React from "react";
 import { BentoGridTheme } from "./themes/BentoGridTheme";
 import { EditorialCollageTheme } from "./themes/EditorialCollageTheme";
+import { InfluenceTheme } from "./themes/InfluenceTheme";
 import { PipelineTheme } from "./themes/PipelineTheme";
 import type { BillMetric, ThemeVariant } from "./types";
 import {
   collectBillThemeSignals,
   collectProceduralSignals,
+  isInfluenceBill,
   isProceduralBill,
   mapLiveBillToArticleProps,
   resolveBillCategoryLabel,
+  type InfluenceStakeholderView,
   type LegislativeBill,
   type PipelineStepView,
 } from "../lib/live-bill";
@@ -17,7 +20,8 @@ import {
 export type ResolvedArticleTheme =
   | "editorial-collage"
   | "bento-grid"
-  | "pipeline";
+  | "pipeline"
+  | "influence";
 
 const FINANCE_SIGNAL_PATTERN =
   /\b(finance|financial|budget|budgets|economy|economic|fiscal|trade|appropriations?|treasury|tax|taxes|revenue|deficit|debt|commerce|banking|securities)\b/i;
@@ -26,7 +30,10 @@ const HUMAN_CENTERED_SIGNAL_PATTERN =
   /\b(education|health|healthcare|housing|social|civil rights|labor|immigration|family|children|veterans|disability|welfare|nutrition|public health)\b/i;
 
 const PROCEDURAL_SIGNAL_PATTERN =
-  /\b(floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|procedural|pipeline|tracking|authorization|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
+  /\b(procedural|authorization|tracker|tracking|floor\s*debate|floor\s*action|chamber\s*vote|final\s*(action|passage)|cloture|pipeline|conference\s*report|veto\s*override|engrossed|enrolled|signed into law|markup hearing)\b/i;
+
+const INFLUENCE_SIGNAL_PATTERN =
+  /\b(regulatory|regulation|lobbying|lobbyist|stakeholder(\s+map)?|influence(\s+network)?|donor|pac)\b/i;
 
 export type ThemeWrapperProps = {
   /** Live / structured bill object — preferred source for routing + copy. */
@@ -36,8 +43,8 @@ export type ThemeWrapperProps = {
   category?: string;
   keyImpacts?: string[];
   /**
-   * Explicit theme override. When omitted, real bill category / subject / type /
-   * procedural tracking signals decide among Pipeline, Bento, and Editorial.
+   * Explicit theme override. When omitted, bill category / tags decide among
+   * Influence, Pipeline, Bento, and Editorial.
    */
   themeVariant?: ThemeVariant;
   humanHook?: string;
@@ -47,6 +54,7 @@ export type ThemeWrapperProps = {
   financialSummary?: string;
   whatItDoes?: string;
   pipelineSteps?: PipelineStepView[];
+  stakeholders?: InfluenceStakeholderView[];
   metrics?: BillMetric[];
   className?: string;
   children?: React.ReactNode;
@@ -74,15 +82,27 @@ export function isProceduralCategory(signals = ""): boolean {
 }
 
 /**
+ * True when signals describe regulatory / lobbying / stakeholder-map content.
+ */
+export function isInfluenceCategory(signals = ""): boolean {
+  return INFLUENCE_SIGNAL_PATTERN.test(signals);
+}
+
+/**
  * Resolve which Article 1 visual theme to render from real bill properties.
- * Explicit theme variants win; then procedural tracking → Pipeline,
- * finance → Bento, everything else → Editorial.
+ *
+ * Routing (Task C):
+ * - Finance / Budget / Appropriations → Bento
+ * - Procedural / Authorization / Tracker → Pipeline
+ * - Regulatory / Lobbying / Stakeholder Map → Influence
+ * - Everything else → Editorial
  */
 export function resolveArticleTheme(
   categoryOrSignals = "",
   themeVariant?: ThemeVariant,
   bill?: LegislativeBill
 ): ResolvedArticleTheme {
+  if (themeVariant === "influence") return "influence";
   if (themeVariant === "pipeline" || themeVariant === "urgent") {
     return "pipeline";
   }
@@ -101,25 +121,28 @@ export function resolveArticleTheme(
     .filter(Boolean)
     .join(" ");
 
-  if (bill && isProceduralBill(bill)) {
+  // Regulatory / Lobbying / Stakeholder Map → Influence Network
+  if ((bill && isInfluenceBill(bill)) || isInfluenceCategory(signals)) {
+    return "influence";
+  }
+
+  // Procedural / Authorization / Tracker → Pipeline
+  if ((bill && isProceduralBill(bill)) || isProceduralCategory(signals)) {
     return "pipeline";
   }
 
-  if (isProceduralCategory(signals)) {
-    return "pipeline";
-  }
-
+  // Finance / Budget / Appropriations → Bento
   if (isFinanceCategory(signals)) {
     return "bento-grid";
   }
 
-  // Education / health / social (and all other non-finance) → Editorial Collage.
+  // Default fallback → Editorial Collage
   return "editorial-collage";
 }
 
 /**
  * Dynamic theme router for Article 1.
- * Prefers a live `bill` object's category / subject / type / procedural status,
+ * Prefers a live `bill` object's category / subject / type / stakeholders,
  * then falls back to explicit props. Vote state stays outside this wrapper.
  */
 export function ThemeWrapper({
@@ -136,6 +159,7 @@ export function ThemeWrapper({
   financialSummary,
   whatItDoes,
   pipelineSteps,
+  stakeholders,
   metrics,
   className = "",
   children,
@@ -167,6 +191,10 @@ export function ThemeWrapper({
     pipelineSteps && pipelineSteps.length > 0
       ? pipelineSteps
       : mapped?.pipelineSteps || [];
+  const resolvedStakeholders =
+    stakeholders && stakeholders.length > 0
+      ? stakeholders
+      : mapped?.stakeholders || [];
 
   const themeSignals = [
     resolvedCategory,
@@ -198,7 +226,18 @@ export function ThemeWrapper({
       data-bill-id={resolvedBillId}
       data-a1-shell="theme-wrapper"
     >
-      {resolvedTheme === "pipeline" ? (
+      {resolvedTheme === "influence" ? (
+        <InfluenceTheme
+          billId={resolvedBillId}
+          title={resolvedTitle}
+          category={resolvedCategory}
+          keyImpacts={resolvedKeyImpacts}
+          summary={resolvedWhatItDoes}
+          stakeholders={resolvedStakeholders}
+        >
+          {children}
+        </InfluenceTheme>
+      ) : resolvedTheme === "pipeline" ? (
         <PipelineTheme
           billId={resolvedBillId}
           title={resolvedTitle}

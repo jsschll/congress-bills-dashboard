@@ -94,6 +94,14 @@ export type LegislativeBill = {
     status?: "complete" | "current" | "upcoming";
     icon?: "gavel" | "mic" | "ballot" | "default";
   }>;
+  stakeholders?: Array<{
+    id?: string;
+    name?: string;
+    weight?: number;
+    stance?: "support" | "oppose";
+    spendLabel?: string;
+    spend_label?: string;
+  }>;
 };
 
 export type ArticleBillViewModel = {
@@ -111,7 +119,9 @@ export type ArticleBillViewModel = {
   themeVariant?: ThemeVariant;
   themeSignals: string;
   pipelineSteps: PipelineStepView[];
+  stakeholders: InfluenceStakeholderView[];
   isProcedural: boolean;
+  isInfluence: boolean;
   isLiveLegislative: boolean;
 };
 
@@ -121,6 +131,14 @@ export type PipelineStepView = {
   description?: string;
   status: "complete" | "current" | "upcoming";
   icon?: "gavel" | "mic" | "ballot" | "default";
+};
+
+export type InfluenceStakeholderView = {
+  id: string;
+  name: string;
+  weight: number;
+  stance: "support" | "oppose";
+  spendLabel?: string;
 };
 
 function asString(value: unknown): string {
@@ -229,6 +247,61 @@ export function collectProceduralSignals(bill: LegislativeBill = {}): string {
 }
 
 /**
+ * True when a bill carries influence / lobbying / regulatory map signals.
+ */
+export function isInfluenceBill(bill: LegislativeBill = {}): boolean {
+  if (bill.themeVariant === "influence" || bill.theme_variant === "influence") {
+    return true;
+  }
+  if (Array.isArray(bill.stakeholders) && bill.stakeholders.length > 0) {
+    return true;
+  }
+  const signals = [
+    collectBillThemeSignals(bill),
+    collectProceduralSignals(bill),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return /\b(regulatory|regulation|lobbying|lobbyist|stakeholder(\s+map)?|influence\s+network|donor|pac)\b/i.test(
+    signals
+  );
+}
+
+/**
+ * Normalize stakeholder nodes for the Influence Network theme.
+ */
+export function resolveStakeholdersFromBill(
+  bill: LegislativeBill = {}
+): InfluenceStakeholderView[] {
+  if (!Array.isArray(bill.stakeholders) || !bill.stakeholders.length) {
+    return [];
+  }
+  return bill.stakeholders
+    .map((entry, index) => {
+      const name = asString(entry?.name);
+      if (!name) return null;
+      const stanceRaw = asString(entry?.stance).toLowerCase();
+      const stance: "support" | "oppose" =
+        stanceRaw === "oppose" ||
+        stanceRaw === "opposed" ||
+        stanceRaw === "against" ||
+        stanceRaw === "no"
+          ? "oppose"
+          : "support";
+      const weight = Number(entry?.weight);
+      return {
+        id: asString(entry?.id) || `stakeholder-${index + 1}`,
+        name,
+        weight: Number.isFinite(weight) ? weight : 0.5,
+        stance,
+        spendLabel:
+          asString(entry?.spendLabel || entry?.spend_label) || undefined,
+      };
+    })
+    .filter(Boolean) as InfluenceStakeholderView[];
+}
+
+/**
  * True when a bill carries procedural tracking signals or structured steps.
  */
 export function isProceduralBill(bill: LegislativeBill = {}): boolean {
@@ -285,7 +358,7 @@ export function resolvePipelineStepsFromBill(
   const defaults: PipelineStepView[] = [
     {
       id: "committee",
-      label: "Committee",
+      label: "In Committee",
       description: "Markup & hearings",
       status: "upcoming",
       icon: "gavel",
@@ -545,7 +618,9 @@ export function mapLiveBillToArticleProps(
     themeVariant: bill.themeVariant || bill.theme_variant,
     themeSignals: collectBillThemeSignals(bill),
     pipelineSteps: resolvePipelineStepsFromBill(bill),
+    stakeholders: resolveStakeholdersFromBill(bill),
     isProcedural: isProceduralBill(bill),
+    isInfluence: isInfluenceBill(bill),
     isLiveLegislative: isLiveLegislativeBill(bill),
   };
 }

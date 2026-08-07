@@ -161,9 +161,9 @@ export function ArticleCard({
     reactionLabel !== null ? (
       <p
         className={
-          resolvedTheme === "bento-grid" || resolvedTheme === "pipeline"
-            ? "text-xs font-medium text-slate-500"
-            : "text-xs font-medium text-[#8A6A45]"
+          resolvedTheme === "editorial-collage"
+            ? "text-xs font-medium text-[#8A6A45]"
+            : "text-xs font-medium text-slate-500"
         }
         aria-live="polite"
       >

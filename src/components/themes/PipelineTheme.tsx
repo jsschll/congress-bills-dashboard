@@ -30,7 +30,7 @@ export type PipelineThemeProps = {
 const DEFAULT_STEPS: PipelineStep[] = [
   {
     id: "committee",
-    label: "Committee",
+    label: "In Committee",
     description: "Markup & hearings",
     status: "current",
     icon: "gavel",
@@ -249,8 +249,8 @@ export function PipelineTheme({
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
               Procedural pipeline
             </p>
-            <p className="mt-1 text-sm font-medium text-slate-700">
-              Committee → Floor Debate → Final Action
+            <p className="mt-1 text-sm font-medium uppercase tracking-[0.06em] text-slate-700">
+              In Committee → Floor Debate → Final Action
             </p>
           </div>
           <p className="font-['IBM_Plex_Mono','ui-monospace',monospace] text-[11px] uppercase tracking-[0.12em] text-slate-400">

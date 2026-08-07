@@ -18,7 +18,7 @@ for (const [route, bills] of Object.entries(byRoute)) {
   console.log(`  ${route}: ${bills.join(", ")}`);
 }
 console.log(
-  "Types: Finance → Bento, Judiciary → Editorial, Authorization → Pipeline, Regulation → Editorial"
+  "Types: Finance → Bento, Judiciary → Editorial, Authorization → Pipeline, Regulation/Lobbying → Influence"
 );
 console.log(
   "API: /api/bills-feed always merges these theme seeds (disable with ?seed=0)."
