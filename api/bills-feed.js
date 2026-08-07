@@ -850,28 +850,75 @@ module.exports = async function handler(req, res) {
 
     let seedItems = [];
     const liveLegislativeCount = federalItems.length + stateItems.length;
-    if (allowSeed && liveLegislativeCount === 0) {
-      seedItems = seedFederalAndStateBills().filter((item) => {
-        if (!stateFilter) return true;
-        return String(item.stateCode || "").toUpperCase() === stateFilter;
-      });
-      if (seedItems.length) {
+    const themeSeedPool = seedFederalAndStateBills().filter((item) => {
+      if (!stateFilter) return true;
+      // Always keep federal showcase rows; filter state rows by code.
+      if (String(item.level || "").toLowerCase() === "federal") return true;
+      return String(item.stateCode || "").toUpperCase() === stateFilter;
+    });
+
+    if (allowSeed) {
+      if (liveLegislativeCount === 0) {
+        // Full fallback when Congress.gov / OpenStates / processed_votes are empty.
+        seedItems = themeSeedPool;
         federalCoverage =
           federalCoverage === "coming soon" || federalCoverage === "empty"
             ? "seed fallback"
             : federalCoverage;
         stateCoverage =
           stateCoverage === "coming soon" ? "seed fallback" : stateCoverage;
+      } else {
+        // Ensure Finance / Judiciary / Authorization / Regulation theme paths
+        // remain visible even when processed_votes is sparse.
+        const existingKeys = new Set();
+        for (const item of [...federalItems, ...stateItems]) {
+          const id = String(item.id || item.billId || "")
+            .toLowerCase()
+            .trim();
+          const number = String(item.billNumber || item.bill_number || "")
+            .toLowerCase()
+            .replace(/\./g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (id) existingKeys.add(id);
+          if (number) existingKeys.add(number);
+        }
+        seedItems = themeSeedPool.filter((item) => {
+          const id = String(item.id || "")
+            .toLowerCase()
+            .trim();
+          const number = String(item.billNumber || "")
+            .toLowerCase()
+            .replace(/\./g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (id && existingKeys.has(id)) return false;
+          if (number && existingKeys.has(number)) return false;
+          return true;
+        });
+        if (seedItems.length) {
+          federalCoverage =
+            federalCoverage === "processed_votes" || federalCoverage === "live"
+              ? `${federalCoverage}+theme_seeds`
+              : federalCoverage;
+        }
       }
     }
 
     const merged = [
+      ...seedItems,
       ...federalItems,
       ...stateItems,
-      ...seedItems,
       ...localItems,
     ].sort(
-      (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+      (a, b) => {
+        const aSeed = String(a.source || "").includes("seed") ? 1 : 0;
+        const bSeed = String(b.source || "").includes("seed") ? 1 : 0;
+        if (aSeed !== bSeed) return bSeed - aSeed;
+        return (
+          new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+        );
+      }
     );
 
     if (!merged.length) {
@@ -895,8 +942,12 @@ module.exports = async function handler(req, res) {
       sources: {
         congressGov: Boolean(apiKey),
         openStates: Boolean(openStatesKey),
-        processedVotes: federalCoverage === "processed_votes",
+        processedVotes:
+          String(federalCoverage).includes("processed_votes") ||
+          federalCoverage === "processed_votes",
         seedFallback: seedItems.length > 0,
+        themeSeeds: seedItems.filter((item) => item.source === "theme_seed")
+          .length,
       },
       items: merged,
     });

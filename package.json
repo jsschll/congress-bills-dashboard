@@ -12,6 +12,7 @@
     "coverage:judges": "node scripts/coverage-report.js",
     "seed:scorecard": "node scripts/seed-scorecard-profiles.js",
     "seed:federal-reps": "node --experimental-strip-types supabase/seed-federal-reps.ts",
-    "seed:article1-bills": "node scripts/seed-article1-bills-feed.js"
+    "seed:article1-bills": "node scripts/seed-article1-bills-feed.js",
+    "seed:article1-db": "node scripts/seed-article1-processed-votes.js"
   }
 }
