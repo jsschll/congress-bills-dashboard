@@ -1180,23 +1180,39 @@ function resolveFeedCardCopy(item = {}, copy = {}) {
     !looksLikeOfficialBillTitle(shortTitle) &&
     shortTitle.length <= 120
   ) {
-    headline = firstCompleteSentence(shortTitle, 110);
+    headline = firstCompleteSentence(shortTitle, 90);
   } else if (summary) {
     headline =
       (typeof clampPunchySummary === "function"
-        ? clampPunchySummary(summary, { maxSentences: 1, maxWords: 28 })
-        : "") || firstCompleteSentence(summary, 110);
+        ? clampPunchySummary(summary, { maxSentences: 1, maxWords: 12 })
+        : "") || firstCompleteSentence(summary, 90);
   } else if (shortTitle && !looksLikeTruncatedHeadline(shortTitle)) {
-    headline = firstCompleteSentence(shortTitle, 110);
+    headline = firstCompleteSentence(shortTitle, 90);
   } else {
     headline = cleanTitle;
   }
 
   return {
     title: cleanTitle,
-    headline: headline || cleanTitle || "Legislation",
+    headline: clampFeedHeadlineWords(headline || cleanTitle || "Legislation", 12),
     summary: summary || "",
   };
+}
+
+/** Hard-cap feed headlines to ~10–12 words for glanceability. */
+function clampFeedHeadlineWords(text, maxWords = 12) {
+  const cleaned = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) {
+    return cleaned.replace(/[,:;–—-]+$/, "").replace(/\.$/, "");
+  }
+  return `${words
+    .slice(0, maxWords)
+    .join(" ")
+    .replace(/[,:;–—-]+$/, "")}…`;
 }
 
 function formatFeedStatusTag(item = {}, { isVote = false } = {}) {
@@ -1210,18 +1226,18 @@ function formatFeedStatusTag(item = {}, { isVote = false } = {}) {
   const lower = result.toLowerCase();
 
   if (/\b(passed|pass|agreed|confirmed|adopted|carried|enacted|became law|signed)\b/.test(lower)) {
-    if (chamber) return { label: `Passed ${chamber}`, tone: "passed" };
-    return { label: result.length <= 28 ? result : "Passed", tone: "passed" };
+    const label = chamber ? `Passed ${chamber}` : "Passed";
+    return { label, tone: "passed", icon: "✓" };
   }
   if (/\b(failed|fail|rejected|reject|defeated|defeat|not agree|tabled|vetoed|veto)\b/.test(lower)) {
-    if (chamber) return { label: `Rejected ${chamber}`, tone: "failed" };
-    return { label: result.length <= 28 ? result : "Rejected", tone: "failed" };
+    const label = chamber ? `Rejected ${chamber}` : "Rejected";
+    return { label, tone: "failed", icon: "✕" };
   }
-  if (isVote) return { label: "Pending Vote", tone: "pending" };
+  if (isVote) return { label: "Pending Vote", tone: "pending", icon: "◎" };
   if (result && result.length <= 28 && !/calendar no\.?\s*$/i.test(result)) {
-    return { label: result, tone: "pending" };
+    return { label: result, tone: "pending", icon: "◎" };
   }
-  return { label: "Pending Vote", tone: "pending" };
+  return { label: "Pending Vote", tone: "pending", icon: "◎" };
 }
 
 function formatFeedCategoryPill(item = {}) {
@@ -1234,17 +1250,33 @@ function formatFeedCategoryPill(item = {}) {
       item.tags?.[0] ||
       ""
   ).trim();
-  if (explicit) {
-    // Shorten long policy buckets for the pill.
-    return explicit
+  let label = explicit;
+  if (label) {
+    label = label
       .replace(/^Immigration\b.*/i, "Immigration")
-      .replace(/^Energy\b.*/i, "Energy")
-      .replace(/^Economy\b.*/i, "Economy")
+      .replace(/^(Energy|Environment)\b.*/i, "Energy")
+      .replace(/^(Economy|Tax|Taxes)\b.*/i, "Economy")
       .replace(/^Foreign Policy\b.*/i, "Foreign Policy")
+      .replace(/^(Defense|National Security)\b.*/i, "Defense")
       .replace(/^Civil Rights\b.*/i, "Civil Rights")
       .replace(/^Healthcare\b.*/i, "Healthcare");
+  } else {
+    label = inferVoteTopic(item) || "Congress";
   }
-  return inferVoteTopic(item) || "Congress";
+  return { label, icon: feedCategoryIcon(label) };
+}
+
+function feedCategoryIcon(category = "") {
+  const value = String(category || "").toLowerCase();
+  if (/immigra|border|asylum/.test(value)) return "🛂";
+  if (/defense|national security|military|armed/.test(value)) return "🛡️";
+  if (/energy|environment|climate/.test(value)) return "⚡";
+  if (/economy|tax|budget|finance/.test(value)) return "💵";
+  if (/health|medicare|medicaid/.test(value)) return "🏥";
+  if (/foreign|diplomacy|sanction/.test(value)) return "🌐";
+  if (/civil rights|justice|voting/.test(value)) return "⚖️";
+  if (/tech|cyber|broadband|ai\b/.test(value)) return "💻";
+  return "📜";
 }
 
 function mountFeedCardStanceButtons(card, item, options = {}) {
@@ -1287,8 +1319,8 @@ function wireFeedCardAskAi(card, item) {
 }
 
 /**
- * Social feed card shell — tight single-column layout:
- * status/category → title + Bill ID • Date → Ask AI + Support/Oppose
+ * Visual-first social feed card:
+ * category icon + status → short headline → Bill ID • Date → actions
  */
 function renderSocialFeedCardShell({
   status,
@@ -1297,16 +1329,28 @@ function renderSocialFeedCardShell({
   subtext,
 }) {
   const tone = String(status?.tone || "pending").replace(/[^a-z0-9_-]/gi, "");
+  const statusIcon = status?.icon || "◎";
+  const categoryLabel =
+    typeof category === "string" ? category : category?.label || "";
+  const categoryIcon =
+    (typeof category === "object" && category?.icon) ||
+    feedCategoryIcon(categoryLabel);
   return `
     <div class="feed-social-card__header">
-      <span class="status-badge is-${tone}">${escapePolicyHtml(
-        status?.label || "Pending Vote"
-      )}</span>
-      ${
-        category
-          ? `<span class="category-pill">${escapePolicyHtml(category)}</span>`
-          : ""
-      }
+      <div class="category-pill" title="${escapePolicyHtml(categoryLabel || "Congress")}">
+        <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
+        <span class="category-pill__label">${escapePolicyHtml(
+          categoryLabel || "Congress"
+        )}</span>
+      </div>
+      <span class="status-badge is-${tone}">
+        <span class="status-badge__icon" aria-hidden="true">${escapePolicyHtml(
+          statusIcon
+        )}</span>
+        <span class="status-badge__label">${escapePolicyHtml(
+          status?.label || "Pending Vote"
+        )}</span>
+      </span>
     </div>
     <div class="feed-social-card__body">
       <h3 class="feed-social-card__headline">${escapePolicyHtml(headline)}</h3>
@@ -1320,7 +1364,7 @@ function renderSocialFeedCardShell({
     </div>
     <div class="feed-social-card__actions">
       <button type="button" class="details-toggle-btn">
-        Ask AI / Details →
+        💬 Ask AI / Details
       </button>
       <div class="engagement-mount-point" aria-label="Your stance"></div>
     </div>
