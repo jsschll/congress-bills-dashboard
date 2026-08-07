@@ -216,6 +216,9 @@
             key_impacts: impactsList,
           })
         : null;
+    const defaultStockUrl =
+      (mapper && mapper.DEFAULT_STOCK && mapper.DEFAULT_STOCK.url) ||
+      "https://images.unsplash.com/photo-1555848962-6e79363ec58f?auto=format&fit=crop&w=1400&q=80";
     const imageSrc = String(
       item.imageSrc ||
         item.image_src ||
@@ -224,7 +227,7 @@
         item.photoUrl ||
         item.photo_url ||
         (resolvedImage && resolvedImage.url) ||
-        ""
+        defaultStockUrl
     ).trim();
     const imageAlt = String(
       item.imageAlt ||
@@ -233,20 +236,18 @@
         title
     ).trim();
 
-    // Always keep the magazine art plane. Prefer a real photo; otherwise an
-    // atmospheric blur wash (never an empty labeled placeholder box).
-    const artInner = imageSrc
-      ? `<img
+    // Always keep the magazine art plane with a real photo. If the primary
+    // URL 404s, swap once to the civic default before falling back to wash.
+    const artInner = `<img
             class="a1-editorial__photo"
             src="${escapeHtml(imageSrc)}"
             alt="${escapeHtml(imageAlt)}"
             loading="lazy"
             decoding="async"
-            onerror="this.classList.add('is-broken'); this.removeAttribute('src');"
+            data-fallback-src="${escapeHtml(defaultStockUrl)}"
+            onerror="(function(img){var fb=img.getAttribute('data-fallback-src');if(fb&&img.src!==fb&&!img.dataset.triedFallback){img.dataset.triedFallback='1';img.src=fb;return;}img.classList.add('is-broken');img.removeAttribute('src');})(this);"
           />
-          <div class="a1-editorial__frame-wash a1-editorial__frame-wash--fallback" aria-hidden="true"></div>`
-      : `<div class="a1-editorial__frame-wash" aria-hidden="true"></div>
-          <div class="a1-editorial__frame-blur" aria-hidden="true"></div>`;
+          <div class="a1-editorial__frame-wash a1-editorial__frame-wash--fallback" aria-hidden="true"></div>`;
 
     return `
       <div class="a1-theme a1-theme--editorial">
