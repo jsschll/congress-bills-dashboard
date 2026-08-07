@@ -8,7 +8,8 @@ export type ThemeVariant =
   | "civic"
   | "urgent"
   | "fiscal"
-  | "compact";
+  | "compact"
+  | "editorial-collage";
 
 export type ReactionId =
   | "pass"

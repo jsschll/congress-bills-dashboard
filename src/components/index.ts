@@ -11,6 +11,11 @@ export { ThemeWrapper } from "./ThemeWrapper";
 export type { ThemeWrapperProps } from "./ThemeWrapper";
 
 export {
+  EditorialCollageTheme,
+} from "./themes/EditorialCollageTheme";
+export type { EditorialCollageThemeProps } from "./themes/EditorialCollageTheme";
+
+export {
   DEFAULT_REACTIONS,
   EMPTY_VOTE_COUNTS,
 } from "./types";
@@ -21,3 +26,4 @@ export type {
   ThemeVariant,
   VoteCounts,
 } from "./types";
+
