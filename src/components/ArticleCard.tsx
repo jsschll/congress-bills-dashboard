@@ -6,6 +6,7 @@ import {
   ThemeWrapper,
 } from "./ThemeWrapper";
 import {
+  VoteFeedback,
   VoteStampOverlay,
   reactionIdToFeedbackStance,
   readLocalFeedVote,
@@ -14,6 +15,7 @@ import {
   type VoteFeedbackStance,
 } from "./VoteFeedback";
 import {
+  DEFAULT_REACTIONS,
   EMPTY_VOTE_COUNTS,
   type ReactionId,
   type ThemeVariant,
@@ -61,92 +63,6 @@ export type ArticleCardProps = {
 
 function mergeCounts(seed?: Partial<VoteCounts>): VoteCounts {
   return { ...EMPTY_VOTE_COUNTS, ...seed };
-}
-
-/** Pass % → mercury color: Red (0°) → Yellow (60°) → Green (120°). */
-function passPctToThermoColor(passPct: number): string {
-  const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
-  return `hsl(${(t * 120).toFixed(1)} 90% 50%)`;
-}
-
-const THERMO_TICKS = [0, 25, 50, 75, 100] as const;
-
-/**
- * Glass vertical thermometer on the card’s right inner edge.
- * Fill height + hue track community Pass % (red → yellow → green).
- */
-function GlassThermometer({
-  passPct,
-  killPct,
-}: {
-  passPct: number;
-  killPct: number;
-}) {
-  const pct = Math.max(0, Math.min(100, Number(passPct) || 0));
-  const color = passPctToThermoColor(pct);
-
-  return (
-    <div
-      className="pointer-events-none absolute bottom-28 right-2 top-3 z-20 flex w-5 flex-col items-center"
-      role="img"
-      aria-label={`${Math.round(pct)}% Pass, ${Math.round(killPct)}% Kill`}
-      data-pass-pct={Math.round(pct)}
-    >
-      <div
-        className="relative w-[11px] flex-1 overflow-visible rounded-full"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 45%, rgba(255,255,255,0.16) 100%)",
-          border: "1px solid rgba(255,255,255,0.42)",
-          boxShadow:
-            "inset 0 1px 2px rgba(255,255,255,0.35), inset 0 -1px 3px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.18)",
-          backdropFilter: "blur(6px)",
-        }}
-      >
-        {/* Hash / tick marks along the glass tube */}
-        <div className="absolute inset-y-1 -right-[3px] left-auto z-[2]" aria-hidden>
-          {THERMO_TICKS.map((tick) => (
-            <span
-              key={tick}
-              className="absolute right-0 block h-px bg-white/55"
-              style={{
-                bottom: `${tick}%`,
-                width: tick % 50 === 0 ? 7 : 4,
-                backgroundColor:
-                  tick % 50 === 0
-                    ? "rgba(255,255,255,0.7)"
-                    : "rgba(226,232,240,0.45)",
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Mercury / fluid */}
-        <div
-          className="absolute bottom-0 left-[2px] right-[2px] z-[1] rounded-full"
-          style={{
-            height: `${pct}%`,
-            backgroundColor: color,
-            boxShadow: `0 0 10px color-mix(in srgb, ${color} 55%, transparent), inset 0 1px 0 rgba(255,255,255,0.35)`,
-            transition:
-              "height 700ms cubic-bezier(0.22, 1, 0.36, 1), background-color 700ms ease-out, box-shadow 700ms ease-out",
-          }}
-        />
-      </div>
-
-      {/* Rounded bulb at the base — same dynamic color */}
-      <div
-        className="relative z-[3] -mt-[3px] h-[18px] w-[18px] shrink-0 rounded-full"
-        style={{
-          backgroundColor: color,
-          border: "1px solid rgba(255,255,255,0.5)",
-          boxShadow: `inset 0 2px 3px rgba(255,255,255,0.35), inset 0 -2px 4px rgba(0,0,0,0.2), 0 0 12px color-mix(in srgb, ${color} 45%, transparent)`,
-          transition: "background-color 700ms ease-out, box-shadow 700ms ease-out",
-        }}
-        aria-hidden
-      />
-    </div>
-  );
 }
 
 /**
@@ -271,12 +187,8 @@ export function ArticleCard({
 
   const totalVotes = Object.values(voteCounts).reduce((sum, n) => sum + n, 0);
   const feedbackStance = reactionIdToFeedbackStance(selectedReaction);
-  const passSplit = splitFromCounts(
-    voteCounts,
-    feedbackStance === "pass" || feedbackStance === "kill"
-      ? feedbackStance
-      : null
-  );
+  const showPostVote =
+    hasSubmitted && (feedbackStance === "pass" || feedbackStance === "kill");
 
   const displayMetrics =
     resolvedMetrics.length > 0
@@ -311,10 +223,6 @@ export function ArticleCard({
       data-a1-shell="article-card"
       data-theme={resolvedTheme}
     >
-      <GlassThermometer
-        passPct={passSplit.passPct}
-        killPct={passSplit.killPct}
-      />
       <ThemeWrapper
         bill={bill}
         billId={resolvedBillId}
@@ -330,12 +238,24 @@ export function ArticleCard({
         metrics={displayMetrics}
         actionBar={
           showReactionDock ? (
-            <ReactionDock
-              selectedReaction={selectedReaction}
-              disabled={false}
-              onReact={handleReact}
-              theme={resolvedTheme}
-            />
+            showPostVote && feedbackStance ? (
+              <VoteFeedback
+                stance={feedbackStance}
+                voteCounts={voteCounts}
+                animate
+                onChange={() => {
+                  setHasSubmitted(false);
+                  setSelectedReaction(null);
+                }}
+              />
+            ) : (
+              <ReactionDock
+                selectedReaction={selectedReaction}
+                disabled={false}
+                onReact={handleReact}
+                theme={resolvedTheme}
+              />
+            )
           ) : null
         }
       >
