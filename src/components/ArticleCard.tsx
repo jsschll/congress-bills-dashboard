@@ -6,7 +6,6 @@ import {
   ThemeWrapper,
 } from "./ThemeWrapper";
 import {
-  VoteFeedback,
   VoteStampOverlay,
   reactionIdToFeedbackStance,
   readLocalFeedVote,
@@ -15,7 +14,6 @@ import {
   type VoteFeedbackStance,
 } from "./VoteFeedback";
 import {
-  DEFAULT_REACTIONS,
   EMPTY_VOTE_COUNTS,
   type ReactionId,
   type ThemeVariant,
@@ -63,6 +61,12 @@ export type ArticleCardProps = {
 
 function mergeCounts(seed?: Partial<VoteCounts>): VoteCounts {
   return { ...EMPTY_VOTE_COUNTS, ...seed };
+}
+
+/** Pass % → fill color: Red (0°) → Yellow (60°) → Green (120°). */
+function passPctToGaugeColor(passPct: number): string {
+  const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+  return `hsl(${(t * 120).toFixed(1)} 84% 52%)`;
 }
 
 /**
@@ -187,8 +191,12 @@ export function ArticleCard({
 
   const totalVotes = Object.values(voteCounts).reduce((sum, n) => sum + n, 0);
   const feedbackStance = reactionIdToFeedbackStance(selectedReaction);
-  const showPostVote =
-    hasSubmitted && (feedbackStance === "pass" || feedbackStance === "kill");
+  const passSplit = splitFromCounts(
+    voteCounts,
+    feedbackStance === "pass" || feedbackStance === "kill"
+      ? feedbackStance
+      : null
+  );
 
   const displayMetrics =
     resolvedMetrics.length > 0
@@ -223,6 +231,22 @@ export function ArticleCard({
       data-a1-shell="article-card"
       data-theme={resolvedTheme}
     >
+      {/* Vertical community Pass% bar — right edge of card (replaces old horizontal bar). */}
+      <div
+        className="pointer-events-none absolute inset-y-3 right-0 z-10 w-1.5 overflow-hidden rounded-full bg-rose-500"
+        role="img"
+        aria-label={`${passSplit.passPct}% Pass, ${passSplit.killPct}% Kill`}
+      >
+        <div
+          className="absolute bottom-0 left-0 w-full"
+          style={{
+            height: `${passSplit.passPct}%`,
+            backgroundColor: passPctToGaugeColor(passSplit.passPct),
+            transition:
+              "background-color 700ms ease-out, height 700ms ease-out",
+          }}
+        />
+      </div>
       <ThemeWrapper
         bill={bill}
         billId={resolvedBillId}
@@ -238,24 +262,12 @@ export function ArticleCard({
         metrics={displayMetrics}
         actionBar={
           showReactionDock ? (
-            showPostVote && feedbackStance ? (
-              <VoteFeedback
-                stance={feedbackStance}
-                voteCounts={voteCounts}
-                animate
-                onChange={() => {
-                  setHasSubmitted(false);
-                  setSelectedReaction(null);
-                }}
-              />
-            ) : (
-              <ReactionDock
-                selectedReaction={selectedReaction}
-                disabled={false}
-                onReact={handleReact}
-                theme={resolvedTheme}
-              />
-            )
+            <ReactionDock
+              selectedReaction={selectedReaction}
+              disabled={false}
+              onReact={handleReact}
+              theme={resolvedTheme}
+            />
           ) : null
         }
       >
