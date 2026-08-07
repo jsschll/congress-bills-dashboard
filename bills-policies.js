@@ -1388,7 +1388,7 @@ function clampFeedTldrText(text = "") {
     .map((part) => part.trim())
     .filter(Boolean)
     .join(" ");
-  return clampFeedHeadlineWords(joined, 36) || "Updates a federal policy rule.";
+  return clampFeedHeadlineWords(joined, 22) || "Updates a federal policy rule.";
 }
 
 function buildFeedImpactChips(impactText = "", categoryLabel = "", summary = "") {
@@ -1758,13 +1758,24 @@ function renderSocialFeedCardShell({
 
   return `
     <div class="feed-social-card__header">
-      <div class="category-pill" title="${escapePolicyHtml(
-        categoryLabel || "Congress"
-      )}">
-        <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
-        <span class="category-pill__label">${escapePolicyHtml(
+      <div class="feed-social-card__meta" aria-label="Bill meta">
+        <div class="category-pill" title="${escapePolicyHtml(
           categoryLabel || "Congress"
-        )}</span>
+        )}">
+          <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
+          <span class="category-pill__label">${escapePolicyHtml(
+            categoryLabel || "Congress"
+          )}</span>
+        </div>
+        <span class="feed-meta-dot" aria-hidden="true">•</span>
+        <div class="feed-cost-pill is-${costTone}" aria-label="Fiscal impact">
+          <span class="feed-cost-pill__icon" aria-hidden="true">${
+            costPill.icon || "🟢"
+          }</span>
+          <span class="feed-cost-pill__label">${escapePolicyHtml(
+            costPill.label || "$0 Net Cost"
+          )}</span>
+        </div>
       </div>
       <time class="feed-social-card__time">${escapePolicyHtml(
         timestamp || "Just now"
@@ -1779,21 +1790,10 @@ function renderSocialFeedCardShell({
         <span class="feed-tldr__label" aria-hidden="true">⚡ THE TL;DR</span>
         <p class="feed-tldr__text">${escapePolicyHtml(what)}</p>
       </div>
-      <div class="feed-story-row" aria-label="Who is affected">
-        <span class="feed-story-row__label">Who's affected</span>
+      <div class="feed-story-row feed-story-row--inline" aria-label="Who is affected">
+        <span class="feed-story-row__label">Who's affected:</span>
         <div class="feed-impact-chips">
           ${chipHtml}
-        </div>
-      </div>
-      <div class="feed-story-row" aria-label="Fiscal impact">
-        <span class="feed-story-row__label">Fiscal impact</span>
-        <div class="feed-cost-pill is-${costTone}">
-          <span class="feed-cost-pill__icon" aria-hidden="true">${
-            costPill.icon || "🟢"
-          }</span>
-          <span class="feed-cost-pill__label">${escapePolicyHtml(
-            costPill.label || "$0 Net Cost"
-          )}</span>
         </div>
       </div>
     </div>
