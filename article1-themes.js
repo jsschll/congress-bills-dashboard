@@ -265,7 +265,7 @@
    * Instagram/TikTok-style story peek: fixed-height hero + overlay type + vote dock.
    * Dense theme layouts live in the breakdown drawer template.
    */
-  function renderStoryPeek(payload, theme, label) {
+  function renderStoryPeek(payload, theme) {
     const { billId, title, category, impactsList, summary, item } = payload;
     const { imageSrc, imageAlt, defaultStockUrl } = resolveHeroImage(item, {
       title,
@@ -294,9 +294,6 @@
           <div class="a1-story-card__scrim" aria-hidden="true"></div>
           <div class="a1-story-card__top">
             <div class="a1-story-card__pills">
-              <span class="a1-story-card__pill a1-story-card__pill--theme">${escapeHtml(
-                label
-              )}</span>
               <span class="a1-story-card__pill a1-story-card__pill--cat">${escapeHtml(
                 category || "Congress"
               )}</span>
@@ -883,7 +880,7 @@
       item,
     };
 
-    const peek = withChrome(true, () => renderStoryPeek(payload, theme, label));
+    const peek = withChrome(true, () => renderStoryPeek(payload, theme));
     const detail = renderThemeDetail(theme, payload);
 
     return {
