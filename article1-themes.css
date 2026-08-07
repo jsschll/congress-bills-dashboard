@@ -323,17 +323,22 @@
   min-height: 0;
   border-radius: 999px;
   overflow: visible;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.28) 0%,
-    rgba(255, 255, 255, 0.08) 45%,
-    rgba(255, 255, 255, 0.16) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.42);
+  /* Dark glass tube so the gauge reads on bright card photos (bg-black/60) */
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.04) 42%,
+      rgba(255, 255, 255, 0.02) 58%,
+      rgba(255, 255, 255, 0.12) 100%
+    ),
+    rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4); /* border-white/40 */
   box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 3px rgba(0, 0, 0, 0.22),
-    0 2px 8px rgba(0, 0, 0, 0.18);
+    inset 0 1px 2px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 3px rgba(0, 0, 0, 0.35),
+    0 10px 15px -3px rgb(0 0 0 / 0.25),
+    0 4px 6px -4px rgb(0 0 0 / 0.2); /* shadow-lg */
   backdrop-filter: blur(6px);
 }
 
@@ -350,7 +355,7 @@
   display: block;
   width: 0.28rem;
   height: 1px;
-  background: rgba(226, 232, 240, 0.45);
+  background: rgba(255, 255, 255, 0.7); /* bg-white/70 */
 }
 
 .a1-glass-thermo__tick.is-major {

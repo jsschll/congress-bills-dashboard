@@ -287,7 +287,7 @@
       .map(
         (tick) => `
           <span
-            class="a1-glass-thermo__tick${tick % 50 === 0 ? " is-major" : ""}"
+            class="a1-glass-thermo__tick bg-white/70${tick % 50 === 0 ? " is-major" : ""}"
             style="bottom:${tick}%"
             aria-hidden="true"
           ></span>`
@@ -302,7 +302,7 @@
         data-pass-pct="${hasPct ? pct : ""}"
         style="--thermo-pct:${pct}%; --thermo-color:${color};"
       >
-        <div class="a1-glass-thermo__tube">
+        <div class="a1-glass-thermo__tube bg-black/60 border border-white/40 shadow-lg">
           <div class="a1-glass-thermo__ticks">${ticks}</div>
           <span class="a1-glass-thermo__mercury" style="height:${pct}%; background-color:${color};"></span>
         </div>
