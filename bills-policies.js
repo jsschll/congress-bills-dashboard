@@ -2037,14 +2037,129 @@ function mountFeedCardStanceButtons(card, item, options = {}) {
 
 function wireFeedCardAskAi(card, item) {
   card
-    .querySelector(".details-toggle-btn")
-    ?.addEventListener("click", (event) => {
+    .querySelectorAll(".details-toggle-btn, .a1-ask-ai-btn")
+    .forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (window.PolicyEngagement?.openAskAi) {
+          window.PolicyEngagement.openAskAi(item);
+        } else if (typeof openBillAskAiModal === "function") {
+          openBillAskAiModal(item);
+        }
+      });
+    });
+}
+
+function ensureFeedBreakdownDrawer() {
+  let drawer = document.getElementById("feed-breakdown-drawer");
+  if (drawer) return drawer;
+
+  drawer = document.createElement("div");
+  drawer.id = "feed-breakdown-drawer";
+  drawer.className = "feed-breakdown-drawer";
+  drawer.hidden = true;
+  drawer.innerHTML = `
+    <div class="feed-breakdown-drawer__backdrop" data-close-breakdown="1"></div>
+    <div
+      class="feed-breakdown-drawer__panel"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="feed-breakdown-title"
+    >
+      <div class="feed-breakdown-drawer__handle" aria-hidden="true"></div>
+      <header class="feed-breakdown-drawer__header">
+        <div>
+          <p class="feed-breakdown-drawer__eyebrow">Full breakdown</p>
+          <h2 id="feed-breakdown-title">Bill details</h2>
+        </div>
+        <button
+          type="button"
+          class="feed-breakdown-drawer__close"
+          data-close-breakdown="1"
+          aria-label="Close breakdown"
+        >✕</button>
+      </header>
+      <div class="feed-breakdown-drawer__body" id="feed-breakdown-body"></div>
+    </div>
+  `;
+  document.body.append(drawer);
+
+  drawer.addEventListener("click", (event) => {
+    if (event.target.closest("[data-close-breakdown]")) {
+      closeFeedBreakdownDrawer();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !drawer.hidden) {
+      closeFeedBreakdownDrawer();
+    }
+  });
+
+  return drawer;
+}
+
+function closeFeedBreakdownDrawer() {
+  const drawer = document.getElementById("feed-breakdown-drawer");
+  if (!drawer) return;
+  drawer.classList.remove("is-open");
+  document.body.classList.remove("feed-breakdown-open");
+  window.setTimeout(() => {
+    if (!drawer.classList.contains("is-open")) {
+      drawer.hidden = true;
+      const body = document.getElementById("feed-breakdown-body");
+      if (body) body.innerHTML = "";
+    }
+  }, 280);
+}
+
+function openFeedBreakdownDrawer(card, item = {}) {
+  const template = card?.querySelector?.(".a1-story-detail-template");
+  const drawer = ensureFeedBreakdownDrawer();
+  const body = drawer.querySelector("#feed-breakdown-body");
+  const titleEl = drawer.querySelector("#feed-breakdown-title");
+  if (!template || !body) return;
+
+  const detail = template.content.cloneNode(true);
+  body.replaceChildren(detail);
+
+  const headline =
+    item.short_title ||
+    item.shortTitle ||
+    item.title ||
+    card.querySelector(".a1-story-card__title")?.textContent ||
+    "Bill details";
+  if (titleEl) titleEl.textContent = String(headline).trim() || "Bill details";
+
+  // Wire Ask AI inside the drawer to the same bill item.
+  body.querySelectorAll(".details-toggle-btn, .a1-ask-ai-btn").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (window.PolicyEngagement?.openAskAi) {
-        window.PolicyEngagement.openAskAi(item);
-      } else if (typeof openBillAskAiModal === "function") {
-        openBillAskAiModal(item);
-      }
+      closeFeedBreakdownDrawer();
+      window.setTimeout(() => {
+        if (window.PolicyEngagement?.openAskAi) {
+          window.PolicyEngagement.openAskAi(item);
+        } else if (typeof openBillAskAiModal === "function") {
+          openBillAskAiModal(item);
+        }
+      }, 180);
+    });
+  });
+
+  drawer.hidden = false;
+  document.body.classList.add("feed-breakdown-open");
+  requestAnimationFrame(() => drawer.classList.add("is-open"));
+}
+
+function wireFeedCardBreakdown(card, item) {
+  card
+    .querySelectorAll("[data-feed-breakdown], .a1-story-card__breakdown")
+    .forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        openFeedBreakdownDrawer(card, item);
+      });
     });
 }
 
@@ -2212,7 +2327,7 @@ function renderSocialFeedCardShell({
 function renderBillCard(item) {
   const card = document.createElement("article");
   card.className =
-    "policy-bill-card feed-social-card feed-story-card a1-themed-card";
+    "policy-bill-card feed-social-card feed-story-card a1-themed-card a1-story-feed";
 
   const pitch = String(
     preferPlainSummaryText(item) || item.shortPitch || ""
@@ -2246,6 +2361,7 @@ function renderBillCard(item) {
   }
 
   wireFeedCardAskAi(card, item);
+  wireFeedCardBreakdown(card, item);
   wireFeedCardMicroActions(card, item);
   mountFeedCardStanceButtons(card, item, { useVoteMount: false });
   return card;
@@ -2383,7 +2499,8 @@ function formatVoteResultBadge(result) {
 
 function renderVoteCard(item) {
   const card = document.createElement("article");
-  card.className = "feed-social-card vote-feed-card feed-story-card a1-themed-card";
+  card.className =
+    "feed-social-card vote-feed-card feed-story-card a1-themed-card a1-story-feed";
 
   const copy =
     typeof resolveVoteCardCopy === "function"
@@ -2418,6 +2535,7 @@ function renderVoteCard(item) {
   }
 
   wireFeedCardAskAi(card, item);
+  wireFeedCardBreakdown(card, item);
   wireFeedCardMicroActions(card, item);
   mountFeedCardStanceButtons(card, item, { useVoteMount: true });
   return card;

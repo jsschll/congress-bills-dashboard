@@ -104,6 +104,19 @@
     return "Editorial Collage";
   }
 
+  /** When false, theme detail HTML omits bookmark/share + Pass/Kill dock (drawer mode). */
+  let includeChrome = true;
+
+  function withChrome(enabled, fn) {
+    const prev = includeChrome;
+    includeChrome = enabled !== false;
+    try {
+      return fn();
+    } finally {
+      includeChrome = prev;
+    }
+  }
+
   function keyImpacts(item = {}, impacts = {}) {
     const fromItem = asList(
       item.key_impacts || item.keyImpacts || item.key_points || item.keyPoints
@@ -170,15 +183,16 @@
   }
 
   function reactionDockHtml() {
+    if (!includeChrome) return "";
     return `
       <div class="a1-reaction-dock a1-reaction-dock--anchored" role="toolbar" aria-label="Bill reactions">
         <div class="engagement-mount-point" aria-label="Your stance"></div>
-        <button type="button" class="details-toggle-btn a1-ask-ai-btn">✨ Ask AI</button>
       </div>
     `;
   }
 
   function microActionsHtml() {
+    if (!includeChrome) return "";
     return `
       <div class="a1-micro-actions" aria-label="Card actions">
         <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="Bookmark this bill" aria-pressed="false" title="Bookmark">🔖</button>
@@ -187,17 +201,7 @@
     `;
   }
 
-  function renderEditorial({ billId, title, category, impactsList, summary, item }) {
-    const bullets = impactsList
-      .map(
-        (impact) => `
-        <li class="a1-editorial__impact">
-          <span class="a1-editorial__bullet" aria-hidden="true"></span>
-          <span>${escapeHtml(impact)}</span>
-        </li>`
-      )
-      .join("");
-
+  function resolveHeroImage(item = {}, { title = "", category = "", summary = "", impactsList = [] } = {}) {
     const mapper =
       typeof globalThis !== "undefined" && globalThis.BillImageMapper
         ? globalThis.BillImageMapper
@@ -233,11 +237,116 @@
       item.imageAlt ||
         item.image_alt ||
         (resolvedImage && resolvedImage.alt) ||
-        title
+        title ||
+        "Legislation"
     ).trim();
+    return { imageSrc, imageAlt, defaultStockUrl };
+  }
 
-    // Always keep the magazine art plane with a real photo. If the primary
-    // URL 404s, swap once to the civic default before falling back to wash.
+  function punchLine({ summary = "", impactsList = [], title = "" } = {}) {
+    const firstImpact = normalizeCopyLine(impactsList[0] || "");
+    const line = normalizeCopyLine(firstImpact || summary || title);
+    if (line.length <= 110) return line;
+    return `${line.slice(0, 107).replace(/\s+\S*$/, "").trim()}…`;
+  }
+
+  function renderThemeDetail(theme, payload) {
+    return withChrome(false, () => {
+      if (theme === "versus") return renderVersus(payload);
+      if (theme === "local") return renderLocal(payload);
+      if (theme === "bento-grid") return renderBento(payload);
+      if (theme === "pipeline") return renderPipeline(payload);
+      if (theme === "influence") return renderInfluence(payload);
+      return renderEditorial(payload);
+    });
+  }
+
+  /**
+   * Instagram/TikTok-style story peek: fixed-height hero + overlay type + vote dock.
+   * Dense theme layouts live in the breakdown drawer template.
+   */
+  function renderStoryPeek(payload, theme, label) {
+    const { billId, title, category, impactsList, summary, item } = payload;
+    const { imageSrc, imageAlt, defaultStockUrl } = resolveHeroImage(item, {
+      title,
+      category,
+      summary,
+      impactsList,
+    });
+    const punch = punchLine({ summary, impactsList, title });
+    const second =
+      impactsList[1] && normalizeCopyLine(impactsList[1]) !== punch
+        ? normalizeCopyLine(impactsList[1])
+        : "";
+
+    return `
+      <div class="a1-story-card" data-theme="${escapeHtml(theme)}">
+        <div class="a1-story-card__media a1-story-card__frame">
+          <img
+            class="a1-story-card__photo"
+            src="${escapeHtml(imageSrc)}"
+            alt="${escapeHtml(imageAlt)}"
+            loading="lazy"
+            decoding="async"
+            data-fallback-src="${escapeHtml(defaultStockUrl)}"
+            onerror="(function(img){var fb=img.getAttribute('data-fallback-src');if(fb&&img.src!==fb&&!img.dataset.triedFallback){img.dataset.triedFallback='1';img.src=fb;return;}img.classList.add('is-broken');img.removeAttribute('src');})(this);"
+          />
+          <div class="a1-story-card__scrim" aria-hidden="true"></div>
+          <div class="a1-story-card__top">
+            <div class="a1-story-card__pills">
+              <span class="a1-story-card__pill a1-story-card__pill--theme">${escapeHtml(
+                label
+              )}</span>
+              <span class="a1-story-card__pill a1-story-card__pill--cat">${escapeHtml(
+                category || "Congress"
+              )}</span>
+              <span class="a1-story-card__pill a1-story-card__pill--id">${escapeHtml(
+                billId
+              )}</span>
+            </div>
+            ${microActionsHtml()}
+          </div>
+          <div class="a1-story-card__copy">
+            <h3 class="a1-story-card__title">${escapeHtml(title)}</h3>
+            <p class="a1-story-card__punch">${escapeHtml(punch)}</p>
+            ${
+              second
+                ? `<p class="a1-story-card__punch a1-story-card__punch--secondary">${escapeHtml(
+                    second
+                  )}</p>`
+                : ""
+            }
+          </div>
+        </div>
+        <div class="a1-story-card__footer">
+          <button type="button" class="a1-story-card__breakdown" data-feed-breakdown="1">
+            <span aria-hidden="true">↕</span>
+            Tap for Full Breakdown / AI Summary
+          </button>
+          ${reactionDockHtml()}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderEditorial({ billId, title, category, impactsList, summary, item }) {
+    const bullets = impactsList
+      .map(
+        (impact) => `
+        <li class="a1-editorial__impact">
+          <span class="a1-editorial__bullet" aria-hidden="true"></span>
+          <span>${escapeHtml(impact)}</span>
+        </li>`
+      )
+      .join("");
+
+    const { imageSrc, imageAlt, defaultStockUrl } = resolveHeroImage(item, {
+      title,
+      category,
+      summary,
+      impactsList,
+    });
+
     const artInner = `<img
             class="a1-editorial__photo"
             src="${escapeHtml(imageSrc)}"
@@ -751,11 +860,11 @@
   }
 
   /**
-   * Render a themed Article 1 card shell into `card`.
-   * Expects helpers from bills-policies.js to wire Ask AI / bookmark / stance.
+   * Story-first feed card: punchy peek surface + theme detail for the drawer.
    */
   function renderThemedCardHtml(item, opts = {}) {
     const theme = resolveTheme(item);
+    const label = themeLabel(theme);
     const categoryLabel =
       typeof opts.category === "string"
         ? opts.category
@@ -774,23 +883,34 @@
       item,
     };
 
-    let body = "";
-    if (theme === "versus") body = renderVersus(payload);
-    else if (theme === "local") body = renderLocal(payload);
-    else if (theme === "bento-grid") body = renderBento(payload);
-    else if (theme === "pipeline") body = renderPipeline(payload);
-    else if (theme === "influence") body = renderInfluence(payload);
-    else body = renderEditorial(payload);
+    const peek = withChrome(true, () => renderStoryPeek(payload, theme, label));
+    const detail = renderThemeDetail(theme, payload);
 
     return {
       theme,
-      themeLabel: themeLabel(theme),
+      themeLabel: label,
       html: `
-        <div class="a1-card-shell" data-a1-theme="${escapeHtml(theme)}">
-          <div class="a1-theme-badge" data-theme="${escapeHtml(theme)}">
-            Theme · ${escapeHtml(themeLabel(theme))}
-          </div>
-          ${body}
+        <div class="a1-card-shell a1-card-shell--story" data-a1-theme="${escapeHtml(
+          theme
+        )}">
+          ${peek}
+          <template class="a1-story-detail-template">
+            <div class="a1-story-detail" data-a1-theme="${escapeHtml(theme)}">
+              <div class="a1-story-detail__intro">
+                <p class="a1-story-detail__eyebrow">${escapeHtml(label)} · Full breakdown</p>
+                <h3 class="a1-story-detail__title">${escapeHtml(title)}</h3>
+                <p class="a1-story-detail__bill">${escapeHtml(billId)} · ${escapeHtml(
+                  categoryLabel
+                )}</p>
+              </div>
+              ${detail}
+              <div class="a1-story-detail__ai">
+                <button type="button" class="details-toggle-btn a1-ask-ai-btn a1-story-detail__ask">
+                  ✨ Ask AI about this bill
+                </button>
+              </div>
+            </div>
+          </template>
         </div>
       `,
     };
