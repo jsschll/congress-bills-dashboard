@@ -99,8 +99,68 @@ export function reactionIdToFeedbackStance(
   return null;
 }
 
+export type VoteSideGaugeProps = {
+  passPct: number;
+  animate?: boolean;
+  className?: string;
+};
+
+/** Slim vertical Pass/Kill gauge along the card inner right edge. */
+export function VoteSideGauge({
+  passPct,
+  animate = true,
+  className = "",
+}: VoteSideGaugeProps) {
+  const pct = clampPct(passPct);
+  const killPct = 100 - pct;
+  const [ready, setReady] = useState(!animate);
+  const [hasMounted, setHasMounted] = useState(!animate);
+
+  useEffect(() => {
+    if (!animate) {
+      setReady(true);
+      setHasMounted(true);
+      return;
+    }
+    if (!hasMounted) {
+      setReady(false);
+      const id = requestAnimationFrame(() => {
+        setReady(true);
+        setHasMounted(true);
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    setReady(true);
+  }, [animate, pct, hasMounted]);
+
+  const fillPct = ready ? pct : 0;
+
+  return (
+    <div
+      className={[
+        "vote-side-gauge",
+        ready ? "is-ready" : "",
+        animate ? "" : "is-settled",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      role="img"
+      aria-label={`${pct}% Pass, ${killPct}% Kill`}
+      data-pass-pct={pct}
+    >
+      <div className="vote-side-gauge__track">
+        <span
+          className="vote-side-gauge__fill"
+          style={{ height: `${fillPct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /**
- * Post-vote community ratio bar + selected-choice highlight.
+ * Post-vote choice row (no horizontal percentage track — side gauge handles that).
  * Pair with card-level motion classes (`vote-motion--pass|kill`) from CSS.
  */
 export function VoteFeedback({
@@ -114,17 +174,6 @@ export function VoteFeedback({
     () => splitFromCounts(voteCounts, stance),
     [voteCounts, stance]
   );
-  const [filled, setFilled] = useState(!animate);
-
-  useEffect(() => {
-    if (!animate) {
-      setFilled(true);
-      return;
-    }
-    setFilled(false);
-    const id = requestAnimationFrame(() => setFilled(true));
-    return () => cancelAnimationFrame(id);
-  }, [animate, stance, split.passPct, split.killPct]);
 
   const isPass = stance === "pass";
 
@@ -132,7 +181,8 @@ export function VoteFeedback({
     <div
       className={[
         "vote-feedback-bar",
-        filled ? "is-filled" : "",
+        "vote-feedback-bar--compact",
+        "is-filled",
         animate ? "is-animating" : "is-settled",
         "w-full rounded-2xl border border-[#D4B896]/70 bg-[#FFFCF7] px-3 py-2.5 shadow-[0_8px_20px_rgba(28,20,16,0.06)]",
         className,
@@ -143,25 +193,7 @@ export function VoteFeedback({
       role="status"
       aria-live="polite"
     >
-      <div
-        className="vote-feedback-bar__track flex h-2.5 w-full overflow-hidden rounded-full bg-black/10"
-        role="img"
-        aria-label={`${split.passPct}% Pass, ${split.killPct}% Kill`}
-      >
-        <span
-          className="vote-feedback-bar__fill vote-feedback-bar__fill--pass block h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-[width] duration-700 ease-out"
-          style={{
-            width: filled ? `${split.passPct}%` : "0%",
-          }}
-        />
-        <span
-          className="vote-feedback-bar__fill vote-feedback-bar__fill--kill block h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-[width] duration-700 ease-out"
-          style={{
-            width: filled ? `${split.killPct}%` : "0%",
-          }}
-        />
-      </div>
-      <div className="vote-feedback-bar__meta mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="vote-feedback-bar__meta mt-0 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span
           className={[
             "vote-feedback-bar__choice inline-flex items-center gap-1.5 text-sm font-bold",

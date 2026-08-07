@@ -325,6 +325,16 @@
           </button>
           ${reactionDockHtml()}
         </div>
+        <div
+          class="vote-side-gauge"
+          role="img"
+          aria-label="Pass percentage"
+          data-pass-pct="0"
+        >
+          <div class="vote-side-gauge__track">
+            <span class="vote-side-gauge__fill" style="height:0%"></span>
+          </div>
+        </div>
       </div>
     `;
   }

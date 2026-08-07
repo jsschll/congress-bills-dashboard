@@ -7,6 +7,7 @@ import {
 } from "./ThemeWrapper";
 import {
   VoteFeedback,
+  VoteSideGauge,
   VoteStampOverlay,
   reactionIdToFeedbackStance,
   readLocalFeedVote,
@@ -189,6 +190,12 @@ export function ArticleCard({
   const feedbackStance = reactionIdToFeedbackStance(selectedReaction);
   const showPostVote =
     hasSubmitted && (feedbackStance === "pass" || feedbackStance === "kill");
+  const sideSplit = splitFromCounts(
+    voteCounts,
+    feedbackStance === "pass" || feedbackStance === "kill"
+      ? feedbackStance
+      : null
+  );
 
   const displayMetrics =
     resolvedMetrics.length > 0
@@ -260,6 +267,10 @@ export function ArticleCard({
         }
       >
         {children}
+        <VoteSideGauge
+          passPct={sideSplit.passPct}
+          animate={Boolean(showPostVote || voteCounts.pass + voteCounts.kill > 0)}
+        />
         <VoteStampOverlay stance={stampStance} />
       </ThemeWrapper>
     </article>
