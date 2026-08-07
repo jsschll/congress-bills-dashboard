@@ -22,6 +22,15 @@ function clampPct(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+/** Smooth Red → Orange → Yellow → Green from Pass % (0–100). */
+export function passPctToColor(passPct: number) {
+  const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+  const hue = t * 120;
+  const sat = 92;
+  const light = 48 + t * 4;
+  return `hsl(${hue.toFixed(1)} ${sat}% ${light.toFixed(1)}%)`;
+}
+
 export function splitFromCounts(
   voteCounts?: Pick<VoteCounts, "pass" | "kill">,
   stance?: VoteFeedbackStance | null
@@ -99,8 +108,61 @@ export function reactionIdToFeedbackStance(
   return null;
 }
 
+export type VoteThermoGaugeProps = {
+  passPct: number;
+  animate?: boolean;
+  className?: string;
+};
+
+/** Slim vertical Pass% thermometer along the card inner edge. */
+export function VoteThermoGauge({
+  passPct,
+  animate = true,
+  className = "",
+}: VoteThermoGaugeProps) {
+  const pct = clampPct(passPct);
+  const color = passPctToColor(pct);
+  const [ready, setReady] = useState(!animate);
+
+  useEffect(() => {
+    if (!animate) {
+      setReady(true);
+      return;
+    }
+    setReady(false);
+    const id = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(id);
+  }, [animate, pct, color]);
+
+  return (
+    <div
+      className={[
+        "vote-thermo-gauge",
+        ready ? "is-ready" : "",
+        animate ? "" : "is-settled",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      role="img"
+      aria-label={`${pct}% Pass`}
+      data-pass-pct={pct}
+      style={
+        {
+          ["--thermo-pct" as string]: ready ? `${pct}%` : "0%",
+          ["--thermo-color" as string]: color,
+        } as React.CSSProperties
+      }
+    >
+      <div className="vote-thermo-gauge__track">
+        <span className="vote-thermo-gauge__fill" />
+      </div>
+    </div>
+  );
+}
+
 /**
- * Post-vote community ratio bar + selected-choice highlight.
+ * Post-vote choice row (no horizontal percentage track — thermo handles that).
  * Pair with card-level motion classes (`vote-motion--pass|kill`) from CSS.
  */
 export function VoteFeedback({
@@ -114,17 +176,6 @@ export function VoteFeedback({
     () => splitFromCounts(voteCounts, stance),
     [voteCounts, stance]
   );
-  const [filled, setFilled] = useState(!animate);
-
-  useEffect(() => {
-    if (!animate) {
-      setFilled(true);
-      return;
-    }
-    setFilled(false);
-    const id = requestAnimationFrame(() => setFilled(true));
-    return () => cancelAnimationFrame(id);
-  }, [animate, stance, split.passPct, split.killPct]);
 
   const isPass = stance === "pass";
 
@@ -132,7 +183,8 @@ export function VoteFeedback({
     <div
       className={[
         "vote-feedback-bar",
-        filled ? "is-filled" : "",
+        "vote-feedback-bar--compact",
+        "is-filled",
         animate ? "is-animating" : "is-settled",
         "w-full rounded-2xl border border-[#D4B896]/70 bg-[#FFFCF7] px-3 py-2.5 shadow-[0_8px_20px_rgba(28,20,16,0.06)]",
         className,
@@ -143,25 +195,7 @@ export function VoteFeedback({
       role="status"
       aria-live="polite"
     >
-      <div
-        className="vote-feedback-bar__track flex h-2.5 w-full overflow-hidden rounded-full bg-black/10"
-        role="img"
-        aria-label={`${split.passPct}% Pass, ${split.killPct}% Kill`}
-      >
-        <span
-          className="vote-feedback-bar__fill vote-feedback-bar__fill--pass block h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-[width] duration-700 ease-out"
-          style={{
-            width: filled ? `${split.passPct}%` : "0%",
-          }}
-        />
-        <span
-          className="vote-feedback-bar__fill vote-feedback-bar__fill--kill block h-full bg-gradient-to-r from-rose-600 to-rose-400 transition-[width] duration-700 ease-out"
-          style={{
-            width: filled ? `${split.killPct}%` : "0%",
-          }}
-        />
-      </div>
-      <div className="vote-feedback-bar__meta mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="vote-feedback-bar__meta mt-0 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span
           className={[
             "vote-feedback-bar__choice inline-flex items-center gap-1.5 text-sm font-bold",
@@ -201,7 +235,7 @@ export type VoteStampOverlayProps = {
   stance: VoteFeedbackStance | null;
 };
 
-/** Brief PASS IT / KILLED stamp overlay for the photo frame. */
+/** Brief PASS / KILLED stamp overlay for the photo frame. */
 export function VoteStampOverlay({ stance }: VoteStampOverlayProps) {
   if (!stance) return null;
   const isPass = stance === "pass";
@@ -209,20 +243,20 @@ export function VoteStampOverlay({ stance }: VoteStampOverlayProps) {
     <div
       className={[
         "vote-feedback-stamp pointer-events-none absolute inset-0 z-20 grid place-items-center",
-        "animate-[vote-stamp-in_0.38s_cubic-bezier(0.22,1.55,0.36,1)_both]",
+        isPass ? "vote-feedback-stamp--pass" : "vote-feedback-stamp--kill",
       ].join(" ")}
       aria-hidden
     >
       <span
         className={[
-          "inline-flex rotate-[-8deg] items-center justify-center rounded border-[3px] px-4 py-2",
-          "font-['Fraunces',Georgia,serif] text-lg font-bold uppercase tracking-[0.08em] shadow-lg sm:text-xl",
+          "vote-feedback-stamp__badge inline-flex items-center justify-center rounded border-[3px] px-4 py-2",
+          "font-['Fraunces',Georgia,serif] text-lg font-bold uppercase tracking-[0.08em] sm:text-xl",
           isPass
             ? "border-emerald-300 bg-emerald-900/90 text-emerald-50"
             : "border-rose-300 bg-rose-950/90 text-rose-50",
         ].join(" ")}
       >
-        {isPass ? "PASS IT" : "KILLED"}
+        {isPass ? "PASS" : "KILLED"}
       </span>
     </div>
   );

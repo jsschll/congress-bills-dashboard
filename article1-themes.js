@@ -325,6 +325,17 @@
           </button>
           ${reactionDockHtml()}
         </div>
+        <div
+          class="vote-thermo-gauge"
+          role="img"
+          aria-label="Pass percentage"
+          style="--thermo-pct:0%; --thermo-color:hsl(60 92% 50%);"
+          data-pass-pct="0"
+        >
+          <div class="vote-thermo-gauge__track">
+            <span class="vote-thermo-gauge__fill"></span>
+          </div>
+        </div>
       </div>
     `;
   }
