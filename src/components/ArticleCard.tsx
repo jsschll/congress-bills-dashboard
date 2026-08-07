@@ -147,7 +147,9 @@ export function ArticleCard({
             className="text-xs font-medium text-white/60"
             aria-live="polite"
           >
-            You reacted: {selectedReaction.replace(/^\w/, (c) => c.toUpperCase())}
+            You reacted:{" "}
+            {DEFAULT_REACTIONS.find((r) => r.id === selectedReaction)?.label ??
+              selectedReaction}
             {" · "}
             {totalVotes} total reaction{totalVotes === 1 ? "" : "s"}
           </p>
