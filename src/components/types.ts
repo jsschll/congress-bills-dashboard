@@ -11,7 +11,8 @@ export type ThemeVariant =
   | "compact"
   | "editorial-collage"
   | "bento-grid"
-  | "pipeline";
+  | "pipeline"
+  | "influence";
 
 export type ReactionId =
   | "pass"

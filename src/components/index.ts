@@ -11,6 +11,7 @@ export {
   ThemeWrapper,
   isFinanceCategory,
   isHumanCenteredCategory,
+  isInfluenceCategory,
   isProceduralCategory,
   resolveArticleTheme,
 } from "./ThemeWrapper";
@@ -23,6 +24,7 @@ export {
   collectBillThemeSignals,
   collectProceduralSignals,
   extractLiveBillsFromFeed,
+  isInfluenceBill,
   isLiveLegislativeBill,
   isProceduralBill,
   mapLiveBillToArticleProps,
@@ -30,10 +32,12 @@ export {
   resolveBillId,
   resolveBillTitle,
   resolvePipelineStepsFromBill,
+  resolveStakeholdersFromBill,
 } from "../lib/live-bill";
 export type {
   ArticleBillViewModel,
   BillsFeedResponse,
+  InfluenceStakeholderView,
   LegislativeBill,
   PipelineStepView,
 } from "../lib/live-bill";
@@ -52,6 +56,17 @@ export type {
   PipelineStepStatus,
   PipelineThemeProps,
 } from "./themes/PipelineTheme";
+
+export { InfluenceTheme } from "./themes/InfluenceTheme";
+export type {
+  InfluenceStakeholder,
+  InfluenceThemeProps,
+  StakeholderStance,
+} from "./themes/InfluenceTheme";
+export {
+  INFLUENCE_OPPOSE,
+  INFLUENCE_SUPPORT,
+} from "./themes/InfluenceTheme";
 
 export {
   DEFAULT_REACTIONS,
