@@ -289,11 +289,6 @@
   box-shadow: 0 8px 22px rgba(244, 63, 94, 0.28);
 }
 
-.a1-story-card .policy-engage__logged-panel.vote-feedback-panel {
-  background: rgba(255, 252, 247, 0.96);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
 /* Hide legacy theme badge when using story shell */
 .a1-card-shell--story > .a1-theme-badge {
   display: none;
@@ -1831,30 +1826,93 @@ body.feed-breakdown-open {
   to { opacity: 0; transform: scale(0.92); }
 }
 
-/* ── Vertical Pass/Kill side gauge (right inner edge) ───────────────── */
+/* ── Glass thermometer Pass% gauge (right inner edge) ───────────────── */
+
+@property --thermo-pct {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+@property --thermo-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: hsl(0 95% 50%);
+}
 
 .vote-side-gauge {
   position: absolute;
-  top: 10%;
-  bottom: calc(5.5rem + 8%);
-  right: 0.55rem;
+  top: 9%;
+  bottom: calc(5.5rem + 6%);
+  right: 0.4rem;
   z-index: 6;
-  width: 0.45rem;
+  width: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   pointer-events: none;
+  --thermo-pct: 0%;
+  --thermo-color: hsl(0 95% 50%);
+}
+
+.vote-side-gauge__tube {
+  position: relative;
+  flex: 1 1 auto;
+  width: 0.58rem;
+  min-height: 0;
+  border-radius: 999px 999px 0.28rem 0.28rem;
+  overflow: hidden;
+  /* Semi-transparent glass tube */
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.38) 0%,
+      rgba(255, 255, 255, 0.1) 38%,
+      rgba(255, 255, 255, 0.04) 62%,
+      rgba(255, 255, 255, 0.22) 100%
+    ),
+    rgba(248, 250, 252, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.42),
+    inset -1px 0 0 rgba(15, 23, 42, 0.18),
+    inset 0 1px 2px rgba(15, 23, 42, 0.12),
+    0 4px 14px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.vote-side-gauge__ticks {
+  position: absolute;
+  top: 8%;
+  bottom: 10%;
+  right: 1px;
+  width: 42%;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(16.66% - 1px),
+    rgba(255, 255, 255, 0.55) calc(16.66% - 1px),
+    rgba(255, 255, 255, 0.55) 16.66%
+  );
+  opacity: 0.7;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 8%,
+    #000 92%,
+    transparent 100%
+  );
 }
 
 .vote-side-gauge__track {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 999px;
+  position: absolute;
+  inset: 2px 2px 1px;
+  border-radius: inherit;
   overflow: hidden;
-  /* Kill % shows as the uncovered red track */
-  background: #e11d48;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.2),
-    0 4px 12px rgba(0, 0, 0, 0.16);
+  background: rgba(15, 23, 42, 0.18);
 }
 
 .vote-side-gauge__fill {
@@ -1862,134 +1920,108 @@ body.feed-breakdown-open {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 0%;
+  height: var(--thermo-pct, 0%);
   border-radius: inherit;
-  /* Pass % fills upward in green */
-  background: #10b981;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: height;
+  background-color: var(--thermo-color, hsl(0 95% 50%));
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--thermo-color) 50%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    height 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.75s ease,
+    box-shadow 0.75s ease;
+  will-change: height, background-color;
 }
 
-.vote-side-gauge.is-settled .vote-side-gauge__fill {
+.vote-side-gauge__shine {
+  position: absolute;
+  top: 7%;
+  bottom: 14%;
+  left: 2px;
+  width: 28%;
+  border-radius: 999px;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.65),
+    rgba(255, 255, 255, 0.08) 55%,
+    rgba(255, 255, 255, 0.02)
+  );
+}
+
+.vote-side-gauge__bulb {
+  position: relative;
+  z-index: 1;
+  width: 1.08rem;
+  height: 1.08rem;
+  margin-top: -0.22rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 32% 28%,
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0.08) 42%,
+      rgba(255, 255, 255, 0.02) 70%
+    ),
+    rgba(248, 250, 252, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.4),
+    inset -1px -1px 0 rgba(15, 23, 42, 0.18),
+    0 4px 12px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.vote-side-gauge__bulb-fluid {
+  position: absolute;
+  inset: 16%;
+  border-radius: 50%;
+  background-color: var(--thermo-color, hsl(0 95% 50%));
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--thermo-color) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    background-color 0.75s ease,
+    box-shadow 0.75s ease;
+}
+
+.vote-side-gauge:not(.is-ready) .vote-side-gauge__fill {
+  height: 0% !important;
+}
+
+.vote-side-gauge.is-settled .vote-side-gauge__fill,
+.vote-side-gauge.is-settled .vote-side-gauge__bulb-fluid {
   transition: none;
 }
 
+.a1-story-card .vote-side-gauge {
+  top: 9%;
+  bottom: calc(5.5rem + 6%);
+  right: 0.4rem;
+}
+
+.a1-article-card > .vote-side-gauge {
+  top: 0.7rem;
+  bottom: 4.75rem;
+  right: 0.4rem;
+}
+
 .feed-social-card:not(.a1-story-feed) .vote-side-gauge {
-  top: 0.75rem;
-  bottom: 4.5rem;
-  right: 0.45rem;
+  top: 0.65rem;
+  bottom: 4.25rem;
+  right: 0.35rem;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .vote-side-gauge__fill {
-    transition: none;
-  }
-}
-
-.policy-engage__logged-panel.vote-feedback-panel {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  gap: 0.55rem;
-  padding: 0.55rem 0.65rem 0.6rem;
-  border-radius: 1rem;
-  background: rgba(255, 252, 247, 0.92);
-  border: 1px solid rgba(212, 184, 150, 0.55);
-  box-shadow: 0 8px 20px rgba(28, 20, 16, 0.06);
-}
-
-.a1-themed-card .policy-engage__logged-panel.vote-feedback-panel,
-.feed-social-card .policy-engage__logged-panel.vote-feedback-panel {
-  width: 100%;
-  border-radius: 1rem;
-  justify-content: stretch;
-  backdrop-filter: none;
-}
-
-.vote-feedback-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  width: 100%;
-}
-
-/* Horizontal percentage track removed — Pass/Kill % lives on the side gauge */
+/* Bottom overlapping Pass%/Kill%/Change results bar — fully removed */
+.vote-feedback-bar,
 .vote-feedback-bar__track,
-.vote-feedback-bar--compact .vote-feedback-bar__track {
+.vote-feedback-bar__fill,
+.vote-feedback-bar__meta,
+.policy-engage__logged-panel.vote-feedback-panel {
   display: none !important;
-}
-
-.vote-feedback-bar__fill {
-  display: none;
-}
-
-.vote-feedback-bar__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.55rem;
-  justify-content: space-between;
-}
-
-.vote-feedback-bar__choice {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.vote-feedback-bar__choice.is-pass {
-  color: #047857;
-}
-
-.vote-feedback-bar__choice.is-kill {
-  color: #be123c;
-}
-
-.vote-feedback-bar__check {
-  display: inline-grid;
-  place-items: center;
-  width: 1.05rem;
-  height: 1.05rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
-  line-height: 1;
-  color: #fff;
-}
-
-.vote-feedback-bar__choice.is-pass .vote-feedback-bar__check {
-  background: #059669;
-}
-
-.vote-feedback-bar__choice.is-kill .vote-feedback-bar__check {
-  background: #e11d48;
-}
-
-.vote-feedback-bar__other {
-  font-size: 0.72rem;
-  color: rgba(28, 20, 16, 0.55);
-}
-
-.vote-feedback-bar__change,
-.vote-feedback-panel .policy-engage__change {
-  margin-left: auto;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid rgba(28, 20, 16, 0.14);
-  background: rgba(255, 255, 255, 0.7);
-  color: rgba(28, 20, 16, 0.72);
-  font-size: 0.65rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.vote-feedback-bar__change:hover,
-.vote-feedback-panel .policy-engage__change:hover {
-  border-color: rgba(28, 20, 16, 0.28);
-  color: #1c1410;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2001,7 +2033,8 @@ body.feed-breakdown-open {
     animation: none;
   }
 
-  .vote-side-gauge__fill {
+  .vote-side-gauge__fill,
+  .vote-side-gauge__bulb-fluid {
     transition: none;
   }
 }

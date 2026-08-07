@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { ReactionId, VoteCounts } from "./types";
 
 export type VoteFeedbackStance = "pass" | "kill";
@@ -20,6 +20,15 @@ const STORAGE_KEY = "a1.feedVotes.v1";
 function clampPct(value: number) {
   if (!Number.isFinite(value)) return 50;
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+/** Smooth Red (0%) → Yellow (50%) → Green (100%) from Pass %. */
+export function passPctToColor(passPct: number) {
+  const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+  const hue = t * 120;
+  const sat = 95;
+  const light = 48 + t * 4;
+  return `hsl(${hue.toFixed(1)} ${sat}% ${light.toFixed(1)}%)`;
 }
 
 export function splitFromCounts(
@@ -105,7 +114,7 @@ export type VoteSideGaugeProps = {
   className?: string;
 };
 
-/** Slim vertical Pass/Kill gauge along the card inner right edge. */
+/** Glass thermometer Pass% gauge along the card inner right edge. */
 export function VoteSideGauge({
   passPct,
   animate = true,
@@ -113,6 +122,7 @@ export function VoteSideGauge({
 }: VoteSideGaugeProps) {
   const pct = clampPct(passPct);
   const killPct = 100 - pct;
+  const color = passPctToColor(pct);
   const [ready, setReady] = useState(!animate);
   const [hasMounted, setHasMounted] = useState(!animate);
 
@@ -131,7 +141,7 @@ export function VoteSideGauge({
       return () => cancelAnimationFrame(id);
     }
     setReady(true);
-  }, [animate, pct, hasMounted]);
+  }, [animate, pct, color, hasMounted]);
 
   const fillPct = ready ? pct : 0;
 
@@ -148,11 +158,27 @@ export function VoteSideGauge({
       role="img"
       aria-label={`${pct}% Pass, ${killPct}% Kill`}
       data-pass-pct={pct}
+      style={
+        {
+          ["--thermo-pct" as string]: `${fillPct}%`,
+          ["--thermo-color" as string]: color,
+        } as React.CSSProperties
+      }
     >
-      <div className="vote-side-gauge__track">
+      <div className="vote-side-gauge__tube">
+        <span className="vote-side-gauge__ticks" aria-hidden="true" />
+        <div className="vote-side-gauge__track">
+          <span
+            className="vote-side-gauge__fill"
+            style={{ height: `${fillPct}%`, backgroundColor: color }}
+          />
+        </div>
+        <span className="vote-side-gauge__shine" aria-hidden="true" />
+      </div>
+      <div className="vote-side-gauge__bulb" aria-hidden="true">
         <span
-          className="vote-side-gauge__fill"
-          style={{ height: `${fillPct}%` }}
+          className="vote-side-gauge__bulb-fluid"
+          style={{ backgroundColor: color }}
         />
       </div>
     </div>
@@ -160,73 +186,11 @@ export function VoteSideGauge({
 }
 
 /**
- * Post-vote choice row (no horizontal percentage track — side gauge handles that).
- * Pair with card-level motion classes (`vote-motion--pass|kill`) from CSS.
+ * Bottom Pass%/Kill%/Change results bar removed — Pass % lives on the glass thermometer.
+ * Kept as a no-op export so older call sites do not break.
  */
-export function VoteFeedback({
-  stance,
-  voteCounts,
-  animate = true,
-  onChange,
-  className = "",
-}: VoteFeedbackProps) {
-  const split = useMemo(
-    () => splitFromCounts(voteCounts, stance),
-    [voteCounts, stance]
-  );
-
-  const isPass = stance === "pass";
-
-  return (
-    <div
-      className={[
-        "vote-feedback-bar",
-        "vote-feedback-bar--compact",
-        "is-filled",
-        animate ? "is-animating" : "is-settled",
-        "w-full rounded-2xl border border-[#D4B896]/70 bg-[#FFFCF7] px-3 py-2.5 shadow-[0_8px_20px_rgba(28,20,16,0.06)]",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      data-user-stance={isPass ? "support" : "oppose"}
-      role="status"
-      aria-live="polite"
-    >
-      <div className="vote-feedback-bar__meta mt-0 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span
-          className={[
-            "vote-feedback-bar__choice inline-flex items-center gap-1.5 text-sm font-bold",
-            isPass ? "text-emerald-700" : "text-rose-700",
-          ].join(" ")}
-        >
-          <span
-            className={[
-              "inline-grid h-4 w-4 place-items-center rounded-full text-[10px] text-white",
-              isPass ? "bg-emerald-600" : "bg-rose-600",
-            ].join(" ")}
-            aria-hidden
-          >
-            ✓
-          </span>
-          {isPass ? "Pass It" : "Kill It"}
-          <strong>{isPass ? split.passPct : split.killPct}%</strong>
-        </span>
-        <span className="text-xs text-stone-500">
-          {isPass ? `${split.killPct}% Kill` : `${split.passPct}% Pass`}
-        </span>
-        {onChange ? (
-          <button
-            type="button"
-            onClick={onChange}
-            className="ml-auto rounded-full border border-stone-300/80 bg-white/80 px-2.5 py-0.5 text-[11px] font-semibold text-stone-600 hover:border-stone-400 hover:text-stone-900"
-          >
-            Change
-          </button>
-        ) : null}
-      </div>
-    </div>
-  );
+export function VoteFeedback(_props: VoteFeedbackProps) {
+  return null;
 }
 
 export type VoteStampOverlayProps = {

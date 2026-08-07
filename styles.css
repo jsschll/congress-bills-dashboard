@@ -7997,7 +7997,7 @@ body.politician-notes-modal-open {
   color: #cbd5e1;
 }
 
-/* Legacy horizontal meter — replaced by .vote-side-gauge */
+/* Legacy horizontal meter — replaced by glass thermometer (.vote-side-gauge) */
 .feed-story-meter,
 .feed-story-meter__fill {
   display: none !important;

@@ -8,6 +8,7 @@ export {
   VoteFeedback,
   VoteSideGauge,
   VoteStampOverlay,
+  passPctToColor,
   reactionIdToFeedbackStance,
   readLocalFeedVote,
   splitFromCounts,

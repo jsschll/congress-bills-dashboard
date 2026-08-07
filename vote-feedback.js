@@ -1,5 +1,5 @@
 /**
- * Pass It / Kill It vote motion + post-vote ratio bar (Phase 1 gamification).
+ * Pass It / Kill It vote motion + glass thermometer Pass% gauge.
  * Dual export: browser global `VoteFeedback` + CommonJS.
  */
 (function (root, factory) {
@@ -203,16 +203,36 @@
     );
   }
 
+  /**
+   * Smooth Red (0%) → Yellow (50%) → Green (100%) from Pass %.
+   * Hue walks 0° (red) → 120° (green) in HSL.
+   */
+  function passPctToColor(passPct) {
+    const t = Math.max(0, Math.min(100, Number(passPct) || 0)) / 100;
+    const hue = t * 120;
+    const sat = 95;
+    const light = 48 + t * 4;
+    return `hsl(${hue.toFixed(1)} ${sat}% ${light.toFixed(1)}%)`;
+  }
+
   function applySideGaugeFill(gauge, pct, { animate = true, fromZero = false } = {}) {
     if (!gauge) return;
     const fill = gauge.querySelector(".vote-side-gauge__fill");
+    const bulb = gauge.querySelector(".vote-side-gauge__bulb-fluid");
+    const color = passPctToColor(pct);
     const kill = 100 - pct;
     gauge.setAttribute("aria-label", `${pct}% Pass, ${kill}% Kill`);
     gauge.dataset.passPct = String(pct);
     gauge.classList.remove("is-settled");
 
     const applyTarget = () => {
-      if (fill) fill.style.height = `${pct}%`;
+      gauge.style.setProperty("--thermo-pct", `${pct}%`);
+      gauge.style.setProperty("--thermo-color", color);
+      if (fill) {
+        fill.style.height = `${pct}%`;
+        fill.style.backgroundColor = color;
+      }
+      if (bulb) bulb.style.backgroundColor = color;
       gauge.classList.add("is-ready");
     };
 
@@ -224,6 +244,7 @@
 
     if (fromZero || !gauge.classList.contains("is-ready")) {
       gauge.classList.remove("is-ready");
+      gauge.style.setProperty("--thermo-pct", "0%");
       if (fill) fill.style.height = "0%";
       void gauge.offsetWidth;
       requestAnimationFrame(applyTarget);
@@ -236,15 +257,30 @@
   function buildSideGaugeHtml(passPct = 0) {
     const pct = clampPct(passPct);
     const kill = 100 - pct;
+    const color = passPctToColor(pct);
     return `
       <div
         class="vote-side-gauge"
         role="img"
         aria-label="${pct}% Pass, ${kill}% Kill"
         data-pass-pct="${pct}"
+        style="--thermo-pct:${pct}%; --thermo-color:${color};"
       >
-        <div class="vote-side-gauge__track">
-          <span class="vote-side-gauge__fill" style="height:${pct}%"></span>
+        <div class="vote-side-gauge__tube">
+          <span class="vote-side-gauge__ticks" aria-hidden="true"></span>
+          <div class="vote-side-gauge__track">
+            <span
+              class="vote-side-gauge__fill"
+              style="height:${pct}%; background-color:${color};"
+            ></span>
+          </div>
+          <span class="vote-side-gauge__shine" aria-hidden="true"></span>
+        </div>
+        <div class="vote-side-gauge__bulb" aria-hidden="true">
+          <span
+            class="vote-side-gauge__bulb-fluid"
+            style="background-color:${color};"
+          ></span>
         </div>
       </div>
     `;
@@ -266,6 +302,15 @@
       gauge = host.querySelector(".vote-side-gauge");
       const prior = host.style.position;
       if (!prior || prior === "static") host.style.position = "relative";
+    } else if (!gauge.querySelector(".vote-side-gauge__tube")) {
+      // Upgrade legacy slim-bar markup in place.
+      const next = document.createElement("div");
+      next.innerHTML = buildSideGaugeHtml(animate ? 0 : pct);
+      const upgraded = next.firstElementChild;
+      if (upgraded) {
+        gauge.replaceWith(upgraded);
+        gauge = upgraded;
+      }
     }
     if (!gauge) return null;
 
@@ -324,55 +369,18 @@
   }
 
   /**
-   * Compact logged-vote row (no horizontal percentage track — side gauge handles that).
+   * Bottom Pass%/Kill%/Change results bar removed — thermometer owns Pass %.
+   * Kept as a no-op HTML builder for older call sites.
    */
-  function buildPostVoteBarHtml({
-    stance,
-    passPct,
-    killPct,
-    animate = true,
-    showChange = true,
-  } = {}) {
-    const isPass = stance === "support" || stance === "pass";
-    const pass = clampPct(passPct);
-    const kill = clampPct(killPct != null ? killPct : 100 - pass);
-    return `
-      <div
-        class="vote-feedback-bar vote-feedback-bar--compact ${
-          animate ? "is-animating" : "is-settled"
-        } is-filled"
-        data-user-stance="${isPass ? "support" : "oppose"}"
-        role="status"
-        aria-live="polite"
-      >
-        <div class="vote-feedback-bar__meta">
-          <span class="vote-feedback-bar__choice ${
-            isPass ? "is-pass" : "is-kill"
-          }">
-            <span class="vote-feedback-bar__check" aria-hidden="true">✓</span>
-            ${isPass ? "Pass It" : "Kill It"}
-            <strong>${isPass ? pass : kill}%</strong>
-          </span>
-          <span class="vote-feedback-bar__other">
-            ${isPass ? `${kill}% Kill` : `${pass}% Pass`}
-          </span>
-          ${
-            showChange
-              ? `<button type="button" class="policy-engage__change vote-feedback-bar__change">Change</button>`
-              : ""
-          }
-        </div>
-      </div>
-    `;
+  function buildPostVoteBarHtml() {
+    return "";
   }
 
   function mountPostVoteBar(container, options = {}) {
-    if (!container) return null;
-    container.hidden = false;
-    container.innerHTML = buildPostVoteBarHtml(options);
-    const bar = container.querySelector(".vote-feedback-bar");
-    if (bar) {
-      bar.classList.add("is-filled", "is-settled");
+    if (container) {
+      container.hidden = true;
+      container.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+      container.innerHTML = "";
     }
     const card = findCardRoot(container);
     if (card) {
@@ -380,12 +388,12 @@
         animate: options.animate !== false,
       });
     }
-    return bar;
+    return null;
   }
 
   /**
-   * Apply post-vote UI: keep Pass/Kill buttons clean, drive the side gauge.
-   * Horizontal percentage track is intentionally omitted.
+   * Apply post-vote UI: keep Pass/Kill buttons clean, drive the glass thermometer.
+   * Horizontal percentage results bar is intentionally omitted.
    */
   function applyPostVoteState(roots, item, stance, split, { animate = true } = {}) {
     if (!roots) return;
@@ -442,6 +450,7 @@
     mountPostVoteBar,
     applyPostVoteState,
     findCardRoot,
+    passPctToColor,
     buildSideGaugeHtml,
     mountOrUpdateSideGauge,
   };

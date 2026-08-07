@@ -6,7 +6,6 @@ import {
   ThemeWrapper,
 } from "./ThemeWrapper";
 import {
-  VoteFeedback,
   VoteSideGauge,
   VoteStampOverlay,
   reactionIdToFeedbackStance,
@@ -245,34 +244,24 @@ export function ArticleCard({
         metrics={displayMetrics}
         actionBar={
           showReactionDock ? (
-            showPostVote && feedbackStance ? (
-              <VoteFeedback
-                stance={feedbackStance}
-                voteCounts={voteCounts}
-                animate
-                onChange={() => {
-                  setHasSubmitted(false);
-                  setSelectedReaction(null);
-                }}
-              />
-            ) : (
-              <ReactionDock
-                selectedReaction={selectedReaction}
-                disabled={false}
-                onReact={handleReact}
-                theme={resolvedTheme}
-              />
-            )
+            <ReactionDock
+              selectedReaction={selectedReaction}
+              disabled={false}
+              onReact={handleReact}
+              theme={resolvedTheme}
+            />
           ) : null
         }
       >
         {children}
-        <VoteSideGauge
-          passPct={sideSplit.passPct}
-          animate={Boolean(showPostVote || voteCounts.pass + voteCounts.kill > 0)}
-        />
         <VoteStampOverlay stance={stampStance} />
       </ThemeWrapper>
+      <VoteSideGauge
+        passPct={sideSplit.passPct}
+        animate={Boolean(
+          showPostVote || voteCounts.pass + voteCounts.kill > 0
+        )}
+      />
     </article>
   );
 }
