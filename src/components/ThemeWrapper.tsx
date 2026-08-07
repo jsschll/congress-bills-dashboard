@@ -2,21 +2,32 @@ import React from "react";
 import { BentoGridTheme } from "./themes/BentoGridTheme";
 import { EditorialCollageTheme } from "./themes/EditorialCollageTheme";
 import type { BillMetric, ThemeVariant } from "./types";
+import {
+  collectBillThemeSignals,
+  mapLiveBillToArticleProps,
+  resolveBillCategoryLabel,
+  type LegislativeBill,
+} from "../lib/live-bill";
 
 /** Visual themes ThemeWrapper can dynamically select between. */
 export type ResolvedArticleTheme = "editorial-collage" | "bento-grid";
 
-const FINANCE_CATEGORY_PATTERN =
-  /\b(finance|financial|budget|budgets|economy|economic|fiscal|trade|appropriations?|treasury|tax|revenue|deficit|debt)\b/i;
+const FINANCE_SIGNAL_PATTERN =
+  /\b(finance|financial|budget|budgets|economy|economic|fiscal|trade|appropriations?|treasury|tax|taxes|revenue|deficit|debt|commerce|banking|securities)\b/i;
+
+const HUMAN_CENTERED_SIGNAL_PATTERN =
+  /\b(education|health|healthcare|housing|social|civil rights|labor|immigration|family|children|veterans|disability|welfare|nutrition|public health)\b/i;
 
 export type ThemeWrapperProps = {
-  billId: string;
-  title: string;
-  category: string;
-  keyImpacts: string[];
+  /** Live / structured bill object — preferred source for routing + copy. */
+  bill?: LegislativeBill;
+  billId?: string;
+  title?: string;
+  category?: string;
+  keyImpacts?: string[];
   /**
-   * Explicit theme override. When omitted (or a legacy shell variant),
-   * category keywords decide between Bento Grid and Editorial Collage.
+   * Explicit theme override. When omitted, real bill category / subject / type
+   * (and tags) decide between Bento Grid and Editorial Collage.
    */
   themeVariant?: ThemeVariant;
   humanHook?: string;
@@ -30,20 +41,28 @@ export type ThemeWrapperProps = {
 };
 
 /**
- * True when the category string signals finance / budget / economy content.
+ * True when taxonomy signals point at finance / budget / economy content.
  */
-export function isFinanceCategory(category = ""): boolean {
-  return FINANCE_CATEGORY_PATTERN.test(category);
+export function isFinanceCategory(signals = ""): boolean {
+  return FINANCE_SIGNAL_PATTERN.test(signals);
 }
 
 /**
- * Resolve which Article 1 visual theme to render.
+ * True when taxonomy signals point at human-centered social policy.
+ */
+export function isHumanCenteredCategory(signals = ""): boolean {
+  return HUMAN_CENTERED_SIGNAL_PATTERN.test(signals);
+}
+
+/**
+ * Resolve which Article 1 visual theme to render from real bill properties.
  * Explicit `bento-grid` / `editorial-collage` (and `fiscal`) win;
- * otherwise finance-like categories → Bento, everything else → Editorial.
+ * otherwise finance-like signals → Bento, everything else → Editorial.
  */
 export function resolveArticleTheme(
-  category = "",
-  themeVariant?: ThemeVariant
+  categoryOrSignals = "",
+  themeVariant?: ThemeVariant,
+  bill?: LegislativeBill
 ): ResolvedArticleTheme {
   if (themeVariant === "bento-grid" || themeVariant === "fiscal") {
     return "bento-grid";
@@ -51,18 +70,29 @@ export function resolveArticleTheme(
   if (themeVariant === "editorial-collage") {
     return "editorial-collage";
   }
-  if (isFinanceCategory(category)) {
+
+  const signals = [
+    categoryOrSignals,
+    bill ? collectBillThemeSignals(bill) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (isFinanceCategory(signals)) {
     return "bento-grid";
   }
+
+  // Education / health / social (and all other non-finance) → Editorial Collage.
   return "editorial-collage";
 }
 
 /**
  * Dynamic theme router for Article 1.
- * Selects Bento Grid vs Editorial Collage from `themeVariant` / `category`,
- * then forwards bill props into the active theme without touching vote state.
+ * Prefers a live `bill` object's category / subject / type / tags, then
+ * falls back to explicit props. Vote state stays outside this wrapper.
  */
 export function ThemeWrapper({
+  bill,
   billId,
   title,
   category,
@@ -73,11 +103,47 @@ export function ThemeWrapper({
   imageSrc,
   imageAlt,
   financialSummary,
-  metrics = [],
+  metrics,
   className = "",
   children,
 }: ThemeWrapperProps) {
-  const resolvedTheme = resolveArticleTheme(category, themeVariant);
+  const mapped = bill ? mapLiveBillToArticleProps(bill) : null;
+
+  const resolvedBillId = billId || mapped?.billId || "Bill";
+  const resolvedTitle = title || mapped?.title || "Untitled legislation";
+  const resolvedCategory =
+    category ||
+    mapped?.category ||
+    (bill ? resolveBillCategoryLabel(bill) : "") ||
+    "Legislation";
+  const resolvedKeyImpacts = keyImpacts?.length
+    ? keyImpacts
+    : mapped?.keyImpacts || [];
+  const resolvedMetrics = metrics?.length
+    ? metrics
+    : mapped?.metrics || [];
+  const resolvedThemeVariant = themeVariant || mapped?.themeVariant;
+  const resolvedHumanHook = humanHook || mapped?.humanHook;
+  const resolvedPrompt = promptQuestion || mapped?.promptQuestion;
+  const resolvedImageSrc = imageSrc || mapped?.imageSrc;
+  const resolvedImageAlt = imageAlt || mapped?.imageAlt;
+  const resolvedFinancialSummary =
+    financialSummary || mapped?.financialSummary;
+
+  const themeSignals = [
+    resolvedCategory,
+    mapped?.themeSignals || "",
+    bill ? collectBillThemeSignals(bill) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const resolvedTheme = resolveArticleTheme(
+    themeSignals,
+    resolvedThemeVariant,
+    bill
+  );
+
   const wrapperClass = [
     "a1-theme",
     `a1-theme--${resolvedTheme}`,
@@ -90,30 +156,31 @@ export function ThemeWrapper({
     <div
       className={wrapperClass}
       data-theme={resolvedTheme}
-      data-theme-requested={themeVariant ?? "auto"}
+      data-theme-requested={resolvedThemeVariant ?? "auto"}
+      data-bill-id={resolvedBillId}
       data-a1-shell="theme-wrapper"
     >
       {resolvedTheme === "bento-grid" ? (
         <BentoGridTheme
-          billId={billId}
-          title={title}
-          category={category}
-          keyImpacts={keyImpacts}
-          financialSummary={financialSummary}
-          metrics={metrics}
+          billId={resolvedBillId}
+          title={resolvedTitle}
+          category={resolvedCategory}
+          keyImpacts={resolvedKeyImpacts}
+          financialSummary={resolvedFinancialSummary}
+          metrics={resolvedMetrics}
         >
           {children}
         </BentoGridTheme>
       ) : (
         <EditorialCollageTheme
-          billId={billId}
-          title={title}
-          category={category}
-          keyImpacts={keyImpacts}
-          humanHook={humanHook}
-          promptQuestion={promptQuestion}
-          imageSrc={imageSrc}
-          imageAlt={imageAlt}
+          billId={resolvedBillId}
+          title={resolvedTitle}
+          category={resolvedCategory}
+          keyImpacts={resolvedKeyImpacts}
+          humanHook={resolvedHumanHook}
+          promptQuestion={resolvedPrompt}
+          imageSrc={resolvedImageSrc}
+          imageAlt={resolvedImageAlt}
         >
           {children}
         </EditorialCollageTheme>
