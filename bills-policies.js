@@ -1316,16 +1316,40 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
 
   const whatCandidates = [
     keyPoints[0],
-    firstCompleteSentence(summary, 90),
-    headline,
     yea,
     takeaway,
+    firstCompleteSentence(summary, 90),
+    headline,
   ];
   let whatRaw = "";
   for (const candidate of whatCandidates) {
-    const cleaned = stripTitleFromWhatItDoes(candidate, title);
+    let cleaned = stripTitleFromWhatItDoes(candidate, title);
+    cleaned = stripTitleFromWhatItDoes(cleaned, headline);
+    cleaned = stripTitleFromWhatItDoes(
+      cleaned,
+      clampFeedHeadlineWords(headline || title, 8)
+    );
     if (!cleaned) continue;
     if (looksLikeOfficialBillTitle(cleaned)) continue;
+    // Skip near-duplicates of the scannable title (avoid TL;DR echoing headline).
+    const titleWords = new Set(
+      String(title || "")
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+    );
+    const cleanedWords = cleaned
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (
+      cleanedWords.length &&
+      cleanedWords.filter((w) => titleWords.has(w)).length /
+        cleanedWords.length >=
+        0.7
+    ) {
+      continue;
+    }
     whatRaw = cleaned;
     break;
   }
@@ -1510,6 +1534,72 @@ function feedCategoryIcon(category = "") {
   return "📜";
 }
 
+function formatFeedSocialCount(n) {
+  const num = Math.max(0, Number(n) || 0);
+  if (num >= 10000) return `${(num / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(num);
+}
+
+/** Initial social-proof copy from roll-call margins when present. */
+function buildFeedSocialProof(item = {}) {
+  const result = String(item.result || item.statusLabel || item.vote_result || "");
+  const roll = result.match(/(\d{1,4})\s*[-–—to]+\s*(\d{1,4})/i);
+  if (roll) {
+    const yea = Number(roll[1]);
+    const nay = Number(roll[2]);
+    const total = yea + nay;
+    if (total > 0) {
+      return {
+        votedLabel: `🔥 ${formatFeedSocialCount(total)} Voted`,
+        supportPct: Math.round((yea / total) * 100),
+        hasData: true,
+      };
+    }
+  }
+  return {
+    votedLabel: "🔥 Cast your vote",
+    supportPct: null,
+    hasData: false,
+  };
+}
+
+function renderFeedSocialProofHtml(proof = {}) {
+  const support =
+    proof.hasData && proof.supportPct != null
+      ? `<span class="feed-social-proof__support">${escapePolicyHtml(
+          String(proof.supportPct)
+        )}% Support</span>`
+      : "";
+  return `
+    <span class="feed-social-proof__votes">${escapePolicyHtml(
+      proof.votedLabel || "🔥 Cast your vote"
+    )}</span>
+    ${support}
+  `;
+}
+
+async function hydrateFeedSocialProof(card, item) {
+  const el = card?.querySelector(".feed-social-proof");
+  if (!el || !item?.id) return;
+  let proof = buildFeedSocialProof(item);
+  try {
+    const stats = await window.PolicyEngagement?.fetchCommunityStats?.(item.id);
+    if (stats && Number(stats.total) > 0) {
+      const total = Number(stats.total);
+      const support = Number(stats.support || 0);
+      proof = {
+        votedLabel: `🔥 ${formatFeedSocialCount(total)} Voted`,
+        supportPct: Math.round((support / total) * 100),
+        hasData: true,
+      };
+    }
+  } catch (_) {
+    /* keep roll-call / empty fallback */
+  }
+  el.innerHTML = renderFeedSocialProofHtml(proof);
+}
+
 function mountFeedCardStanceButtons(card, item, options = {}) {
   const mountOpts = {
     supportLabel: "👍 Support",
@@ -1534,6 +1624,7 @@ function mountFeedCardStanceButtons(card, item, options = {}) {
   const slot = card.querySelector(".engagement-mount-point");
   const engage = card.querySelector(".policy-engage");
   if (slot && engage) slot.append(engage);
+  hydrateFeedSocialProof(card, item);
 }
 
 function wireFeedCardAskAi(card, item) {
@@ -1550,13 +1641,14 @@ function wireFeedCardAskAi(card, item) {
 }
 
 /**
- * Visual-first social feed card: TL;DR callout, impact chips, cost pill.
+ * Visual-first social feed card: meta chips, TL;DR, impact pills, social proof.
  */
 function renderSocialFeedCardShell({
   status,
   category,
   title,
   impacts,
+  socialProof,
 }) {
   const tone = String(status?.tone || "pending").replace(/[^a-z0-9_-]/gi, "");
   const statusIcon = status?.icon || "🟡";
@@ -1575,6 +1667,7 @@ function renderSocialFeedCardShell({
     label: "$0 Net Cost",
   };
   const costTone = String(costPill.tone || "zero").replace(/[^a-z0-9_-]/gi, "");
+  const proof = socialProof || buildFeedSocialProof({});
   const chipHtml = chips
     .map(
       (chip) => `
@@ -1591,18 +1684,32 @@ function renderSocialFeedCardShell({
 
   return `
     <div class="feed-social-card__header">
-      <div class="category-pill" title="${escapePolicyHtml(categoryLabel || "Congress")}">
-        <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
-        <span class="category-pill__label">${escapePolicyHtml(
+      <div class="feed-social-card__meta" aria-label="Bill meta">
+        <div class="category-pill" title="${escapePolicyHtml(
           categoryLabel || "Congress"
-        )}</span>
+        )}">
+          <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
+          <span class="category-pill__label">${escapePolicyHtml(
+            categoryLabel || "Congress"
+          )}</span>
+        </div>
+        <span class="feed-meta-dot" aria-hidden="true">•</span>
+        <div class="feed-cost-pill is-${costTone}" aria-label="Cost or savings">
+          <span class="feed-cost-pill__icon" aria-hidden="true">${
+            costPill.icon || "🟢"
+          }</span>
+          <span class="feed-cost-pill__label">${escapePolicyHtml(
+            costPill.label || "$0 Net Cost"
+          )}</span>
+        </div>
+        <span class="feed-meta-dot" aria-hidden="true">•</span>
+        <span class="status-badge is-${tone}">
+          <span class="status-badge__icon" aria-hidden="true">${statusIcon}</span>
+          <span class="status-badge__label">${escapePolicyHtml(
+            status?.label || "Pending Vote"
+          )}</span>
+        </span>
       </div>
-      <span class="status-badge is-${tone}">
-        <span class="status-badge__icon" aria-hidden="true">${statusIcon}</span>
-        <span class="status-badge__label">${escapePolicyHtml(
-          status?.label || "Pending Vote"
-        )}</span>
-      </span>
     </div>
     <div class="feed-social-card__body">
       <h3 class="feed-social-card__headline">${escapePolicyHtml(title)}</h3>
@@ -1613,20 +1720,17 @@ function renderSocialFeedCardShell({
       <div class="feed-impact-chips" aria-label="Who it impacts">
         ${chipHtml}
       </div>
-      <div class="feed-cost-pill is-${costTone}" aria-label="Cost or savings">
-        <span class="feed-cost-pill__icon" aria-hidden="true">${
-          costPill.icon || "🟢"
-        }</span>
-        <span class="feed-cost-pill__label">${escapePolicyHtml(
-          costPill.label || "$0 Net Cost"
-        )}</span>
-      </div>
     </div>
     <div class="feed-social-card__actions">
-      <button type="button" class="details-toggle-btn">
-        💬 Ask AI / Deep Dive
-      </button>
-      <div class="engagement-mount-point" aria-label="Your stance"></div>
+      <div class="feed-social-proof" aria-label="Community engagement">
+        ${renderFeedSocialProofHtml(proof)}
+      </div>
+      <div class="feed-social-card__action-row">
+        <button type="button" class="details-toggle-btn">
+          💬 Ask AI
+        </button>
+        <div class="engagement-mount-point" aria-label="Your stance"></div>
+      </div>
     </div>
   `;
 }
@@ -1647,6 +1751,7 @@ function renderBillCard(item) {
     category,
     title: cardCopy.displayTitle,
     impacts: cardCopy.impacts,
+    socialProof: buildFeedSocialProof(item),
   });
 
   wireFeedCardAskAi(card, item);
@@ -1801,6 +1906,7 @@ function renderVoteCard(item) {
     category,
     title: cardCopy.displayTitle,
     impacts: cardCopy.impacts,
+    socialProof: buildFeedSocialProof(item),
   });
 
   wireFeedCardAskAi(card, item);

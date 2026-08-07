@@ -1324,6 +1324,7 @@ Sincerely,
     init,
     mount,
     mountVote,
+    fetchCommunityStats: fetchCommunity,
     renderHeaderScore,
     openTakeAction,
     openAskAi: (item) => {
