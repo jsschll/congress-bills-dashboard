@@ -43,6 +43,11 @@ const THEME_LAYOUT: Record<
     wrapper: "a1-theme a1-theme--editorial-collage",
     content: "contents",
   },
+  /** Full layout lives in BentoGridTheme — wrapper stays transparent. */
+  "bento-grid": {
+    wrapper: "a1-theme a1-theme--bento-grid",
+    content: "contents",
+  },
 };
 
 /**

@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import { BillMetrics, type BillMetricsProps } from "./BillMetrics";
 import { ReactionDock } from "./ReactionDock";
 import { ThemeWrapper } from "./ThemeWrapper";
+import { BentoGridTheme } from "./themes/BentoGridTheme";
 import { EditorialCollageTheme } from "./themes/EditorialCollageTheme";
 import {
   DEFAULT_REACTIONS,
@@ -24,6 +25,8 @@ export type ArticleCardProps = {
   /** Editorial photograph for collage themes. */
   imageSrc?: string;
   imageAlt?: string;
+  /** High-level financial / structural summary (Bento Grid main cell). */
+  financialSummary?: string;
   /** Optional metrics row (Net Cost, Vote Totals, Days Left, …). */
   metrics?: BillMetricsProps["metrics"];
   /** Seed vote totals from the server when available. */
@@ -60,6 +63,7 @@ export function ArticleCard({
   promptQuestion,
   imageSrc,
   imageAlt,
+  financialSummary,
   metrics = [],
   initialVoteCounts,
   onReactionSubmit,
@@ -110,18 +114,103 @@ export function ArticleCard({
           },
         ];
 
+  const reactionLabel =
+    hasSubmitted && selectedReaction
+      ? DEFAULT_REACTIONS.find((r) => r.id === selectedReaction)?.label ??
+        selectedReaction
+      : null;
+
   const reactionEcho =
-    hasSubmitted && selectedReaction ? (
-      <p className="text-xs font-medium text-[#8A6A45]" aria-live="polite">
-        You reacted:{" "}
-        {DEFAULT_REACTIONS.find((r) => r.id === selectedReaction)?.label ??
-          selectedReaction}
+    reactionLabel !== null ? (
+      <p
+        className={
+          themeVariant === "bento-grid"
+            ? "text-xs font-medium text-slate-500"
+            : themeVariant === "editorial-collage"
+              ? "text-xs font-medium text-[#8A6A45]"
+              : "text-xs font-medium text-white/60"
+        }
+        aria-live="polite"
+      >
+        You reacted: {reactionLabel}
         {" · "}
         {totalVotes} total reaction{totalVotes === 1 ? "" : "s"}
       </p>
     ) : null;
 
-  const isEditorialCollage = themeVariant === "editorial-collage";
+  let themedContent: React.ReactNode;
+
+  if (themeVariant === "editorial-collage") {
+    themedContent = (
+      <ThemeWrapper themeVariant="editorial-collage">
+        <EditorialCollageTheme
+          billId={billId}
+          title={title}
+          category={category}
+          keyImpacts={keyImpacts}
+          humanHook={humanHook}
+          promptQuestion={promptQuestion}
+          imageSrc={imageSrc}
+          imageAlt={imageAlt}
+        >
+          {children}
+          {reactionEcho}
+        </EditorialCollageTheme>
+      </ThemeWrapper>
+    );
+  } else if (themeVariant === "bento-grid") {
+    themedContent = (
+      <ThemeWrapper themeVariant="bento-grid">
+        <BentoGridTheme
+          billId={billId}
+          title={title}
+          category={category}
+          keyImpacts={keyImpacts}
+          financialSummary={financialSummary}
+          metrics={resolvedMetrics}
+        >
+          {children}
+          {reactionEcho}
+        </BentoGridTheme>
+      </ThemeWrapper>
+    );
+  } else {
+    themedContent = (
+      <ThemeWrapper themeVariant={themeVariant}>
+        <header className="a1-article-header flex flex-col gap-2">
+          <span className="inline-flex w-fit items-center rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/80">
+            {category}
+          </span>
+          <h2 className="text-xl font-bold leading-snug tracking-tight text-white sm:text-2xl">
+            {title}
+          </h2>
+        </header>
+
+        {keyImpacts.length > 0 ? (
+          <section className="a1-key-impacts" aria-label="Key impacts">
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/55">
+              Key Impacts
+            </h3>
+            <ul className="flex flex-col gap-1.5">
+              {keyImpacts.map((impact, index) => (
+                <li
+                  key={`${billId}-impact-${index}`}
+                  className="text-sm leading-relaxed text-white/85"
+                >
+                  {impact}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <BillMetrics metrics={resolvedMetrics} />
+
+        {children}
+        {reactionEcho}
+      </ThemeWrapper>
+    );
+  }
 
   return (
     <article
@@ -133,69 +222,7 @@ export function ArticleCard({
       data-a1-shell="article-card"
       data-theme={themeVariant}
     >
-      {isEditorialCollage ? (
-        <ThemeWrapper themeVariant="editorial-collage">
-          <EditorialCollageTheme
-            billId={billId}
-            title={title}
-            category={category}
-            keyImpacts={keyImpacts}
-            humanHook={humanHook}
-            promptQuestion={promptQuestion}
-            imageSrc={imageSrc}
-            imageAlt={imageAlt}
-          >
-            {children}
-            {reactionEcho}
-          </EditorialCollageTheme>
-        </ThemeWrapper>
-      ) : (
-        <ThemeWrapper themeVariant={themeVariant}>
-          <header className="a1-article-header flex flex-col gap-2">
-            <span className="inline-flex w-fit items-center rounded-md border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/80">
-              {category}
-            </span>
-            <h2 className="text-xl font-bold leading-snug tracking-tight text-white sm:text-2xl">
-              {title}
-            </h2>
-          </header>
-
-          {keyImpacts.length > 0 ? (
-            <section className="a1-key-impacts" aria-label="Key impacts">
-              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/55">
-                Key Impacts
-              </h3>
-              <ul className="flex flex-col gap-1.5">
-                {keyImpacts.map((impact, index) => (
-                  <li
-                    key={`${billId}-impact-${index}`}
-                    className="text-sm leading-relaxed text-white/85"
-                  >
-                    {impact}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          <BillMetrics metrics={resolvedMetrics} />
-
-          {children}
-
-          {hasSubmitted && selectedReaction ? (
-            <p
-              className="text-xs font-medium text-white/60"
-              aria-live="polite"
-            >
-              You reacted:{" "}
-              {DEFAULT_REACTIONS.find((r) => r.id === selectedReaction)
-                ?.label ?? selectedReaction}
-              {" · "}
-              {totalVotes} total reaction{totalVotes === 1 ? "" : "s"}
-            </p>
-          ) : null}
-        </ThemeWrapper>
-      )}
+      {themedContent}
 
       {showReactionDock ? (
         <ReactionDock
