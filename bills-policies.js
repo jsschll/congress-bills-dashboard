@@ -1918,16 +1918,60 @@ async function hydrateFeedSocialProof(card, item) {
   const el = card?.querySelector(".feed-social-proof");
   if (!el || !item?.id) return;
   let proof = buildFeedSocialProof(item);
+  let community = null;
   try {
-    const stats = await window.PolicyEngagement?.fetchCommunityStats?.(item.id);
-    if (stats && Number(stats.total) > 0) {
-      proof = buildFeedSocialProof(item, stats);
+    community = await window.PolicyEngagement?.fetchCommunityStats?.(item.id);
+    if (community && Number(community.total) > 0) {
+      proof = buildFeedSocialProof(item, community);
     }
   } catch (_) {
     /* keep roll-call / empty fallback */
   }
   el.innerHTML = renderFeedSocialProofHtml(proof);
   applyFeedVoteRatioLabels(card, proof);
+
+  // Keep post-vote ratio bar in sync with live community split.
+  const local = window.VoteFeedback?.getLocalVote?.(item);
+  const stance =
+    local?.stance ||
+    window.PolicyEngagement?.getStance?.(item.id) ||
+    null;
+  if (stance && window.VoteFeedback && proof.hasData) {
+    window.VoteFeedback.setLocalVote(item, {
+      stance,
+      passPct: proof.supportPct,
+      killPct: proof.opposePct,
+      total: proof.total,
+    });
+    const panel = card.querySelector(".policy-engage__logged-panel.vote-feedback-panel");
+    if (panel && !panel.hidden) {
+      window.VoteFeedback.mountPostVoteBar(panel, {
+        stance,
+        passPct: proof.supportPct,
+        killPct: proof.opposePct,
+        animate: false,
+        showChange: true,
+      });
+      panel.querySelector(".policy-engage__change")?.addEventListener("click", () => {
+        const engage = card.querySelector(".policy-engage");
+        // Re-show buttons via a synthetic change: remount stance UI.
+        const supportBtn = card.querySelector('[data-stance="support"]');
+        const opposeBtn = card.querySelector('[data-stance="oppose"]');
+        const stances = card.querySelector(".policy-engage__stances");
+        if (stances) stances.hidden = false;
+        panel.hidden = false;
+        panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+        panel.innerHTML = `
+          <p class="policy-engage__logged-hint">
+            Choose Pass It or Kill It to update your vote.
+          </p>
+        `;
+        supportBtn?.classList.toggle("is-active", stance === "support");
+        opposeBtn?.classList.toggle("is-active", stance === "oppose");
+        engage?.classList.add("is-changing-vote");
+      });
+    }
+  }
 }
 
 function mountFeedCardStanceButtons(card, item, options = {}) {
@@ -1960,6 +2004,8 @@ function mountFeedCardStanceButtons(card, item, options = {}) {
     showWhoVoted: false,
     showCommunity: false,
     showAlignment: false,
+    voteFeedbackMode: true,
+    allowLocalGuestVote: true,
     ...options,
   };
   if (window.PolicyEngagement?.mountVote && options.useVoteMount !== false) {
