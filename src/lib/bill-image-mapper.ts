@@ -219,6 +219,44 @@ export function collectTopicSignals(bill: BillImageInput = {}): string {
     .join(" ");
 }
 
+function stockResult(entry: CategoryStockEntry): ResolvedBillImage {
+  return {
+    url: entry.url,
+    alt: entry.alt,
+    source: "category_stock",
+    categoryId: entry.id,
+    categoryLabel: entry.label,
+  };
+}
+
+/** Prefer an explicit primary category / policy area label when it maps cleanly. */
+export function matchPrimaryCategory(
+  bill: BillImageInput = {}
+): ResolvedBillImage | null {
+  const labels = [
+    bill.primaryCategory,
+    bill.primary_category,
+    bill.category,
+    bill.subjectCategory,
+    bill.policyArea,
+    bill.policy_area,
+  ]
+    .map(asString)
+    .filter(Boolean);
+  if (!labels.length) return null;
+
+  for (const label of labels) {
+    const lower = label.toLowerCase();
+    for (const key of CATEGORY_ORDER) {
+      const entry = CATEGORY_STOCK[key];
+      if (entry.label.toLowerCase() === lower || entry.pattern.test(label)) {
+        return stockResult(entry);
+      }
+    }
+  }
+  return null;
+}
+
 export function matchCategoryStock(
   signals = ""
 ): ResolvedBillImage | null {
@@ -227,13 +265,7 @@ export function matchCategoryStock(
   for (const key of CATEGORY_ORDER) {
     const entry = CATEGORY_STOCK[key];
     if (entry.pattern.test(haystack)) {
-      return {
-        url: entry.url,
-        alt: entry.alt,
-        source: "category_stock",
-        categoryId: entry.id,
-        categoryLabel: entry.label,
-      };
+      return stockResult(entry);
     }
   }
   return null;
@@ -252,6 +284,8 @@ export function getDefaultStock(): ResolvedBillImage {
 export function resolveBillImage(bill: BillImageInput = {}): ResolvedBillImage {
   const explicit = getExplicitBillImage(bill);
   if (explicit) return explicit;
+  const primary = matchPrimaryCategory(bill);
+  if (primary) return primary;
   const matched = matchCategoryStock(collectTopicSignals(bill));
   if (matched) return matched;
   return getDefaultStock();
