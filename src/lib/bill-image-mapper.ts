@@ -75,7 +75,7 @@ export const CATEGORY_STOCK: Record<string, CategoryStockEntry> = {
     label: "Agriculture",
     pattern:
       /\b(agriculture|agricultural|farm(ers?|ing)?|crop(s)?|livestock|usda|food\s*security|rural)\b/i,
-    url: "https://images.unsplash.com/photo-1500937386664-56d1dfef142f?auto=format&fit=crop&w=1400&q=80",
+    url: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1400&q=80",
     alt: "Golden farmland under open sky",
   },
   infrastructure: {
@@ -123,8 +123,8 @@ export const CATEGORY_STOCK: Record<string, CategoryStockEntry> = {
 export const DEFAULT_STOCK = {
   id: "default",
   label: "Civic",
-  url: "https://images.unsplash.com/photo-1523480717983-8643265ba78e?auto=format&fit=crop&w=1400&q=80",
-  alt: "Capitol dome against a clear sky",
+  url: "https://images.unsplash.com/photo-1555848962-6e79363ec58f?auto=format&fit=crop&w=1400&q=80",
+  alt: "U.S. Capitol dome against the sky",
 };
 
 // Prefer topical domains before broad economy/tax keywords (which appear in many bills).
@@ -242,7 +242,9 @@ export function matchPrimaryCategory(
     bill.policy_area,
   ]
     .map(asString)
-    .filter(Boolean);
+    .filter(Boolean)
+    // Skip generic jurisdiction labels so title/summary keywords can match.
+    .filter((label) => !/^(congress|legislation|bill|federal|u\.?s\.?)$/i.test(label));
   if (!labels.length) return null;
 
   for (const label of labels) {
