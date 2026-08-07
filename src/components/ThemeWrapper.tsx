@@ -38,6 +38,11 @@ const THEME_LAYOUT: Record<
     wrapper: "a1-theme a1-theme--compact rounded-lg overflow-hidden",
     content: "flex flex-col gap-2 p-3 md:p-4",
   },
+  /** Full layout lives in EditorialCollageTheme — wrapper stays transparent. */
+  "editorial-collage": {
+    wrapper: "a1-theme a1-theme--editorial-collage",
+    content: "contents",
+  },
 };
 
 /**

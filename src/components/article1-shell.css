@@ -41,6 +41,11 @@
   background: rgba(16, 22, 34, 0.94);
 }
 
+.a1-theme--editorial-collage {
+  background: transparent;
+  color: inherit;
+}
+
 .a1-reaction-dock {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
