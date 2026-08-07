@@ -1217,3 +1217,70 @@
   color: #9f1239;
   font-weight: 650;
 }
+
+/* Beat legacy feed-social-card stance gradients inside themed docks */
+.a1-themed-card .a1-reaction-dock .policy-engage__stance--support,
+.a1-themed-card .a1-reaction-dock .policy-engage__stance--oppose {
+  background-image: none;
+  filter: none;
+  transform: none;
+}
+
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--support,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--support:hover,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--support.is-active,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--support:focus-visible {
+  background: #f7ede0;
+  border-color: #d4b896;
+  color: #1c1410;
+  box-shadow: none;
+}
+
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--support:hover,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--support.is-active {
+  background: #efe0cb;
+  border-color: #8a6a45;
+  color: #3f2d1c;
+}
+
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--oppose,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--oppose:hover,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--oppose.is-active,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--oppose:focus-visible {
+  background: #f7ede0;
+  border-color: #d4b896;
+  color: #1c1410;
+  box-shadow: none;
+}
+
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--oppose:hover,
+.a1-themed-card .a1-theme--editorial .a1-reaction-dock .policy-engage__stance--oppose.is-active {
+  background: #f3e2d6;
+  border-color: #a15c3a;
+  color: #5c2e1a;
+}
+
+.a1-themed-card .a1-theme--bento .a1-reaction-dock .policy-engage__stance--support,
+.a1-themed-card .a1-theme--bento .a1-reaction-dock .policy-engage__stance--support:hover,
+.a1-themed-card .a1-theme--bento .a1-reaction-dock .policy-engage__stance--support.is-active {
+  background: rgba(5, 150, 105, 0.22);
+  border-color: #34d399;
+  color: #6ee7b7;
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.18), 0 0 16px rgba(16, 185, 129, 0.35);
+}
+
+.a1-themed-card .a1-theme--bento .a1-reaction-dock .policy-engage__stance--oppose,
+.a1-themed-card .a1-theme--bento .a1-reaction-dock .policy-engage__stance--oppose:hover,
+.a1-themed-card .a1-theme--bento .a1-reaction-dock .policy-engage__stance--oppose.is-active {
+  background: rgba(225, 29, 72, 0.2);
+  border-color: #fb7185;
+  color: #fda4af;
+  box-shadow: 0 0 0 1px rgba(251, 113, 133, 0.18), 0 0 16px rgba(244, 63, 94, 0.35);
+}
+
+@media (min-width: 860px) {
+  .policy-feed-list:has(.a1-theme--editorial),
+  .votes-feed-list:has(.a1-theme--editorial) {
+    max-width: 720px;
+  }
+}
