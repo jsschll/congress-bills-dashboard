@@ -1931,6 +1931,24 @@ async function hydrateFeedSocialProof(card, item) {
 }
 
 function mountFeedCardStanceButtons(card, item, options = {}) {
+  if (!card || !item) return;
+
+  // Guaranteed single Pass/Kill row: clear prior widgets before remount.
+  card.querySelectorAll(".policy-engage").forEach((node) => node.remove());
+
+  const mountItem = item.id
+    ? item
+    : {
+        ...item,
+        id:
+          item.billId ||
+          item.bill_id ||
+          item.roll_call_id ||
+          item.billNumber ||
+          item.bill_number ||
+          `feed-${Date.now()}`,
+      };
+
   const mountOpts = {
     supportLabel: "👍 PASS IT",
     opposeLabel: "👎 KILL IT",
@@ -1945,16 +1963,30 @@ function mountFeedCardStanceButtons(card, item, options = {}) {
     ...options,
   };
   if (window.PolicyEngagement?.mountVote && options.useVoteMount !== false) {
-    window.PolicyEngagement.mountVote(card, item, mountOpts);
+    window.PolicyEngagement.mountVote(card, mountItem, mountOpts);
   } else if (window.PolicyEngagement?.mount) {
-    window.PolicyEngagement.mount(card, item, mountOpts);
+    window.PolicyEngagement.mount(card, mountItem, mountOpts);
   }
 
-  // Mount poll buttons into the story action slot.
-  const slot = card.querySelector(".engagement-mount-point");
-  const engage = card.querySelector(".policy-engage");
-  if (slot && engage) slot.append(engage);
-  hydrateFeedSocialProof(card, item);
+  // Keep the only engagement widget inside the themed footer dock (or legacy slot).
+  const slot =
+    card.querySelector(".a1-reaction-dock .engagement-mount-point") ||
+    card.querySelector(".engagement-mount-point");
+  const engages = Array.from(card.querySelectorAll(".policy-engage"));
+  if (slot && engages.length) {
+    slot.replaceChildren(engages[0]);
+    engages.slice(1).forEach((node) => node.remove());
+  } else if (engages.length > 1) {
+    engages.slice(1).forEach((node) => node.remove());
+  }
+
+  // Never leave a second dock / orphan engage outside the shell.
+  const docks = Array.from(card.querySelectorAll(".a1-reaction-dock"));
+  if (docks.length > 1) {
+    docks.slice(1).forEach((node) => node.remove());
+  }
+
+  hydrateFeedSocialProof(card, mountItem);
 }
 
 function wireFeedCardAskAi(card, item) {
@@ -2148,7 +2180,12 @@ function renderBillCard(item) {
       title: cardCopy.displayTitle,
       billId: formatFeedBillId(item),
       impacts: cardCopy.impacts,
-      summary: cardCopy.impacts?.what || pitch,
+      summary:
+        preferPlainSummaryText(item) ||
+        item.whatItDoes ||
+        item.what_it_does ||
+        pitch ||
+        cardCopy.summary,
     });
     card.dataset.a1Theme = themed.theme;
     card.innerHTML = themed.html;
@@ -2315,7 +2352,12 @@ function renderVoteCard(item) {
       title: cardCopy.displayTitle,
       billId: formatFeedBillId(item),
       impacts: cardCopy.impacts,
-      summary: cardCopy.impacts?.what || preferPlainSummaryText(item),
+      summary:
+        preferPlainSummaryText(item) ||
+        item.whatItDoes ||
+        item.what_it_does ||
+        cardCopy.summary ||
+        cardCopy.impacts?.what,
     });
     card.dataset.a1Theme = themed.theme;
     card.innerHTML = themed.html;
