@@ -48,8 +48,8 @@ function dedupeImpacts(impacts: string[], exclude: string[] = []): string[] {
 
 /**
  * Theme #1 — Editorial Collage
- * When an image exists: portrait artwork + TL;DR column.
- * When missing: copy-only layout (no empty "Editorial frame" placeholder).
+ * Always keeps a magazine art plane: real photo when available, otherwise an
+ * atmospheric blur wash (no empty labeled placeholder).
  */
 export function EditorialCollageTheme({
   billId,
@@ -68,6 +68,12 @@ export function EditorialCollageTheme({
   const prompt = (promptQuestion ?? defaultPrompt(category)).trim();
   const impacts = dedupeImpacts(keyImpacts, [hook, title]).slice(0, 2);
   const hasImage = Boolean(imageSrc?.trim());
+  const [photoFailed, setPhotoFailed] = React.useState(false);
+  const showPhoto = hasImage && !photoFailed;
+
+  React.useEffect(() => {
+    setPhotoFailed(false);
+  }, [imageSrc]);
 
   return (
     <div
@@ -83,7 +89,7 @@ export function EditorialCollageTheme({
         .join(" ")}
       data-theme="editorial-collage"
       data-a1-theme="editorial-collage"
-      data-has-image={hasImage ? "true" : "false"}
+      data-has-image={showPhoto ? "true" : "false"}
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-70"
@@ -134,31 +140,47 @@ export function EditorialCollageTheme({
         </div>
       </header>
 
-      <div
-        className={[
-          "editorial-collage__layout flex flex-col gap-4",
-          hasImage ? "lg:flex-row lg:items-stretch lg:gap-5" : "",
-        ].join(" ")}
-      >
-        {hasImage ? (
-          <div className="editorial-collage__art w-full shrink-0 lg:w-[min(42%,20rem)]">
+      <div className="editorial-collage__layout flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+        <div className="editorial-collage__art w-full shrink-0 lg:w-[min(42%,20rem)]">
+          <div
+            className={[
+              "editorial-collage__frame",
+              "relative w-full overflow-hidden rounded-[1.25rem]",
+              "border-[3px] border-[#1C1410]",
+              "bg-[#1C1410] shadow-[0_18px_40px_rgba(28,20,16,0.18)]",
+              "aspect-[3/4]",
+            ].join(" ")}
+          >
+            {/* Atmospheric wash always present under / instead of photo */}
             <div
-              className={[
-                "editorial-collage__frame",
-                "relative w-full overflow-hidden rounded-[1.25rem]",
-                "border-[3px] border-[#1C1410]",
-                "bg-[#1C1410] shadow-[0_18px_40px_rgba(28,20,16,0.18)]",
-                "aspect-[3/4]",
-              ].join(" ")}
-            >
+              className="absolute inset-0"
+              aria-hidden
+              style={{
+                background:
+                  "radial-gradient(circle at 78% 18%, rgba(214,168,98,0.42), transparent 42%), radial-gradient(circle at 18% 78%, rgba(120,80,48,0.35), transparent 48%), linear-gradient(145deg, #2A221C 0%, #4A3428 42%, #1A1410 100%)",
+              }}
+            />
+            <div
+              className="pointer-events-none absolute -inset-[12%] opacity-90 blur-[18px]"
+              aria-hidden
+              style={{
+                background:
+                  "radial-gradient(circle at 30% 40%, rgba(253,248,242,0.16), transparent 36%), radial-gradient(circle at 70% 60%, rgba(214,168,98,0.28), transparent 40%)",
+              }}
+            />
+            {hasImage ? (
               <img
                 src={imageSrc}
                 alt={imageAlt ?? hook}
-                className="absolute inset-0 h-full w-full object-contain contrast-[1.08] saturate-[1.05]"
+                onError={() => setPhotoFailed(true)}
+                className={[
+                  "absolute inset-0 h-full w-full object-cover contrast-[1.08] saturate-[1.05]",
+                  showPhoto ? "opacity-100" : "opacity-0",
+                ].join(" ")}
               />
-            </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
 
         <div className="editorial-collage__copy flex min-w-0 flex-1 flex-col gap-3">
           <div

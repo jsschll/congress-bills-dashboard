@@ -199,25 +199,33 @@
       .join("");
 
     const imageSrc = String(
-      item.imageSrc || item.image_src || item.imageUrl || item.image_url || ""
+      item.imageSrc ||
+        item.image_src ||
+        item.imageUrl ||
+        item.image_url ||
+        item.photoUrl ||
+        item.photo_url ||
+        ""
     ).trim();
     const imageAlt = String(item.imageAlt || item.image_alt || title).trim();
 
-    const artHtml = imageSrc
-      ? `
-          <div class="a1-editorial__art">
-            <div class="a1-editorial__frame">
-              <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(
-          imageAlt
-        )}" loading="lazy" decoding="async" />
-            </div>
-          </div>`
-      : "";
+    // Always keep the magazine art plane. Prefer a real photo; otherwise an
+    // atmospheric blur wash (never an empty labeled placeholder box).
+    const artInner = imageSrc
+      ? `<img
+            class="a1-editorial__photo"
+            src="${escapeHtml(imageSrc)}"
+            alt="${escapeHtml(imageAlt)}"
+            loading="lazy"
+            decoding="async"
+            onerror="this.classList.add('is-broken'); this.removeAttribute('src');"
+          />
+          <div class="a1-editorial__frame-wash a1-editorial__frame-wash--fallback" aria-hidden="true"></div>`
+      : `<div class="a1-editorial__frame-wash" aria-hidden="true"></div>
+          <div class="a1-editorial__frame-blur" aria-hidden="true"></div>`;
 
     return `
-      <div class="a1-theme a1-theme--editorial${
-        imageSrc ? "" : " a1-theme--editorial-copy-only"
-      }">
+      <div class="a1-theme a1-theme--editorial">
         <header class="a1-editorial__header">
           <div class="a1-editorial__header-main">
             <p class="a1-kicker">${escapeHtml(category)}</p>
@@ -228,10 +236,14 @@
           </div>
           ${microActionsHtml()}
         </header>
-        <div class="a1-editorial__layout${
-          imageSrc ? "" : " a1-editorial__layout--copy-only"
-        }">
-          ${artHtml}
+        <div class="a1-editorial__layout">
+          <div class="a1-editorial__art">
+            <div class="a1-editorial__frame" data-has-photo="${
+              imageSrc ? "true" : "false"
+            }">
+              ${artInner}
+            </div>
+          </div>
           <div class="a1-editorial__copy">
             <div class="a1-editorial__sticker">
               <p class="a1-section-label">Key Impacts</p>
