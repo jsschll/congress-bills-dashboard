@@ -1781,11 +1781,15 @@ body.feed-breakdown-open {
   display: grid;
   place-items: center;
   pointer-events: none;
-  animation: vote-stamp-in 0.42s cubic-bezier(0.22, 1.55, 0.36, 1) both;
+  animation: vote-stamp-in 0.42s ease-out both;
 }
 
 .vote-feedback-stamp.is-leaving {
   animation: vote-stamp-out 0.24s ease-in forwards;
+}
+
+.vote-feedback-stamp.is-leaving .vote-feedback-stamp__badge {
+  animation: vote-stamp-badge-out 0.24s ease-in forwards;
 }
 
 .vote-feedback-stamp__badge {
@@ -1801,6 +1805,7 @@ body.feed-breakdown-open {
   text-transform: uppercase;
   border: 3px solid currentColor;
   transform-origin: center center;
+  animation: vote-stamp-badge-pop 0.48s cubic-bezier(0.22, 1.55, 0.36, 1) both;
 }
 
 .vote-feedback-stamp--pass .vote-feedback-stamp__badge {
@@ -1809,7 +1814,8 @@ body.feed-breakdown-open {
   border-color: rgba(52, 211, 153, 0.95);
   box-shadow:
     0 0 0 1px rgba(16, 185, 129, 0.25),
-    0 0 28px rgba(16, 185, 129, 0.55),
+    0 0 32px rgba(16, 185, 129, 0.65),
+    0 0 48px rgba(16, 185, 129, 0.35),
     0 12px 28px rgba(16, 12, 8, 0.3);
 }
 
@@ -1819,22 +1825,32 @@ body.feed-breakdown-open {
   border-color: rgba(251, 113, 133, 0.95);
   box-shadow:
     0 0 0 1px rgba(244, 63, 94, 0.28),
-    0 0 28px rgba(244, 63, 94, 0.55),
+    0 0 32px rgba(244, 63, 94, 0.65),
+    0 0 48px rgba(244, 63, 94, 0.35),
     0 12px 28px rgba(16, 12, 8, 0.3);
 }
 
-/* Scale-and-snap: 1.3 → 1.0 with a 3–5° tilt */
+/* Scale-and-snap lives on the badge: 1.3 → 1.0 with a 3–5° tilt */
 @keyframes vote-stamp-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes vote-stamp-badge-pop {
   0% {
     opacity: 0;
     transform: scale(1.3) rotate(-5deg);
   }
-  55% {
+  58% {
     opacity: 1;
-    transform: scale(0.97) rotate(3deg);
+    transform: scale(0.96) rotate(3deg);
   }
   78% {
-    transform: scale(1.04) rotate(-4deg);
+    transform: scale(1.05) rotate(-3deg);
   }
   100% {
     opacity: 1;
@@ -1845,11 +1861,30 @@ body.feed-breakdown-open {
 @keyframes vote-stamp-out {
   to {
     opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes vote-stamp-badge-out {
+  to {
+    opacity: 0;
     transform: scale(0.9) rotate(-6deg);
   }
 }
 
 /* ── Vertical Pass% thermometer (card inner edge) ───────────────────── */
+
+@property --thermo-pct {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+@property --thermo-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: hsl(60 92% 50%);
+}
 
 .vote-thermo-gauge {
   position: absolute;
@@ -1884,7 +1919,7 @@ body.feed-breakdown-open {
   bottom: 0;
   height: var(--thermo-pct, 0%);
   border-radius: inherit;
-  background: var(--thermo-color, hsl(60 92% 50%));
+  background-color: var(--thermo-color, hsl(60 92% 50%));
   box-shadow:
     0 0 10px color-mix(in srgb, var(--thermo-color) 55%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
@@ -1892,10 +1927,11 @@ body.feed-breakdown-open {
     height 0.75s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.75s ease,
     box-shadow 0.75s ease;
+  will-change: height, background-color;
 }
 
 .vote-thermo-gauge:not(.is-ready) .vote-thermo-gauge__fill {
-  height: 0;
+  height: 0% !important;
 }
 
 .vote-thermo-gauge.is-settled .vote-thermo-gauge__fill {
@@ -2029,7 +2065,8 @@ body.feed-breakdown-open {
   .a1-themed-card.vote-motion--kill.is-vote-burst,
   .feed-social-card.vote-motion--pass.is-vote-burst,
   .feed-social-card.vote-motion--kill.is-vote-burst,
-  .vote-feedback-stamp {
+  .vote-feedback-stamp,
+  .vote-feedback-stamp__badge {
     animation: none;
   }
 

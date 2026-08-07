@@ -215,6 +215,42 @@
     return `hsl(${hue.toFixed(1)} ${sat}% ${light.toFixed(1)}%)`;
   }
 
+  function applyThermoFill(gauge, pct, color, { animate = true, fromZero = false } = {}) {
+    if (!gauge) return;
+    const fill = gauge.querySelector(".vote-thermo-gauge__fill");
+    gauge.setAttribute("aria-label", `${pct}% Pass`);
+    gauge.dataset.passPct = String(pct);
+    gauge.classList.remove("is-settled");
+
+    const applyTarget = () => {
+      gauge.style.setProperty("--thermo-pct", `${pct}%`);
+      gauge.style.setProperty("--thermo-color", color);
+      if (fill) {
+        fill.style.height = `${pct}%`;
+        fill.style.backgroundColor = color;
+      }
+      gauge.classList.add("is-ready");
+    };
+
+    if (!animate) {
+      applyTarget();
+      gauge.classList.add("is-settled");
+      return;
+    }
+
+    // First paint: grow from empty. Later updates interpolate from current fill.
+    if (fromZero || !gauge.classList.contains("is-ready")) {
+      gauge.classList.remove("is-ready");
+      gauge.style.setProperty("--thermo-pct", "0%");
+      if (fill) fill.style.height = "0%";
+      void gauge.offsetWidth;
+      requestAnimationFrame(applyTarget);
+      return;
+    }
+
+    requestAnimationFrame(applyTarget);
+  }
+
   function buildThermoGaugeHtml(passPct = 50) {
     const pct = clampPct(passPct);
     const color = passPctToColor(pct);
@@ -227,7 +263,7 @@
         data-pass-pct="${pct}"
       >
         <div class="vote-thermo-gauge__track">
-          <span class="vote-thermo-gauge__fill"></span>
+          <span class="vote-thermo-gauge__fill" style="height:${pct}%; background-color:${color};"></span>
         </div>
       </div>
     `;
@@ -243,30 +279,22 @@
     if (!gauge) {
       gauge = host.querySelector(".vote-thermo-gauge");
     }
+    const isNew = !gauge;
     if (!gauge) {
-      host.insertAdjacentHTML("beforeend", buildThermoGaugeHtml(animate ? 0 : pct));
+      host.insertAdjacentHTML(
+        "beforeend",
+        buildThermoGaugeHtml(animate ? 0 : pct)
+      );
       gauge = host.querySelector(".vote-thermo-gauge");
       const prior = host.style.position;
       if (!prior || prior === "static") host.style.position = "relative";
     }
     if (!gauge) return null;
 
-    gauge.setAttribute("aria-label", `${pct}% Pass`);
-    gauge.dataset.passPct = String(pct);
-    if (animate) {
-      gauge.classList.remove("is-ready");
-      // Force layout so height/color transitions restart.
-      void gauge.offsetWidth;
-      requestAnimationFrame(() => {
-        gauge.style.setProperty("--thermo-pct", `${pct}%`);
-        gauge.style.setProperty("--thermo-color", color);
-        gauge.classList.add("is-ready");
-      });
-    } else {
-      gauge.style.setProperty("--thermo-pct", `${pct}%`);
-      gauge.style.setProperty("--thermo-color", color);
-      gauge.classList.add("is-ready", "is-settled");
-    }
+    applyThermoFill(gauge, pct, color, {
+      animate,
+      fromZero: isNew && animate,
+    });
     return gauge;
   }
 

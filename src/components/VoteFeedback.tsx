@@ -123,16 +123,27 @@ export function VoteThermoGauge({
   const pct = clampPct(passPct);
   const color = passPctToColor(pct);
   const [ready, setReady] = useState(!animate);
+  const [hasMounted, setHasMounted] = useState(!animate);
 
   useEffect(() => {
     if (!animate) {
       setReady(true);
+      setHasMounted(true);
       return;
     }
-    setReady(false);
-    const id = requestAnimationFrame(() => setReady(true));
-    return () => cancelAnimationFrame(id);
-  }, [animate, pct, color]);
+    // First reveal grows from empty; later pct changes interpolate in place.
+    if (!hasMounted) {
+      setReady(false);
+      const id = requestAnimationFrame(() => {
+        setReady(true);
+        setHasMounted(true);
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    setReady(true);
+  }, [animate, pct, color, hasMounted]);
+
+  const fillPct = ready ? pct : 0;
 
   return (
     <div
@@ -149,13 +160,16 @@ export function VoteThermoGauge({
       data-pass-pct={pct}
       style={
         {
-          ["--thermo-pct" as string]: ready ? `${pct}%` : "0%",
+          ["--thermo-pct" as string]: `${fillPct}%`,
           ["--thermo-color" as string]: color,
         } as React.CSSProperties
       }
     >
       <div className="vote-thermo-gauge__track">
-        <span className="vote-thermo-gauge__fill" />
+        <span
+          className="vote-thermo-gauge__fill"
+          style={{ height: `${fillPct}%`, backgroundColor: color }}
+        />
       </div>
     </div>
   );
