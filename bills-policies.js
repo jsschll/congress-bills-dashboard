@@ -1295,7 +1295,7 @@ function inferFeedImpactAudience(item = {}, categoryLabel = "", summary = "") {
 }
 
 /**
- * Build the strict 3-bullet impact face for collapsed feed cards.
+ * Build visual impact face data: TL;DR, target chips, cost pill.
  */
 function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
   const summary = String(resolved.summary || copy.summary || "").trim();
@@ -1347,6 +1347,80 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     what: clampFeedImpactLine(whatRaw, 10),
     impact: clampFeedImpactLine(impactRaw, 10),
     cost: clampFeedImpactLine(moneyRaw, 10),
+    chips: buildFeedImpactChips(impactRaw, categoryLabel, summary),
+    costPill: formatFeedCostPill(moneyRaw),
+  };
+}
+
+function buildFeedImpactChips(impactText = "", categoryLabel = "", summary = "") {
+  const haystack = `${impactText} ${categoryLabel} ${summary}`.toLowerCase();
+  const chips = [];
+  const push = (icon, label) => {
+    if (!label) return;
+    if (chips.some((chip) => chip.label.toLowerCase() === label.toLowerCase())) {
+      return;
+    }
+    chips.push({ icon, label });
+  };
+  const rules = [
+    [/renter|tenant|housing|homeowner/, "🏡", "Renters"],
+    [/small business|small biz|employer/, "💼", "Small Biz"],
+    [/taxpayer/, "🧾", "Taxpayers"],
+    [/border|immigra|asylum/, "🛂", "Border security"],
+    [/veteran|troop|military|service member|defense/, "🪖", "Service members"],
+    [/patient|health|hospital|medicare|medicaid/, "🏥", "Patients"],
+    [/student|school|college|education/, "🎓", "Students"],
+    [/worker|labor|wage/, "👷", "Workers"],
+    [/energy|climate|consumer/, "⚡", "Energy users"],
+    [/farmer|agriculture|rural/, "🌾", "Farmers"],
+  ];
+  for (const [re, icon, label] of rules) {
+    if (re.test(haystack)) push(icon, label);
+    if (chips.length >= 3) break;
+  }
+  if (!chips.length) {
+    // Split free-text impact into short chips when possible.
+    const parts = String(impactText || "")
+      .split(/\s*(?:&|\/|,| and )\s*/i)
+      .map((part) => part.replace(/\s+/g, " ").trim())
+      .filter((part) => part && part.length <= 28);
+    for (const part of parts.slice(0, 3)) {
+      push("👤", clampFeedImpactLine(part, 4));
+    }
+  }
+  if (!chips.length) push("👤", "Public");
+  return chips.slice(0, 3);
+}
+
+function formatFeedCostPill(costText = "") {
+  const raw = String(costText || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const amountMatch = raw.match(
+    /\$[\d,.]+(?:\s*(?:billion|million|trillion|bn|m|k))?|\b\d+(?:\.\d+)?\s*(?:billion|million|trillion)\b/i
+  );
+  const amount = amountMatch ? amountMatch[0] : "";
+  const lower = raw.toLowerCase();
+
+  if (
+    !amount ||
+    /^\$?0(\.0+)?\b/.test(amount.replace(/,/g, "")) ||
+    (/\$0|policy change|no (net )?cost|zero/.test(lower) &&
+      !/\$[1-9]/.test(raw))
+  ) {
+    return { tone: "zero", icon: "🟢", label: "$0 Net Cost" };
+  }
+  if (/\bsave|saves|saving|cut|reduc/.test(lower)) {
+    return {
+      tone: "saves",
+      icon: "💰",
+      label: `Saves ${amount}`.trim(),
+    };
+  }
+  return {
+    tone: "costs",
+    icon: "🔴",
+    label: `Costs ${amount}`.trim(),
   };
 }
 
@@ -1476,8 +1550,7 @@ function wireFeedCardAskAi(card, item) {
 }
 
 /**
- * Visual-first social feed card with strict 3-bullet impact face.
- * No paragraph summaries on the collapsed card.
+ * Visual-first social feed card: TL;DR callout, impact chips, cost pill.
  */
 function renderSocialFeedCardShell({
   status,
@@ -1492,11 +1565,30 @@ function renderSocialFeedCardShell({
   const categoryIcon =
     (typeof category === "object" && category?.icon) ||
     feedCategoryIcon(categoryLabel);
-  const bullets = {
-    what: impacts?.what || "Updates a federal policy rule.",
-    impact: impacts?.impact || "People affected by this policy",
-    cost: impacts?.cost || "$0 / Policy change",
+  const what = impacts?.what || "Updates a federal policy rule.";
+  const chips = Array.isArray(impacts?.chips) && impacts.chips.length
+    ? impacts.chips
+    : [{ icon: "👤", label: "Public" }];
+  const costPill = impacts?.costPill || {
+    tone: "zero",
+    icon: "🟢",
+    label: "$0 Net Cost",
   };
+  const costTone = String(costPill.tone || "zero").replace(/[^a-z0-9_-]/gi, "");
+  const chipHtml = chips
+    .map(
+      (chip) => `
+      <span class="feed-impact-chip">
+        <span class="feed-impact-chip__icon" aria-hidden="true">${
+          chip.icon || "👤"
+        }</span>
+        <span class="feed-impact-chip__label">${escapePolicyHtml(
+          chip.label || "Public"
+        )}</span>
+      </span>`
+    )
+    .join("");
+
   return `
     <div class="feed-social-card__header">
       <div class="category-pill" title="${escapePolicyHtml(categoryLabel || "Congress")}">
@@ -1514,26 +1606,21 @@ function renderSocialFeedCardShell({
     </div>
     <div class="feed-social-card__body">
       <h3 class="feed-social-card__headline">${escapePolicyHtml(title)}</h3>
-      <ul class="feed-impact-list" aria-label="Key impacts">
-        <li class="feed-impact-list__item">
-          <span class="feed-impact-list__icon" aria-hidden="true">🎯</span>
-          <span class="feed-impact-list__copy">
-            <strong>What it does:</strong> ${escapePolicyHtml(bullets.what)}
-          </span>
-        </li>
-        <li class="feed-impact-list__item">
-          <span class="feed-impact-list__icon" aria-hidden="true">👤</span>
-          <span class="feed-impact-list__copy">
-            <strong>Impact:</strong> ${escapePolicyHtml(bullets.impact)}
-          </span>
-        </li>
-        <li class="feed-impact-list__item">
-          <span class="feed-impact-list__icon" aria-hidden="true">💵</span>
-          <span class="feed-impact-list__copy">
-            <strong>Cost / Savings:</strong> ${escapePolicyHtml(bullets.cost)}
-          </span>
-        </li>
-      </ul>
+      <div class="feed-tldr" aria-label="Bottom line">
+        <span class="feed-tldr__label" aria-hidden="true">🎯 TL;DR</span>
+        <p class="feed-tldr__text">${escapePolicyHtml(what)}</p>
+      </div>
+      <div class="feed-impact-chips" aria-label="Who it impacts">
+        ${chipHtml}
+      </div>
+      <div class="feed-cost-pill is-${costTone}" aria-label="Cost or savings">
+        <span class="feed-cost-pill__icon" aria-hidden="true">${
+          costPill.icon || "🟢"
+        }</span>
+        <span class="feed-cost-pill__label">${escapePolicyHtml(
+          costPill.label || "$0 Net Cost"
+        )}</span>
+      </div>
     </div>
     <div class="feed-social-card__actions">
       <button type="button" class="details-toggle-btn">
