@@ -294,9 +294,6 @@
           <div class="a1-story-card__scrim" aria-hidden="true"></div>
           <div class="a1-story-card__top">
             <div class="a1-story-card__pills">
-              <span class="a1-story-card__pill a1-story-card__pill--theme">${escapeHtml(
-                label
-              )}</span>
               <span class="a1-story-card__pill a1-story-card__pill--cat">${escapeHtml(
                 category || "Congress"
               )}</span>
