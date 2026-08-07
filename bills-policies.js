@@ -1300,6 +1300,9 @@ function inferFeedImpactAudience(item = {}, categoryLabel = "", summary = "") {
 function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
   const summary = String(resolved.summary || copy.summary || "").trim();
   const headline = String(resolved.headline || "").trim();
+  const title = String(resolved.title || item.title || item.short_title || "")
+    .replace(/\s+/g, " ")
+    .trim();
   const categoryLabel = formatFeedCategoryPill(item).label;
   const keyPoints = parseFeedKeyPointList(item.key_points || item.keyPoints);
   const yea = String(
@@ -1311,13 +1314,23 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     .replace(/\s+/g, " ")
     .trim();
 
-  const whatRaw =
-    keyPoints[0] ||
-    headline ||
-    firstCompleteSentence(summary, 110) ||
-    yea ||
-    takeaway ||
-    "Updates a federal policy rule.";
+  const whatCandidates = [
+    keyPoints[0],
+    firstCompleteSentence(summary, 90),
+    headline,
+    yea,
+    takeaway,
+  ];
+  let whatRaw = "";
+  for (const candidate of whatCandidates) {
+    const cleaned = stripTitleFromWhatItDoes(candidate, title);
+    if (!cleaned) continue;
+    if (looksLikeOfficialBillTitle(cleaned)) continue;
+    whatRaw = cleaned;
+    break;
+  }
+  if (!whatRaw) whatRaw = "Updates a federal policy rule.";
+
   const impactRaw =
     keyPoints[1] ||
     yea ||
@@ -1331,10 +1344,32 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     "$0 / Policy change";
 
   return {
-    what: clampFeedImpactLine(whatRaw, 14),
+    what: clampFeedImpactLine(whatRaw, 10),
     impact: clampFeedImpactLine(impactRaw, 10),
     cost: clampFeedImpactLine(moneyRaw, 10),
   };
+}
+
+/** Drop bill-title echoes from the "What it does" line. */
+function stripTitleFromWhatItDoes(text, title) {
+  let out = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const titleClean = String(title || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!out) return "";
+  if (titleClean) {
+    const lowerOut = out.toLowerCase();
+    const lowerTitle = titleClean.toLowerCase();
+    if (lowerOut === lowerTitle) return "";
+    if (lowerOut.startsWith(lowerTitle)) {
+      out = out.slice(titleClean.length).replace(/^[\s.:;,—–-]+/, "").trim();
+    }
+  }
+  // Prefer action phrasing; drop leftover title-only fragments.
+  if (!out || looksLikeOfficialBillTitle(out)) return "";
+  return out;
 }
 
 function formatFeedStatusTag(item = {}, { isVote = false } = {}) {
