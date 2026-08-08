@@ -7,6 +7,8 @@ export type { ReactionDockProps } from "./ReactionDock";
 export {
   VoteFeedback,
   VoteStampOverlay,
+  VoteThermoGauge,
+  passPctToColor,
   reactionIdToFeedbackStance,
   readLocalFeedVote,
   splitFromCounts,
@@ -16,6 +18,7 @@ export type {
   VoteFeedbackProps,
   VoteFeedbackStance,
   VoteStampOverlayProps,
+  VoteThermoGaugeProps,
 } from "./VoteFeedback";
 
 export { BillMetrics } from "./BillMetrics";
