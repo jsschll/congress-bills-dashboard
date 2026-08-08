@@ -10,65 +10,88 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260807glass" />
+    <link rel="stylesheet" href="styles.css?v=20260808feedbar" />
     <link rel="stylesheet" href="article1-themes.css?v=20260807story" />
   </head>
   <body class="page-app page-feed">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
     <main class="page page--policy-feed">
-      <header class="header">
-        <div>
-          <p class="eyebrow">Legislation</p>
-          <h1>Feed</h1>
-          <p class="subtitle page-feed__lede">
-            Government activity, follows, and related suggestions.
-          </p>
-        </div>
-        <a class="refresh-btn" href="topics.html" id="feed-manage-topics" hidden
-          >Manage topics</a
-        >
-      </header>
+      <header class="feed-toolbar" aria-label="Feed">
+        <h1 class="feed-toolbar__title">Feed</h1>
 
-      <section class="policy-feed-tabs" aria-label="Feed views">
-        <button
-          id="tab-all-feed"
-          class="policy-feed-tabs__button is-active"
-          type="button"
-          data-tab="all"
-        >
-          All News
-        </button>
-        <button
-          id="tab-my-feed"
-          class="policy-feed-tabs__button"
-          type="button"
-          data-tab="mine"
-        >
-          My Feed
-        </button>
-        <button
-          id="tab-foryou-feed"
-          class="policy-feed-tabs__button"
-          type="button"
-          data-tab="foryou"
-        >
-          For You
-        </button>
-        <button
-          id="tab-votes-feed"
-          class="policy-feed-tabs__button"
-          type="button"
-          data-tab="votes"
-        >
-          Votes
-        </button>
-      </section>
+        <section class="policy-feed-tabs" aria-label="Feed views">
+          <button
+            id="tab-all-feed"
+            class="policy-feed-tabs__button is-active"
+            type="button"
+            data-tab="all"
+          >
+            All News
+          </button>
+          <button
+            id="tab-foryou-feed"
+            class="policy-feed-tabs__button"
+            type="button"
+            data-tab="foryou"
+          >
+            For You
+          </button>
+          <button
+            id="tab-votes-feed"
+            class="policy-feed-tabs__button"
+            type="button"
+            data-tab="votes"
+          >
+            Trending
+          </button>
+          <!-- Kept for deep links (?tab=mine); not shown in the compact bar -->
+          <button
+            id="tab-my-feed"
+            class="policy-feed-tabs__button feed-toolbar__sr-tab"
+            type="button"
+            data-tab="mine"
+            tabindex="-1"
+            aria-hidden="true"
+          >
+            My Feed
+          </button>
+        </section>
+
+        <div class="feed-toolbar__actions">
+          <button
+            id="policy-location-filter-btn"
+            class="feed-location-btn"
+            type="button"
+            aria-expanded="false"
+            aria-controls="policy-feed-filters"
+          >
+            <svg
+              class="feed-location-btn__icon"
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="currentColor"
+                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"
+              />
+            </svg>
+            <span class="feed-location-btn__label">Location</span>
+          </button>
+          <a class="refresh-btn" href="topics.html" id="feed-manage-topics" hidden
+            >Manage topics</a
+          >
+        </div>
+      </header>
 
       <section
         id="policy-feed-filters"
         class="policy-feed-filters"
         aria-label="Filter bills"
+        hidden
       >
         <label class="policy-feed-filters__field">
           <span>State</span>
@@ -208,6 +231,6 @@
     <script src="impact.js?v=20260729z"></script>
     <script src="lib/utils/billImageMapper.js?v=20260807stockfix"></script>
     <script src="article1-themes.js?v=20260807story"></script>
-    <script src="bills-policies.js?v=20260807story" defer></script>
+    <script src="bills-policies.js?v=20260808feedbar" defer></script>
   </body>
 </html>

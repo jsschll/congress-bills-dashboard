@@ -23,6 +23,8 @@ const locationToggle = document.getElementById("policy-location-toggle");
 const locationForm = document.getElementById("policy-location-form");
 const locationInput = document.getElementById("policy-location-input");
 const filterStatus = document.getElementById("policy-filter-status");
+const locationFilterBtn = document.getElementById("policy-location-filter-btn");
+let locationPanelOpen = false;
 
 const STORAGE_KEYS = {
   state: "policyFeed.stateFilter",
@@ -349,6 +351,39 @@ function persistFilters() {
   }
 }
 
+function syncLocationFilterButton() {
+  if (!locationFilterBtn) return;
+  const hasFilter = Boolean(
+    filterState.stateCode || filterState.locationOn || filterState.addressQuery
+  );
+  locationFilterBtn.classList.toggle("is-open", locationPanelOpen);
+  locationFilterBtn.classList.toggle("is-active", hasFilter && !locationPanelOpen);
+  locationFilterBtn.setAttribute("aria-expanded", locationPanelOpen ? "true" : "false");
+  const label = locationFilterBtn.querySelector(".feed-location-btn__label");
+  if (label) {
+    if (filterState.locationOn && filterState.resolved) {
+      const city = filterState.resolved.city;
+      const state = filterState.resolved.state;
+      label.textContent =
+        city && state ? `${city}, ${state}` : city || state || "Location";
+    } else if (filterState.stateCode) {
+      label.textContent = STATE_NAME_BY_CODE[filterState.stateCode] || filterState.stateCode;
+    } else {
+      label.textContent = "Location";
+    }
+  }
+}
+
+function setLocationPanelOpen(open) {
+  locationPanelOpen = Boolean(open);
+  // Panel visibility is also gated by the active tab in setActiveTab.
+  if (policyFeedFilters) {
+    const tabHidesFilters = activeTab === "foryou" || activeTab === "votes";
+    policyFeedFilters.hidden = tabHidesFilters || !locationPanelOpen;
+  }
+  syncLocationFilterButton();
+}
+
 function syncFilterControls() {
   if (stateFilterSelect) stateFilterSelect.value = filterState.stateCode || "";
   if (locationToggle) locationToggle.checked = Boolean(filterState.locationOn);
@@ -357,6 +392,7 @@ function syncFilterControls() {
     locationForm.hidden = !filterState.locationOn;
   }
   updateFilterStatusLine();
+  syncLocationFilterButton();
 }
 
 function updateFilterStatusLine() {
@@ -3016,9 +3052,22 @@ function setActiveTab(tabName) {
   tabForYouFeed?.classList.toggle("is-active", tabName === "foryou");
   tabVotesFeed?.classList.toggle("is-active", tabName === "votes");
 
+  // My Feed stays off the compact bar unless opened via deep link.
+  if (tabMyFeed) {
+    const showMyFeed = tabName === "mine";
+    tabMyFeed.classList.toggle("feed-toolbar__sr-tab", !showMyFeed);
+    tabMyFeed.setAttribute("aria-hidden", showMyFeed ? "false" : "true");
+    tabMyFeed.tabIndex = showMyFeed ? 0 : -1;
+  }
+
   const isForYou = tabName === "foryou";
   const isVotes = tabName === "votes";
-  if (policyFeedFilters) policyFeedFilters.hidden = isForYou || isVotes;
+  if (policyFeedFilters) {
+    policyFeedFilters.hidden = isForYou || isVotes || !locationPanelOpen;
+  }
+  if (locationFilterBtn) {
+    locationFilterBtn.hidden = isForYou || isVotes;
+  }
   if (policyFeedPanel) policyFeedPanel.hidden = isForYou || isVotes;
   if (forYouFeedPanel) forYouFeedPanel.hidden = !isForYou;
   if (votesFeedPanel) votesFeedPanel.hidden = !isVotes;
@@ -3029,6 +3078,7 @@ function setActiveTab(tabName) {
     policyFeedCoverage.hidden = tabName !== "all";
   }
 
+  syncLocationFilterButton();
   syncTabQuery(tabName);
 }
 
@@ -3239,6 +3289,13 @@ locationForm?.addEventListener("submit", async (event) => {
   await refreshWithFilters({ resolveLocation: true });
 });
 
+locationFilterBtn?.addEventListener("click", () => {
+  setLocationPanelOpen(!locationPanelOpen);
+  if (locationPanelOpen && filterState.locationOn) {
+    locationInput?.focus();
+  }
+});
+
 (async function initBillsPoliciesPage() {
   await bootNav("feed");
   populateStateOptions();
@@ -3260,9 +3317,9 @@ locationForm?.addEventListener("submit", async (event) => {
 
   if (window.PolicyEngagement?.init) {
     try {
+      // Keep engagement state warm for cards; skip header score copy so the
+      // feed chrome stays a single compact title row.
       await window.PolicyEngagement.init();
-      const header = document.querySelector(".page--policy-feed .header > div");
-      window.PolicyEngagement.renderHeaderScore(header);
     } catch (error) {
       console.warn(error);
     }
