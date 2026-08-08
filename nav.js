@@ -385,7 +385,7 @@ function buildNotificationBell(notifications, unreadCount) {
 }
 
 async function renderAppNav(activePage = "home") {
-  const { actions } = createNavShell(activePage);
+  const { nav, actions } = createNavShell(activePage);
 
   // Keep the auth page free of app chrome (links, bells, sign-in CTAs).
   if (activePage === "auth") {
