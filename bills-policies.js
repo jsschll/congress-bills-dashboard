@@ -4,6 +4,9 @@ const policyFeedList = document.getElementById("policy-feed-list");
 const policyFeedEmpty = document.getElementById("policy-feed-empty");
 const policyFeedPanel = document.getElementById("policy-feed-panel");
 const policyFeedFilters = document.getElementById("policy-feed-filters");
+const feedLocation = document.querySelector(".feed-location");
+const locationPill = document.getElementById("policy-location-pill");
+const locationPillLabel = document.getElementById("policy-location-pill-label");
 const forYouFeedPanel = document.getElementById("foryou-feed-panel");
 const forYouStatus = document.getElementById("foryou-status");
 const forYouList = document.getElementById("foryou-list");
@@ -23,6 +26,7 @@ const locationToggle = document.getElementById("policy-location-toggle");
 const locationForm = document.getElementById("policy-location-form");
 const locationInput = document.getElementById("policy-location-input");
 const filterStatus = document.getElementById("policy-filter-status");
+let locationPanelOpen = false;
 
 const STORAGE_KEYS = {
   state: "policyFeed.stateFilter",
@@ -349,6 +353,51 @@ function persistFilters() {
   }
 }
 
+function setLocationPanelOpen(open) {
+  locationPanelOpen = Boolean(open);
+  if (policyFeedFilters) {
+    // Keep panel closed on For You / Votes even if a prior open request races in.
+    const allowPanel = activeTab === "all" || activeTab === "mine";
+    policyFeedFilters.hidden = !(locationPanelOpen && allowPanel);
+  }
+  if (locationPill) {
+    locationPill.setAttribute(
+      "aria-expanded",
+      locationPanelOpen && (activeTab === "all" || activeTab === "mine")
+        ? "true"
+        : "false"
+    );
+  }
+}
+
+function locationPillText() {
+  if (filterState.locationOn && filterState.resolved) {
+    const city = filterState.resolved.city;
+    const state = filterState.resolved.state;
+    if (city && state) return `${city}, ${state}`;
+    return city || state || "Location";
+  }
+  if (filterState.locationOn && filterState.addressQuery) {
+    return String(filterState.addressQuery).trim() || "Location";
+  }
+  if (filterState.stateCode) {
+    return STATE_NAME_BY_CODE[filterState.stateCode] || filterState.stateCode;
+  }
+  return "Location";
+}
+
+function syncLocationPill() {
+  if (locationPillLabel) {
+    locationPillLabel.textContent = locationPillText();
+  }
+  if (locationPill) {
+    locationPill.classList.toggle(
+      "is-active",
+      Boolean(filterState.locationOn || filterState.stateCode)
+    );
+  }
+}
+
 function syncFilterControls() {
   if (stateFilterSelect) stateFilterSelect.value = filterState.stateCode || "";
   if (locationToggle) locationToggle.checked = Boolean(filterState.locationOn);
@@ -356,10 +405,13 @@ function syncFilterControls() {
   if (locationForm) {
     locationForm.hidden = !filterState.locationOn;
   }
+  syncLocationPill();
+  setLocationPanelOpen(locationPanelOpen);
   updateFilterStatusLine();
 }
 
 function updateFilterStatusLine() {
+  syncLocationPill();
   if (!filterStatus) return;
   const parts = [];
   if (filterState.stateCode) {
@@ -3018,7 +3070,15 @@ function setActiveTab(tabName) {
 
   const isForYou = tabName === "foryou";
   const isVotes = tabName === "votes";
-  if (policyFeedFilters) policyFeedFilters.hidden = isForYou || isVotes;
+  const showLocation = tabName === "all" || tabName === "mine";
+
+  // Votes stays available via deep links; reveal the pill only while active.
+  if (tabVotesFeed) tabVotesFeed.hidden = !isVotes;
+
+  if (feedLocation) feedLocation.hidden = !showLocation;
+  if (!showLocation) locationPanelOpen = false;
+  setLocationPanelOpen(locationPanelOpen);
+
   if (policyFeedPanel) policyFeedPanel.hidden = isForYou || isVotes;
   if (forYouFeedPanel) forYouFeedPanel.hidden = !isForYou;
   if (votesFeedPanel) votesFeedPanel.hidden = !isVotes;
@@ -3202,6 +3262,7 @@ votesSubjectChips?.addEventListener("click", (event) => {
 
 stateFilterSelect?.addEventListener("change", async () => {
   filterState.stateCode = String(stateFilterSelect.value || "").toUpperCase();
+  syncLocationPill();
   await refreshWithFilters();
 });
 
@@ -3216,6 +3277,7 @@ locationToggle?.addEventListener("change", async () => {
     filterState.locationOn &&
     !String(locationInput?.value || filterState.addressQuery || "").trim()
   ) {
+    setLocationPanelOpen(true);
     locationInput?.focus();
     setPolicyFeedStatus("Enter an address or ZIP, then click Apply.", "error");
     recomputeVisibleItems();
@@ -3237,6 +3299,26 @@ locationForm?.addEventListener("submit", async (event) => {
   }
   await saveHomeAddress(filterState.addressQuery);
   await refreshWithFilters({ resolveLocation: true });
+  setLocationPanelOpen(false);
+});
+
+locationPill?.addEventListener("click", (event) => {
+  event.preventDefault();
+  if (activeTab !== "all" && activeTab !== "mine") return;
+  setLocationPanelOpen(!locationPanelOpen);
+});
+
+document.addEventListener("click", (event) => {
+  if (!locationPanelOpen || !feedLocation) return;
+  const target = event.target;
+  if (target instanceof Node && feedLocation.contains(target)) return;
+  setLocationPanelOpen(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && locationPanelOpen) {
+    setLocationPanelOpen(false);
+  }
 });
 
 (async function initBillsPoliciesPage() {
@@ -3261,8 +3343,7 @@ locationForm?.addEventListener("submit", async (event) => {
   if (window.PolicyEngagement?.init) {
     try {
       await window.PolicyEngagement.init();
-      const header = document.querySelector(".page--policy-feed .header > div");
-      window.PolicyEngagement.renderHeaderScore(header);
+      // Keep the feed chrome to a single heading — no alignment subtitle.
     } catch (error) {
       console.warn(error);
     }
