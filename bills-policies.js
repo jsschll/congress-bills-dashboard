@@ -4,9 +4,6 @@ const policyFeedList = document.getElementById("policy-feed-list");
 const policyFeedEmpty = document.getElementById("policy-feed-empty");
 const policyFeedPanel = document.getElementById("policy-feed-panel");
 const policyFeedFilters = document.getElementById("policy-feed-filters");
-const feedLocation = document.querySelector(".feed-location");
-const locationPill = document.getElementById("policy-location-pill");
-const locationPillLabel = document.getElementById("policy-location-pill-label");
 const forYouFeedPanel = document.getElementById("foryou-feed-panel");
 const forYouStatus = document.getElementById("foryou-status");
 const forYouList = document.getElementById("foryou-list");
@@ -389,14 +386,11 @@ function syncFilterControls() {
   if (locationForm) {
     locationForm.hidden = !filterState.locationOn;
   }
-  syncLocationPill();
-  setLocationPanelOpen(locationPanelOpen);
   updateFilterStatusLine();
   syncLocationFilterButton();
 }
 
 function updateFilterStatusLine() {
-  syncLocationPill();
   if (!filterStatus) return;
   const parts = [];
   if (filterState.stateCode) {
@@ -3253,7 +3247,6 @@ votesSubjectChips?.addEventListener("click", (event) => {
 
 stateFilterSelect?.addEventListener("change", async () => {
   filterState.stateCode = String(stateFilterSelect.value || "").toUpperCase();
-  syncLocationPill();
   await refreshWithFilters();
 });
 
@@ -3293,31 +3286,18 @@ locationForm?.addEventListener("submit", async (event) => {
   setLocationPanelOpen(false);
 });
 
-locationPill?.addEventListener("click", (event) => {
-  event.preventDefault();
-  if (activeTab !== "all" && activeTab !== "mine") return;
-  setLocationPanelOpen(!locationPanelOpen);
-});
-
-document.addEventListener("click", (event) => {
-  if (!locationPanelOpen || !feedLocation) return;
-  const target = event.target;
-  if (target instanceof Node && feedLocation.contains(target)) return;
-  setLocationPanelOpen(false);
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && locationPanelOpen) {
-    setLocationPanelOpen(false);
-  }
-});
-
 locationFilterBtn?.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
   setLocationPanelOpen(!locationPanelOpen);
   if (locationPanelOpen && filterState.locationOn) {
     locationInput?.focus();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && locationPanelOpen) {
+    setLocationPanelOpen(false);
   }
 });
 
