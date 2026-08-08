@@ -10,15 +10,15 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260808feedchrome" />
+    <link rel="stylesheet" href="styles.css?v=20260808feedbar2" />
     <link rel="stylesheet" href="article1-themes.css?v=20260807story" />
   </head>
   <body class="page-app page-feed">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
     <main class="page page--policy-feed">
-      <header class="header feed-chrome" aria-label="Feed controls">
-        <h1 class="feed-chrome__title">Feed</h1>
+      <header class="feed-toolbar" aria-label="Feed">
+        <h1 class="feed-toolbar__title">Feed</h1>
 
         <section class="policy-feed-tabs" aria-label="Feed views">
           <button
@@ -30,14 +30,6 @@
             All News
           </button>
           <button
-            id="tab-my-feed"
-            class="policy-feed-tabs__button"
-            type="button"
-            data-tab="mine"
-          >
-            My Feed
-          </button>
-          <button
             id="tab-foryou-feed"
             class="policy-feed-tabs__button"
             type="button"
@@ -47,93 +39,88 @@
           </button>
           <button
             id="tab-votes-feed"
-            class="policy-feed-tabs__button policy-feed-tabs__button--aux"
+            class="policy-feed-tabs__button"
             type="button"
             data-tab="votes"
-            hidden
           >
-            Votes
+            Trending
+          </button>
+          <!-- Kept for deep links (?tab=mine); not shown in the compact bar -->
+          <button
+            id="tab-my-feed"
+            class="policy-feed-tabs__button feed-toolbar__sr-tab"
+            type="button"
+            data-tab="mine"
+            tabindex="-1"
+            aria-hidden="true"
+          >
+            My Feed
           </button>
         </section>
 
-        <div class="feed-chrome__actions">
-          <div class="feed-location">
-            <button
-              id="policy-location-pill"
-              class="feed-location__pill"
-              type="button"
-              aria-expanded="false"
-              aria-controls="policy-feed-filters"
+        <div class="feed-toolbar__actions">
+          <button
+            id="policy-location-filter-btn"
+            class="feed-location-btn"
+            type="button"
+            aria-expanded="false"
+            aria-controls="policy-feed-filters"
+          >
+            <svg
+              class="feed-location-btn__icon"
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              aria-hidden="true"
+              focusable="false"
             >
-              <svg
-                class="feed-location__icon"
-                viewBox="0 0 20 20"
-                width="14"
-                height="14"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path
-                  fill="currentColor"
-                  d="M10 2a5.5 5.5 0 0 0-5.5 5.5c0 3.54 4.2 8.86 5.12 9.96a.5.5 0 0 0 .76 0c.92-1.1 5.12-6.42 5.12-9.96A5.5 5.5 0 0 0 10 2Zm0 7.75a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5Z"
-                />
-              </svg>
-              <span id="policy-location-pill-label">Location</span>
-            </button>
-            <section
-              id="policy-feed-filters"
-              class="policy-feed-filters feed-location__panel"
-              aria-label="Filter bills"
-              hidden
-            >
-              <label class="policy-feed-filters__field">
-                <span>State</span>
-                <select id="policy-state-filter" name="state">
-                  <option value="">All states</option>
-                </select>
-              </label>
-              <label class="policy-feed-filters__check">
-                <input id="policy-location-toggle" type="checkbox" />
-                <span>Affects my location</span>
-              </label>
-              <form
-                id="policy-location-form"
-                class="policy-feed-filters__location"
-                hidden
-              >
-                <label
-                  class="policy-feed-filters__field policy-feed-filters__field--grow"
-                >
-                  <span>Address or ZIP</span>
-                  <input
-                    id="policy-location-input"
-                    type="text"
-                    name="q"
-                    autocomplete="off"
-                    autocapitalize="off"
-                    autocorrect="off"
-                    spellcheck="false"
-                    placeholder="Street address or ZIP code"
-                  />
-                </label>
-                <button class="refresh-btn" type="submit">Apply</button>
-              </form>
-              <p
-                id="policy-filter-status"
-                class="policy-feed-filters__status"
-                hidden
-              ></p>
-            </section>
-          </div>
-          <a
-            class="refresh-btn feed-chrome__topics"
-            href="topics.html"
-            id="feed-manage-topics"
-            hidden
-            >Topics</a
+              <path
+                fill="currentColor"
+                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"
+              />
+            </svg>
+            <span class="feed-location-btn__label">Location</span>
+          </button>
+          <a class="refresh-btn" href="topics.html" id="feed-manage-topics" hidden
+            >Manage topics</a
           >
         </div>
       </header>
+
+      <section
+        id="policy-feed-filters"
+        class="policy-feed-filters"
+        aria-label="Filter bills"
+        hidden
+      >
+        <label class="policy-feed-filters__field">
+          <span>State</span>
+          <select id="policy-state-filter" name="state">
+            <option value="">All states</option>
+          </select>
+        </label>
+        <label class="policy-feed-filters__check">
+          <input id="policy-location-toggle" type="checkbox" />
+          <span>Affects my location</span>
+        </label>
+        <form id="policy-location-form" class="policy-feed-filters__location" hidden>
+          <label class="policy-feed-filters__field policy-feed-filters__field--grow">
+            <span>Address or ZIP</span>
+            <input
+              id="policy-location-input"
+              type="text"
+              name="q"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              placeholder="Street address or ZIP code"
+            />
+          </label>
+          <button class="refresh-btn" type="submit">Apply</button>
+        </form>
+        <p id="policy-filter-status" class="policy-feed-filters__status" hidden></p>
+      </section>
 
       <div id="policy-feed-panel">
         <section class="policy-feed-summary">
@@ -238,12 +225,12 @@
 
     <script src="config.js"></script>
     <script src="shared.js?v=20260807keyimpacts"></script>
-    <script src="nav.js?v=20260808feedchrome"></script>
+    <script src="nav.js?v=20260808feedbar"></script>
     <script src="vote-feedback.js?v=20260807story"></script>
     <script src="engagement.js?v=20260807votemotion"></script>
     <script src="impact.js?v=20260729z"></script>
     <script src="lib/utils/billImageMapper.js?v=20260807stockfix"></script>
     <script src="article1-themes.js?v=20260807story"></script>
-    <script src="bills-policies.js?v=20260808feedchrome" defer></script>
+    <script src="bills-policies.js?v=20260808feedbar" defer></script>
   </body>
 </html>

@@ -26,6 +26,7 @@ const locationToggle = document.getElementById("policy-location-toggle");
 const locationForm = document.getElementById("policy-location-form");
 const locationInput = document.getElementById("policy-location-input");
 const filterStatus = document.getElementById("policy-filter-status");
+const locationFilterBtn = document.getElementById("policy-location-filter-btn");
 let locationPanelOpen = false;
 
 const STORAGE_KEYS = {
@@ -204,22 +205,17 @@ function friendlyCoverageLabel(level, status) {
 }
 
 function renderCoverageBadges(coverage = {}) {
+  // Compact feed chrome: keep coverage data for tooltips/debug, but do not
+  // render the badge strip — it competes with the card stream for vertical space.
+  if (!policyFeedCoverage) return;
   const entries = Object.entries(coverage || {});
-  if (!entries.length) {
-    policyFeedCoverage.replaceChildren();
-    policyFeedCoverage.hidden = true;
-    return;
+  policyFeedCoverage.replaceChildren();
+  policyFeedCoverage.hidden = true;
+  if (entries.length) {
+    policyFeedCoverage.title = coverageSummaryText(Object.fromEntries(entries));
+  } else {
+    policyFeedCoverage.removeAttribute("title");
   }
-  policyFeedCoverage.hidden = false;
-  policyFeedCoverage.replaceChildren(
-    ...entries.map(([level, status]) => {
-      const badge = document.createElement("span");
-      badge.className = `policy-feed-coverage__badge ${coverageTone(level, status)}`;
-      badge.textContent = `${level}: ${friendlyCoverageLabel(level, status)}`;
-      badge.title = coverageSummaryText({ [level]: status });
-      return badge;
-    })
-  );
 }
 
 function coverageSummaryText(coverage = {}) {
@@ -353,49 +349,37 @@ function persistFilters() {
   }
 }
 
+function syncLocationFilterButton() {
+  if (!locationFilterBtn) return;
+  const hasFilter = Boolean(
+    filterState.stateCode || filterState.locationOn || filterState.addressQuery
+  );
+  locationFilterBtn.classList.toggle("is-open", locationPanelOpen);
+  locationFilterBtn.classList.toggle("is-active", hasFilter && !locationPanelOpen);
+  locationFilterBtn.setAttribute("aria-expanded", locationPanelOpen ? "true" : "false");
+  const label = locationFilterBtn.querySelector(".feed-location-btn__label");
+  if (label) {
+    if (filterState.locationOn && filterState.resolved) {
+      const city = filterState.resolved.city;
+      const state = filterState.resolved.state;
+      label.textContent =
+        city && state ? `${city}, ${state}` : city || state || "Location";
+    } else if (filterState.stateCode) {
+      label.textContent = STATE_NAME_BY_CODE[filterState.stateCode] || filterState.stateCode;
+    } else {
+      label.textContent = "Location";
+    }
+  }
+}
+
 function setLocationPanelOpen(open) {
   locationPanelOpen = Boolean(open);
+  // Panel visibility is also gated by the active tab in setActiveTab.
   if (policyFeedFilters) {
-    // Keep panel closed on For You / Votes even if a prior open request races in.
-    const allowPanel = activeTab === "all" || activeTab === "mine";
-    policyFeedFilters.hidden = !(locationPanelOpen && allowPanel);
+    const tabHidesFilters = activeTab === "foryou" || activeTab === "votes";
+    policyFeedFilters.hidden = tabHidesFilters || !locationPanelOpen;
   }
-  if (locationPill) {
-    locationPill.setAttribute(
-      "aria-expanded",
-      locationPanelOpen && (activeTab === "all" || activeTab === "mine")
-        ? "true"
-        : "false"
-    );
-  }
-}
-
-function locationPillText() {
-  if (filterState.locationOn && filterState.resolved) {
-    const city = filterState.resolved.city;
-    const state = filterState.resolved.state;
-    if (city && state) return `${city}, ${state}`;
-    return city || state || "Location";
-  }
-  if (filterState.locationOn && filterState.addressQuery) {
-    return String(filterState.addressQuery).trim() || "Location";
-  }
-  if (filterState.stateCode) {
-    return STATE_NAME_BY_CODE[filterState.stateCode] || filterState.stateCode;
-  }
-  return "Location";
-}
-
-function syncLocationPill() {
-  if (locationPillLabel) {
-    locationPillLabel.textContent = locationPillText();
-  }
-  if (locationPill) {
-    locationPill.classList.toggle(
-      "is-active",
-      Boolean(filterState.locationOn || filterState.stateCode)
-    );
-  }
+  syncLocationFilterButton();
 }
 
 function syncFilterControls() {
@@ -408,6 +392,7 @@ function syncFilterControls() {
   syncLocationPill();
   setLocationPanelOpen(locationPanelOpen);
   updateFilterStatusLine();
+  syncLocationFilterButton();
 }
 
 function updateFilterStatusLine() {
@@ -3068,17 +3053,22 @@ function setActiveTab(tabName) {
   tabForYouFeed?.classList.toggle("is-active", tabName === "foryou");
   tabVotesFeed?.classList.toggle("is-active", tabName === "votes");
 
+  // My Feed stays off the compact bar unless opened via deep link.
+  if (tabMyFeed) {
+    const showMyFeed = tabName === "mine";
+    tabMyFeed.classList.toggle("feed-toolbar__sr-tab", !showMyFeed);
+    tabMyFeed.setAttribute("aria-hidden", showMyFeed ? "false" : "true");
+    tabMyFeed.tabIndex = showMyFeed ? 0 : -1;
+  }
+
   const isForYou = tabName === "foryou";
   const isVotes = tabName === "votes";
-  const showLocation = tabName === "all" || tabName === "mine";
-
-  // Votes stays available via deep links; reveal the pill only while active.
-  if (tabVotesFeed) tabVotesFeed.hidden = !isVotes;
-
-  if (feedLocation) feedLocation.hidden = !showLocation;
-  if (!showLocation) locationPanelOpen = false;
-  setLocationPanelOpen(locationPanelOpen);
-
+  if (policyFeedFilters) {
+    policyFeedFilters.hidden = isForYou || isVotes || !locationPanelOpen;
+  }
+  if (locationFilterBtn) {
+    locationFilterBtn.hidden = isForYou || isVotes;
+  }
   if (policyFeedPanel) policyFeedPanel.hidden = isForYou || isVotes;
   if (forYouFeedPanel) forYouFeedPanel.hidden = !isForYou;
   if (votesFeedPanel) votesFeedPanel.hidden = !isVotes;
@@ -3089,6 +3079,7 @@ function setActiveTab(tabName) {
     policyFeedCoverage.hidden = tabName !== "all";
   }
 
+  syncLocationFilterButton();
   syncTabQuery(tabName);
 }
 
@@ -3321,6 +3312,15 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+locationFilterBtn?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  setLocationPanelOpen(!locationPanelOpen);
+  if (locationPanelOpen && filterState.locationOn) {
+    locationInput?.focus();
+  }
+});
+
 (async function initBillsPoliciesPage() {
   await bootNav("feed");
   populateStateOptions();
@@ -3342,8 +3342,9 @@ document.addEventListener("keydown", (event) => {
 
   if (window.PolicyEngagement?.init) {
     try {
+      // Keep engagement state warm for cards; skip header score copy so the
+      // feed chrome stays a single compact title row.
       await window.PolicyEngagement.init();
-      // Keep the feed chrome to a single heading — no alignment subtitle.
     } catch (error) {
       console.warn(error);
     }
