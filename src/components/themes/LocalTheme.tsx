@@ -70,14 +70,31 @@ export function LocalTheme({
 }: LocalThemeProps) {
   const rows =
     districts && districts.length > 0 ? districts : DEFAULT_DISTRICTS;
-  const blurb = (summary || title).trim();
+  const titleText = String(title || "").trim();
+  const summaryText = String(summary || "").trim();
+  const distinctImpact =
+    keyImpacts
+      .map((line) => String(line || "").trim())
+      .find(
+        (line) =>
+          line &&
+          line.toLowerCase() !== titleText.toLowerCase() &&
+          line.toLowerCase() !== summaryText.toLowerCase()
+      ) || "";
+  const blurb = (
+    distinctImpact ||
+    (summaryText && summaryText.toLowerCase() !== titleText.toLowerCase()
+      ? summaryText
+      : "") ||
+    "Community-level effects depend on final district allocations."
+  ).trim();
   const impacts = keyImpacts
     .map((line) => String(line || "").trim())
     .filter(Boolean)
     .filter(
       (line) =>
         line.toLowerCase() !== blurb.toLowerCase() &&
-        line.toLowerCase() !== title.trim().toLowerCase()
+        line.toLowerCase() !== titleText.toLowerCase()
     )
     .slice(0, 2);
 
@@ -307,7 +324,7 @@ export function LocalTheme({
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] sm:p-5">
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-          Localized impact
+          Local Impact
         </p>
         <h3 className="text-xl font-bold leading-snug tracking-tight text-slate-900 sm:text-2xl">
           {blurb}
