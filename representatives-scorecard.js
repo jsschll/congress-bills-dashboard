@@ -1491,14 +1491,14 @@
       "#scorecard-note-popover [data-note-action='edit']"
     );
     const clearBtn = $("scorecard-note-clear");
-    const text = noteHasContent() ? "Your note" : "Private note";
+    const text = noteHasContent() ? "Your Journal" : "Journal";
     if (label) label.textContent = text;
     if (button) {
       button.setAttribute(
         "aria-label",
         noteHasContent()
-          ? `Your private note for ${activeRosterPerson?.name || "this official"}`
-          : `Private note for ${activeRosterPerson?.name || "this official"}`
+          ? `Your Journal for ${activeRosterPerson?.name || "this official"}`
+          : `Journal for ${activeRosterPerson?.name || "this official"}`
       );
     }
     if (preview) {
@@ -1507,12 +1507,12 @@
         preview.classList.remove("is-empty");
       } else {
         preview.textContent =
-          "No note yet. Add a private note for this official.";
+          "No Journal yet. Add a private Journal for this official.";
         preview.classList.add("is-empty");
       }
     }
     if (editBtn) {
-      editBtn.textContent = noteHasContent() ? "Edit note" : "Add note";
+      editBtn.textContent = noteHasContent() ? "Edit Journal" : "Add Journal";
     }
     const bodyInput = $("scorecard-note-body");
     const modal = $("scorecard-notes-modal");
@@ -1676,7 +1676,7 @@
     const user = typeof getUser === "function" ? await getUser() : null;
     if (!client || !user) {
       promptScorecardAuth({
-        title: "Save notes with a free account",
+        title: "File a Journal with a free account",
         body: "Create a free account to keep private notes on meetings and follow-ups with your representatives.",
       });
       return;
@@ -1684,7 +1684,7 @@
     const bodyInput = $("scorecard-note-body");
     const body = String(bodyInput?.value || "").trim();
     if (!body) {
-      setNotesStatus("Write something before saving.", "error");
+      setNotesStatus("Write something before filing.", "error");
       return;
     }
     const politicianId = await resolveRosterId(activeRosterPerson);
@@ -1729,10 +1729,10 @@
         politicianNote = data;
       }
       await loadNoteForPerson(activeRosterPerson, user);
-      setNotesStatus("Note saved.", "success");
+      setNotesStatus("Journal filed.", "success");
     } catch (error) {
       console.error(error);
-      setNotesStatus(error.message || "Could not save note.", "error");
+      setNotesStatus(error.message || "Could not file Journal.", "error");
     }
   }
 
@@ -1751,10 +1751,10 @@
       const bodyInput = $("scorecard-note-body");
       if (bodyInput) bodyInput.value = "";
       refreshNoteUi();
-      setNotesStatus("Note cleared.", "success");
+      setNotesStatus("Journal cleared.", "success");
     } catch (error) {
       console.error(error);
-      setNotesStatus(error.message || "Could not clear note.", "error");
+      setNotesStatus(error.message || "Could not clear Journal.", "error");
     }
   }
 
@@ -1912,16 +1912,16 @@
                 aria-controls="scorecard-note-popover"
               >
                 <span class="politician-profile-note-btn__icon" aria-hidden="true">📝</span>
-                <span class="politician-profile-note-btn__label">Private note</span>
+                <span class="politician-profile-note-btn__label">Journal</span>
               </button>
               <div
                 id="scorecard-note-popover"
                 class="politician-profile-note-popover"
                 role="dialog"
-                aria-label="Private note preview"
+                aria-label="Journal preview"
                 hidden
               >
-                <p class="politician-profile-note-popover__kicker">Your private note</p>
+                <p class="politician-profile-note-popover__kicker">Your Journal</p>
                 <div
                   id="scorecard-note-preview"
                   class="politician-profile-note-popover__body"
@@ -1935,14 +1935,14 @@
                     class="politician-profile-note-popover__secondary"
                     data-note-action="edit"
                   >
-                    Add note
+                    Add Journal
                   </button>
                 </div>
               </div>
             </div>
           </div>
           <p class="politician-profile-follow__hint">
-            Follow for My Feed updates · Notes stay private to you
+            Follow for Docket updates · Journal stays private to you
           </p>
         </div>
         <div class="politician-profile-contact" aria-label="Contact links">

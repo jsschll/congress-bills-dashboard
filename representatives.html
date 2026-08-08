@@ -22,7 +22,7 @@
     <main class="page page--scorecard" data-active-view="scorecards">
       <header class="scorecard-page__header">
         <p class="scorecard-page__back">
-          <a href="politicians.html">← Back to Politicians</a>
+          <a href="/representatives">← Back to Public Servants</a>
         </p>
         <p class="scorecard-page__eyebrow">Representative Scorecard</p>
         <h1 id="scorecard-heading" class="scorecard-page__title">
@@ -200,16 +200,16 @@
       >
         <header class="politician-notes-modal__header">
           <div>
-            <h2 id="scorecard-notes-title">Private note</h2>
+            <h2 id="scorecard-notes-title">Journal</h2>
             <p class="politician-notes-modal__lede">
-              One private notepad for this official. Only you can see it.
+              One private Journal for this official. Only you can see it.
             </p>
           </div>
           <button
             type="button"
             class="politician-notes-modal__close"
             data-close-notes="1"
-            aria-label="Close note"
+            aria-label="Close Journal"
           >
             ✕
           </button>
@@ -217,14 +217,14 @@
         <p id="scorecard-notes-status" class="status" hidden></p>
         <div id="scorecard-notes-editor" class="politician-notes-editor">
           <label class="politician-note-editor-label" for="scorecard-note-body"
-            >Your note</label
+            >Your Journal</label
           >
           <textarea
             id="scorecard-note-body"
             class="politician-note-textarea"
             rows="10"
             maxlength="8000"
-            placeholder="Jot thoughts, meetings, follow-ups — keep adding to this note over time…"
+            placeholder="Jot thoughts, meetings, follow-ups — keep adding to this Journal over time…"
           ></textarea>
           <div class="politician-notes-modal__actions">
             <button
@@ -232,7 +232,7 @@
               id="scorecard-note-save"
               class="refresh-btn"
             >
-              Save note
+              File
             </button>
             <button
               type="button"
@@ -240,7 +240,7 @@
               class="politician-note-clear-btn"
               hidden
             >
-              Clear note
+              Clear Journal
             </button>
           </div>
         </div>
@@ -428,7 +428,7 @@
 
     <script src="config.js"></script>
     <script src="shared.js?v=20260806guestux"></script>
-    <script src="nav.js?v=20260806guestux"></script>
+    <script src="nav.js?v=20260808civicnav"></script>
     <script src="engagement.js?v=20260806guestux"></script>
     <script src="politicians-shared.js?v=20260806guestux"></script>
     <script src="representatives-scorecard.js?v=20260806guestux"></script>

@@ -41,6 +41,22 @@
       "destination": "/api/jobs?route=sync-bills"
     },
     {
+      "source": "/docket",
+      "destination": "/bills-policies.html"
+    },
+    {
+      "source": "/archive",
+      "destination": "/search.html"
+    },
+    {
+      "source": "/my-desk",
+      "destination": "/profile.html"
+    },
+    {
+      "source": "/representatives",
+      "destination": "/politicians.html"
+    },
+    {
       "source": "/representatives/:id",
       "destination": "/representatives.html?id=:id"
     }
