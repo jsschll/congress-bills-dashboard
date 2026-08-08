@@ -55,6 +55,56 @@ const DEFAULT_DISTRICTS: LocalDistrictRow[] = [
  * Geo-spatial / district-specific layout: district breakdown panel +
  * regional map representation. ReactionDock stays on ArticleCard.
  */
+function normalizeLocalCopy(value = ""): string {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isSameLocalCopy(a = "", b = ""): boolean {
+  const left = normalizeLocalCopy(a).toLowerCase().replace(/[.…]+$/g, "");
+  const right = normalizeLocalCopy(b).toLowerCase().replace(/[.…]+$/g, "");
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length <= right.length ? right : left;
+  if (shorter.length < 18) return false;
+  return longer.startsWith(shorter);
+}
+
+/** Prefer a district-effects summary that does not echo the bill headline. */
+function resolveLocalImpactBlurb({
+  title = "",
+  summary = "",
+  keyImpacts = [],
+  focusDistrict = "the focus district",
+  fundingLabel = "",
+}: {
+  title?: string;
+  summary?: string;
+  keyImpacts?: string[];
+  focusDistrict?: string;
+  fundingLabel?: string;
+}): string {
+  const headline = normalizeLocalCopy(title);
+  const candidates = [
+    summary,
+    ...keyImpacts.map((line) => normalizeLocalCopy(line)),
+  ]
+    .map(normalizeLocalCopy)
+    .filter(Boolean);
+
+  const distinct = candidates.find((line) => !isSameLocalCopy(line, headline));
+  if (distinct) return distinct;
+
+  const focus = normalizeLocalCopy(focusDistrict) || "the focus district";
+  const funding = normalizeLocalCopy(fundingLabel);
+  if (funding) {
+    return `${funding} earmarked with the heaviest local effects in ${focus}.`;
+  }
+  return `District-level effects concentrate in ${focus}, beyond the bill's headline scope.`;
+}
+
 export function LocalTheme({
   billId,
   title,
@@ -70,14 +120,19 @@ export function LocalTheme({
 }: LocalThemeProps) {
   const rows =
     districts && districts.length > 0 ? districts : DEFAULT_DISTRICTS;
-  const blurb = (summary || title).trim();
+  const blurb = resolveLocalImpactBlurb({
+    title,
+    summary,
+    keyImpacts,
+    focusDistrict,
+    fundingLabel,
+  });
   const impacts = keyImpacts
     .map((line) => String(line || "").trim())
     .filter(Boolean)
     .filter(
       (line) =>
-        line.toLowerCase() !== blurb.toLowerCase() &&
-        line.toLowerCase() !== title.trim().toLowerCase()
+        !isSameLocalCopy(line, blurb) && !isSameLocalCopy(line, title)
     )
     .slice(0, 2);
 
@@ -307,7 +362,7 @@ export function LocalTheme({
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] sm:p-5">
         <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-          Localized impact
+          Local Impact
         </p>
         <h3 className="text-xl font-bold leading-snug tracking-tight text-slate-900 sm:text-2xl">
           {blurb}
