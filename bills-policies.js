@@ -1393,11 +1393,70 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
       "";
   }
 
-  const impactRaw =
-    keyPoints[1] ||
-    inferFeedImpactAudience(item, "", summary) ||
-    firstCompleteSentence(summary, 64) ||
-    "";
+  const focusDistrict = String(
+    item.focusDistrict || item.focus_district || ""
+  ).trim();
+  const fundingLabel = String(
+    item.fundingLabel ||
+      item.funding_label ||
+      item.fundingAllocation ||
+      item.funding_allocation ||
+      ""
+  ).trim();
+  const communityImpact = String(
+    item.communityImpact ||
+      item.community_impact ||
+      item.localImpact ||
+      item.local_impact ||
+      item.local_impact_summary ||
+      ""
+  ).trim();
+
+  const audienceHint = inferFeedImpactAudience(item, "", summary);
+  const impactCandidates = [
+    communityImpact,
+    keyPoints[1],
+    keyPoints[0] &&
+    keyPoints[0].toLowerCase() !== String(whatRaw || "").toLowerCase() &&
+    keyPoints[0].toLowerCase() !== title.toLowerCase() &&
+    keyPoints[0].toLowerCase() !== headline.toLowerCase()
+      ? keyPoints[0]
+      : "",
+    audienceHint ? `${audienceHint} feel the nearest effects.` : "",
+    fundingLabel && focusDistrict
+      ? `Channels ${fundingLabel} toward ${focusDistrict} and nearby communities.`
+      : "",
+    focusDistrict ? `Local effects concentrate around ${focusDistrict}.` : "",
+    firstCompleteSentence(
+      String(summary || "")
+        .replace(new RegExp(`^${escapeRegExp(headline)}[.!?\\s]*`, "i"), "")
+        .replace(new RegExp(`^${escapeRegExp(title)}[.!?\\s]*`, "i"), ""),
+      90
+    ),
+  ];
+
+  let impactRaw = "";
+  for (const candidate of impactCandidates) {
+    const cleaned = String(candidate || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) continue;
+    const lower = cleaned.toLowerCase();
+    if (
+      lower === title.toLowerCase() ||
+      lower === headline.toLowerCase() ||
+      lower === String(whatRaw || "").toLowerCase() ||
+      lower === displayTitle.toLowerCase()
+    ) {
+      continue;
+    }
+    impactRaw = cleaned;
+    break;
+  }
+  if (!impactRaw) {
+    impactRaw =
+      "Community-level effects depend on final district allocations.";
+  }
 
   const moneyRaw =
     extractFeedDollarFootprint(
@@ -1415,7 +1474,7 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
       title,
       displayTitle,
     }),
-    impact: clampFeedImpactLine(impactRaw || summary || title, 10),
+    impact: clampFeedImpactLine(impactRaw, 14),
     cost: clampFeedImpactLine(moneyRaw, 10),
     chips: buildFeedImpactChips({
       title,
@@ -1424,6 +1483,10 @@ function buildFeedImpactBullets(item = {}, copy = {}, resolved = {}) {
     }),
     costPill: formatFeedCostPill(moneyRaw),
   };
+}
+
+function escapeRegExp(value = "") {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Keep TL;DR human: up to ~2 short sentences, not a title echo. */
@@ -2277,6 +2340,15 @@ function renderSocialFeedCardShell({
     feedCategoryIcon(categoryLabel);
   const what =
     impacts?.what || ensureActionVerbTldr("", { title: title || "" });
+  const localImpact = String(impacts?.impact || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const localImpactText =
+    localImpact &&
+    localImpact.toLowerCase() !== String(title || "").toLowerCase() &&
+    localImpact.toLowerCase() !== String(what || "").toLowerCase()
+      ? localImpact
+      : "Community-level effects depend on final district allocations.";
   const chips = Array.isArray(impacts?.chips) && impacts.chips.length
     ? impacts.chips
     : [{ icon: "👤", label: "Public" }];
@@ -2332,9 +2404,11 @@ function renderSocialFeedCardShell({
       <p class="feed-social-card__bill-id">${escapePolicyHtml(
         billId || "Federal measure"
       )}</p>
-      <div class="feed-tldr" aria-label="The TL;DR">
-        <span class="feed-tldr__label" aria-hidden="true">⚡ THE TL;DR</span>
-        <p class="feed-tldr__text">${escapePolicyHtml(what)}</p>
+      <div class="feed-local-impact" aria-label="Local impact">
+        <span class="feed-local-impact__label">Local Impact</span>
+        <p class="feed-local-impact__text">${escapePolicyHtml(
+          localImpactText
+        )}</p>
       </div>
       <div class="feed-story-row feed-story-row--inline" aria-label="Who is affected">
         <span class="feed-story-row__label">Who's affected:</span>

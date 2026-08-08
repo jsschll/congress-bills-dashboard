@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting… · Article 1</title>
+    <script>
+      (function () {
+        var qs = window.location.search || "";
+        var hash = window.location.hash || "";
+        window.location.replace("profile.html" + qs + hash);
+      })();
+    </script>
+    <meta http-equiv="refresh" content="0;url=profile.html" />
+  </head>
+  <body>
+    <p>
+      Moved to
+      <a href="profile.html">My Desk</a>.
+    </p>
+  </body>
+</html>

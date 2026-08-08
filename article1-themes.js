@@ -250,6 +250,103 @@
     return `${line.slice(0, 107).replace(/\s+\S*$/, "").trim()}…`;
   }
 
+  function clampImpactLine(line, maxChars = 120) {
+    const text = normalizeCopyLine(line);
+    if (!text) return "";
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, maxChars - 1).replace(/\s+\S*$/, "").trim()}…`;
+  }
+
+  function splitCopySentences(text = "") {
+    return String(text || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(/(?<=[.!?])\s+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  /** True when candidate is an exact or near echo of the bill headline/title. */
+  function isHeadlineEcho(candidate = "", ...exclude) {
+    const line = normalizeCopyLine(candidate).toLowerCase();
+    if (!line) return true;
+    for (const raw of exclude) {
+      const other = normalizeCopyLine(raw).toLowerCase();
+      if (!other) continue;
+      if (line === other) return true;
+      if (line.includes(other) || other.includes(line)) {
+        const shorter = Math.min(line.length, other.length);
+        const longer = Math.max(line.length, other.length);
+        if (shorter >= 24 && shorter / longer >= 0.72) return true;
+      }
+      const a = new Set(line.split(/\s+/).filter((w) => w.length > 2));
+      const b = other.split(/\s+/).filter((w) => w.length > 2);
+      if (!a.size || !b.length) continue;
+      const overlap = b.filter((w) => a.has(w)).length;
+      if (overlap / Math.max(a.size, b.length) >= 0.82) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Local Impact must describe community/district effects — never echo the
+   * card headline / bill title.
+   */
+  function localImpactLine({
+    summary = "",
+    impactsList = [],
+    title = "",
+    item = {},
+    impacts = {},
+  } = {}) {
+    const focus =
+      normalizeCopyLine(item.focusDistrict || item.focus_district || "") || "";
+    const funding = normalizeCopyLine(
+      item.fundingLabel ||
+        item.funding_label ||
+        item.fundingAllocation ||
+        item.funding_allocation ||
+        ""
+    );
+    const districtDetail = Array.isArray(item.districts)
+      ? item.districts
+          .map((row) => normalizeCopyLine(row?.detail || ""))
+          .find(Boolean) || ""
+      : "";
+
+    const candidates = [
+      item.communityImpact || item.community_impact,
+      item.localImpact || item.local_impact || item.local_impact_summary,
+      impacts.impact,
+      ...asList(impactsList).slice(1),
+      ...splitCopySentences(summary).slice(1),
+      districtDetail,
+      funding && focus
+        ? `Channels ${funding} toward ${focus} and nearby communities.`
+        : "",
+      focus ? `Local effects concentrate around ${focus}.` : "",
+      asList(impactsList)[0],
+      ...splitCopySentences(summary),
+      impacts.what,
+    ]
+      .map(normalizeCopyLine)
+      .filter(Boolean);
+
+    for (const candidate of candidates) {
+      if (isHeadlineEcho(candidate, title, impacts.what)) continue;
+      const clipped = clampImpactLine(candidate, 120);
+      if (clipped && !isHeadlineEcho(clipped, title)) return clipped;
+    }
+
+    if (funding) {
+      return clampImpactLine(
+        `Shifts ${funding} into district-level projects and services.`,
+        120
+      );
+    }
+    return "Community-level effects depend on final district allocations.";
+  }
+
   function renderThemeDetail(theme, payload) {
     return withChrome(false, () => {
       if (theme === "versus") return renderVersus(payload);
@@ -266,18 +363,21 @@
    * Dense theme layouts live in the breakdown drawer template.
    */
   function renderStoryPeek(payload, theme, label) {
-    const { billId, title, category, impactsList, summary, item } = payload;
+    const { billId, title, category, impactsList, summary, item, impacts } =
+      payload;
     const { imageSrc, imageAlt, defaultStockUrl } = resolveHeroImage(item, {
       title,
       category,
       summary,
       impactsList,
     });
-    const punch = punchLine({ summary, impactsList, title });
-    const second =
-      impactsList[1] && normalizeCopyLine(impactsList[1]) !== punch
-        ? normalizeCopyLine(impactsList[1])
-        : "";
+    const impact = localImpactLine({
+      summary,
+      impactsList,
+      title,
+      item,
+      impacts,
+    });
 
     return `
       <div class="a1-story-card" data-theme="${escapeHtml(theme)}">
@@ -308,14 +408,10 @@
           </div>
           <div class="a1-story-card__copy">
             <h3 class="a1-story-card__title">${escapeHtml(title)}</h3>
-            <p class="a1-story-card__punch">${escapeHtml(punch)}</p>
-            ${
-              second
-                ? `<p class="a1-story-card__punch a1-story-card__punch--secondary">${escapeHtml(
-                    second
-                  )}</p>`
-                : ""
-            }
+            <div class="a1-story-card__impact" aria-label="Local impact">
+              <span class="a1-story-card__impact-label">Local Impact</span>
+              <p class="a1-story-card__impact-text">${escapeHtml(impact)}</p>
+            </div>
           </div>
         </div>
         <div class="a1-story-card__footer">
@@ -667,7 +763,13 @@
       })
       .join("");
 
-    const impactHtml = impactsList
+    const localBlurb = localImpactLine({
+      summary,
+      impactsList,
+      title,
+      item,
+    });
+    const impactHtml = dedupeCopyLines(impactsList, [localBlurb, title])
       .map((impact) => `<li>${escapeHtml(impact)}</li>`)
       .join("");
 
@@ -715,8 +817,8 @@
           </div>
         </section>
         <section class="a1-local__summary">
-          <p class="a1-section-label">Localized impact</p>
-          <h3>${escapeHtml(summary || title)}</h3>
+          <p class="a1-section-label">Local Impact</p>
+          <h3>${escapeHtml(localBlurb)}</h3>
           ${impactHtml ? `<ul>${impactHtml}</ul>` : ""}
         </section>
         ${reactionDockHtml()}
@@ -878,6 +980,7 @@
       category: categoryLabel,
       impactsList,
       summary,
+      impacts,
       costLabel: impacts?.costPill?.label || "",
       metrics: buildMetrics(item, impacts),
       item,
