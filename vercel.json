@@ -13,6 +13,30 @@
   },
   "rewrites": [
     {
+      "source": "/docket",
+      "destination": "/bills-policies.html"
+    },
+    {
+      "source": "/archive",
+      "destination": "/search.html"
+    },
+    {
+      "source": "/public-servants",
+      "destination": "/politicians.html"
+    },
+    {
+      "source": "/politicians",
+      "destination": "/politicians.html"
+    },
+    {
+      "source": "/my-desk",
+      "destination": "/profile.html"
+    },
+    {
+      "source": "/profile",
+      "destination": "/profile.html"
+    },
+    {
       "source": "/api/votes-feed",
       "destination": "/api/votes?route=votes-feed"
     },

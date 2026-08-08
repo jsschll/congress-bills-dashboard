@@ -785,14 +785,28 @@ export function mapLiveBillToArticleProps(
     shortPitch,
     title
   );
-  const whatItDoes = firstPresent(
+  const whatItDoesRaw = firstPresent(
     bill.whatItDoes,
     bill.what_it_does,
     bill.plainSummary,
     bill.plain_summary,
-    shortPitch,
-    title
+    shortPitch
   );
+  const titleNorm = title.trim().toLowerCase().replace(/[.…]+$/g, "");
+  const whatNorm = (whatItDoesRaw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.…]+$/g, "");
+  const whatItDoes =
+    whatItDoesRaw && whatNorm && whatNorm !== titleNorm
+      ? whatItDoesRaw
+      : firstPresent(...keyImpacts.filter((line) => {
+          const norm = String(line || "")
+            .trim()
+            .toLowerCase()
+            .replace(/[.…]+$/g, "");
+          return Boolean(norm) && norm !== titleNorm;
+        })) || whatItDoesRaw || title;
 
   const resolvedImage = resolveBillImage({
     ...bill,

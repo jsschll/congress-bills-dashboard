@@ -153,6 +153,66 @@
     return out;
   }
 
+  /** True when two lines are the same idea (exact or truncated headline echo). */
+  function isSameCopyLine(a = "", b = "") {
+    const left = normalizeCopyLine(a).toLowerCase().replace(/[.…]+$/g, "");
+    const right = normalizeCopyLine(b).toLowerCase().replace(/[.…]+$/g, "");
+    if (!left || !right) return false;
+    if (left === right) return true;
+    const shorter = left.length <= right.length ? left : right;
+    const longer = left.length <= right.length ? right : left;
+    if (shorter.length < 18) return false;
+    return longer.startsWith(shorter);
+  }
+
+  /**
+   * Local Impact blurb must describe district / community effects — never echo
+   * the card headline.
+   */
+  function resolveLocalImpactSummary(item = {}, opts = {}) {
+    const headline = normalizeCopyLine(
+      opts.title || item.short_title || item.shortTitle || item.title || ""
+    );
+    const officialTitle = normalizeCopyLine(item.title || "");
+    const exclude = [headline, officialTitle, opts.headline].filter(Boolean);
+    const candidates = [
+      opts.summary,
+      item.whatItDoes,
+      item.what_it_does,
+      item.plain_summary,
+      item.plainSummary,
+      item.shortPitch,
+      item.short_pitch,
+      item.localImpact,
+      item.local_impact,
+      item.regionalImpactSummary,
+      item.regional_impact_summary,
+      opts.impacts?.what,
+      opts.impacts?.impact,
+      ...(Array.isArray(item.key_impacts) ? item.key_impacts : []),
+      ...(Array.isArray(item.keyImpacts) ? item.keyImpacts : []),
+      ...(Array.isArray(item.key_points) ? item.key_points : []),
+    ]
+      .map(normalizeCopyLine)
+      .filter(Boolean);
+
+    const distinct = candidates.find(
+      (line) => !exclude.some((other) => isSameCopyLine(line, other))
+    );
+    if (distinct) return distinct;
+
+    const focus =
+      normalizeCopyLine(item.focusDistrict || item.focus_district) ||
+      "the focus district";
+    const funding = normalizeCopyLine(
+      item.fundingLabel || item.funding_label || item.fundingAllocation
+    );
+    if (funding) {
+      return `${funding} earmarked with the heaviest local effects in ${focus}.`;
+    }
+    return `District-level effects concentrate in ${focus}, beyond the bill's headline scope.`;
+  }
+
   function resolveCardCopy(item = {}, opts = {}) {
     const impacts = opts.impacts || {};
     const title = normalizeCopyLine(
@@ -168,15 +228,22 @@
       item.shortPitch,
       item.short_pitch,
       impacts.what,
-      title,
+      impacts.impact,
     ].map(normalizeCopyLine).filter(Boolean);
 
-    // Prefer a summary that is not just a repeat of the first key impact.
+    // Prefer a summary that is not just a repeat of the headline or key impact.
     let summary =
       altSummaries.find(
         (line) =>
-          !rawImpacts.some((impact) => impact.toLowerCase() === line.toLowerCase())
-      ) || altSummaries[0] || title;
+          !isSameCopyLine(line, title) &&
+          !rawImpacts.some((impact) => isSameCopyLine(impact, line))
+      ) ||
+      altSummaries.find((line) => !isSameCopyLine(line, title)) ||
+      "";
+
+    if (!summary) {
+      summary = resolveLocalImpactSummary(item, { ...opts, title, impacts });
+    }
 
     const impactsList = dedupeCopyLines(rawImpacts, [summary, title]).slice(0, 2);
     return { title, summary, impactsList };
@@ -244,8 +311,16 @@
   }
 
   function punchLine({ summary = "", impactsList = [], title = "" } = {}) {
-    const firstImpact = normalizeCopyLine(impactsList[0] || "");
-    const line = normalizeCopyLine(firstImpact || summary || title);
+    const candidates = [
+      ...impactsList.map(normalizeCopyLine),
+      normalizeCopyLine(summary),
+    ].filter(Boolean);
+    const line =
+      candidates.find((entry) => !isSameCopyLine(entry, title)) ||
+      normalizeCopyLine(summary) ||
+      normalizeCopyLine(impactsList[0] || "") ||
+      "";
+    if (!line || isSameCopyLine(line, title)) return "";
     if (line.length <= 110) return line;
     return `${line.slice(0, 107).replace(/\s+\S*$/, "").trim()}…`;
   }
@@ -274,9 +349,12 @@
       impactsList,
     });
     const punch = punchLine({ summary, impactsList, title });
+    const secondCandidate = normalizeCopyLine(impactsList[1] || "");
     const second =
-      impactsList[1] && normalizeCopyLine(impactsList[1]) !== punch
-        ? normalizeCopyLine(impactsList[1])
+      secondCandidate &&
+      !isSameCopyLine(secondCandidate, punch) &&
+      !isSameCopyLine(secondCandidate, title)
+        ? secondCandidate
         : "";
 
     return `
@@ -308,7 +386,11 @@
           </div>
           <div class="a1-story-card__copy">
             <h3 class="a1-story-card__title">${escapeHtml(title)}</h3>
-            <p class="a1-story-card__punch">${escapeHtml(punch)}</p>
+            ${
+              punch
+                ? `<p class="a1-story-card__punch">${escapeHtml(punch)}</p>`
+                : ""
+            }
             ${
               second
                 ? `<p class="a1-story-card__punch a1-story-card__punch--secondary">${escapeHtml(
@@ -645,6 +727,17 @@
     const regional =
       item.regionalImpact || item.regional_impact || "High";
 
+    const localImpact = resolveLocalImpactSummary(item, {
+      title,
+      summary,
+      impacts: { impact: impactsList[0], what: summary },
+    });
+    const distinctImpacts = dedupeCopyLines(impactsList, [
+      localImpact,
+      title,
+      summary,
+    ]).slice(0, 2);
+
     const districtHtml = districts
       .map((row) => {
         const emphasis = Boolean(row.emphasis);
@@ -667,7 +760,7 @@
       })
       .join("");
 
-    const impactHtml = impactsList
+    const impactHtml = distinctImpacts
       .map((impact) => `<li>${escapeHtml(impact)}</li>`)
       .join("");
 
@@ -698,7 +791,7 @@
             <p class="a1-local__map-caption">${escapeHtml(focus)}</p>
           </section>
         </div>
-        <section class="a1-local__metrics" aria-label="Localized metrics">
+        <section class="a1-local__metrics" aria-label="Local metrics">
           <div class="a1-local__metric">
             <p class="a1-section-label">Funding allocation</p>
             <p class="a1-local__metric-value">${escapeHtml(funding)}</p>
@@ -715,8 +808,8 @@
           </div>
         </section>
         <section class="a1-local__summary">
-          <p class="a1-section-label">Localized impact</p>
-          <h3>${escapeHtml(summary || title)}</h3>
+          <p class="a1-section-label">Local Impact</p>
+          <h3>${escapeHtml(localImpact)}</h3>
           ${impactHtml ? `<ul>${impactHtml}</ul>` : ""}
         </section>
         ${reactionDockHtml()}

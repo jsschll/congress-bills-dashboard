@@ -86,13 +86,23 @@ function createNavShell(activePage = "home") {
   nav.className = "app-nav";
   nav.setAttribute("aria-label", "Main");
 
-  const link = (page, href, label) =>
-    `<a class="app-nav__link ${
-      activePage === page ? "is-active" : ""
-    }" href="${href}"${activePage === page ? ' aria-current="page"' : ""}>${label}</a>`;
+  const docketActive =
+    activePage === "feed" ||
+    activePage === "bills-policies" ||
+    activePage === "docket";
+  const archiveActive =
+    activePage === "search" || activePage === "archive";
+  const servantsActive =
+    activePage === "politicians" ||
+    activePage === "public-servants" ||
+    activePage === "politician";
+  const deskActive =
+    activePage === "profile" || activePage === "my-desk";
 
-  const feedActive =
-    activePage === "feed" || activePage === "bills-policies" ? "is-active" : "";
+  const link = (isActive, href, label) =>
+    `<a class="app-nav__link ${isActive ? "is-active" : ""}" href="${href}"${
+      isActive ? ' aria-current="page"' : ""
+    }>${label}</a>`;
 
   nav.innerHTML = `
     <div class="app-nav__inner">
@@ -100,15 +110,11 @@ function createNavShell(activePage = "home") {
         ${NAV_LOGO_SVG}
         <span class="app-nav__brand-text">Article 1</span>
       </a>
-      <div class="app-nav__links">
-        ${link("home", "index.html", "Home")}
-        ${link("search", "search.html", "Legislation")}
-        <a class="app-nav__link ${feedActive}" href="bills-policies.html"${
-          feedActive ? ' aria-current="page"' : ""
-        }>Feed</a>
-        ${link("topics", "topics.html", "Topics")}
-        ${link("politicians", "politicians.html", "Politicians")}
-        ${link("profile", "profile.html", "Profile")}
+      <div class="app-nav__links" role="navigation" aria-label="Primary">
+        ${link(docketActive, "bills-policies.html", "The Docket")}
+        ${link(archiveActive, "search.html", "The Archive")}
+        ${link(servantsActive, "politicians.html", "Public Servants")}
+        ${link(deskActive, "profile.html", "My Desk")}
       </div>
       <div class="app-nav__actions" id="app-nav-actions"></div>
     </div>
