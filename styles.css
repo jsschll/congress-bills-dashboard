@@ -4130,19 +4130,19 @@ body {
 }
 
 .page-feed .page {
-  padding-top: 0.85rem;
-  padding-bottom: 2rem;
+  padding-top: 0.55rem;
+  padding-bottom: 1.75rem;
 }
 
 .page-feed .header.feed-chrome {
   align-items: center;
-  gap: 0.4rem 0.55rem;
-  margin-bottom: 0.2rem;
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 0.1rem;
 }
 
 .page-feed .feed-chrome__title,
 .page-feed .header h1 {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   margin: 0;
 }
 
