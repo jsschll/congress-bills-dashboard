@@ -10,16 +10,15 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Figtree:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260807glass" />
+    <link rel="stylesheet" href="styles.css?v=20260808feedchrome" />
     <link rel="stylesheet" href="article1-themes.css?v=20260807story" />
   </head>
   <body class="page-app page-feed">
     <nav id="app-nav" class="app-nav" aria-label="Main"></nav>
 
     <main class="page page--policy-feed">
-      <header class="header">
+      <header class="header page-feed__header">
         <div>
-          <p class="eyebrow">Legislation</p>
           <h1>Feed</h1>
           <p class="subtitle page-feed__lede">
             Government activity, follows, and related suggestions.
@@ -71,8 +70,8 @@
         aria-label="Filter bills"
       >
         <label class="policy-feed-filters__field">
-          <span>State</span>
-          <select id="policy-state-filter" name="state">
+          <span class="visually-hidden">State</span>
+          <select id="policy-state-filter" name="state" aria-label="State">
             <option value="">All states</option>
           </select>
         </label>
@@ -82,7 +81,7 @@
         </label>
         <form id="policy-location-form" class="policy-feed-filters__location" hidden>
           <label class="policy-feed-filters__field policy-feed-filters__field--grow">
-            <span>Address or ZIP</span>
+            <span class="visually-hidden">Address or ZIP</span>
             <input
               id="policy-location-input"
               type="text"
@@ -91,7 +90,8 @@
               autocapitalize="off"
               autocorrect="off"
               spellcheck="false"
-              placeholder="Street address or ZIP code"
+              placeholder="Address or ZIP"
+              aria-label="Address or ZIP"
             />
           </label>
           <button class="refresh-btn" type="submit">Apply</button>
@@ -101,7 +101,12 @@
 
       <div id="policy-feed-panel">
         <section class="policy-feed-summary">
-          <div id="policy-feed-coverage" class="policy-feed-coverage"></div>
+          <div
+            id="policy-feed-coverage"
+            class="policy-feed-coverage"
+            hidden
+            aria-hidden="true"
+          ></div>
           <p id="policy-feed-status" class="status" hidden></p>
         </section>
 
@@ -208,6 +213,6 @@
     <script src="impact.js?v=20260729z"></script>
     <script src="lib/utils/billImageMapper.js?v=20260807stockfix"></script>
     <script src="article1-themes.js?v=20260807story"></script>
-    <script src="bills-policies.js?v=20260807story" defer></script>
+    <script src="bills-policies.js?v=20260808feedchrome" defer></script>
   </body>
 </html>

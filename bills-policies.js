@@ -199,23 +199,12 @@ function friendlyCoverageLabel(level, status) {
   return status || "Unavailable";
 }
 
-function renderCoverageBadges(coverage = {}) {
-  const entries = Object.entries(coverage || {});
-  if (!entries.length) {
-    policyFeedCoverage.replaceChildren();
-    policyFeedCoverage.hidden = true;
-    return;
-  }
-  policyFeedCoverage.hidden = false;
-  policyFeedCoverage.replaceChildren(
-    ...entries.map(([level, status]) => {
-      const badge = document.createElement("span");
-      badge.className = `policy-feed-coverage__badge ${coverageTone(level, status)}`;
-      badge.textContent = `${level}: ${friendlyCoverageLabel(level, status)}`;
-      badge.title = coverageSummaryText({ [level]: status });
-      return badge;
-    })
-  );
+function renderCoverageBadges(_coverage = {}) {
+  // Status pills (Federal: Live, State: coming soon, etc.) are intentionally
+  // hidden to keep the feed chrome compact above the card stream.
+  if (!policyFeedCoverage) return;
+  policyFeedCoverage.replaceChildren();
+  policyFeedCoverage.hidden = true;
 }
 
 function coverageSummaryText(coverage = {}) {
@@ -3024,9 +3013,8 @@ function setActiveTab(tabName) {
   if (votesFeedPanel) votesFeedPanel.hidden = !isVotes;
   if (feedManageTopics) feedManageTopics.hidden = tabName === "all" || isVotes;
 
-  // Coverage badges are most useful on All News.
   if (policyFeedCoverage) {
-    policyFeedCoverage.hidden = tabName !== "all";
+    policyFeedCoverage.hidden = true;
   }
 
   syncTabQuery(tabName);
