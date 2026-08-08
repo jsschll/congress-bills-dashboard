@@ -508,16 +508,16 @@ function renderOverview(person, congress) {
               aria-controls="politician-note-popover"
             >
               <span class="politician-profile-note-btn__icon" aria-hidden="true">📝</span>
-              <span class="politician-profile-note-btn__label">Private note</span>
+              <span class="politician-profile-note-btn__label">Journal</span>
             </button>
             <div
               id="politician-note-popover"
               class="politician-profile-note-popover"
               role="dialog"
-              aria-label="Private note preview"
+              aria-label="Journal preview"
               hidden
             >
-              <p class="politician-profile-note-popover__kicker">Your private note</p>
+              <p class="politician-profile-note-popover__kicker">Your Journal</p>
               <div
                 id="politician-note-preview"
                 class="politician-profile-note-popover__body"
@@ -531,14 +531,14 @@ function renderOverview(person, congress) {
                   class="politician-profile-note-popover__secondary"
                   data-note-action="edit"
                 >
-                  Add note
+                  Add Journal
                 </button>
               </div>
             </div>
           </div>
         </div>
         <p class="politician-profile-follow__hint">
-          Follow for My Feed updates · Notes stay private to you
+          Follow for Docket updates · Journal stays private to you
         </p>
       </div>
       <div class="politician-profile-contact" aria-label="Contact links">
@@ -1512,14 +1512,14 @@ function refreshNoteUi() {
   const editBtn = document.querySelector(
     "#politician-note-popover [data-note-action='edit']"
   );
-  const text = noteHasContent() ? "Your note" : "Private note";
+  const text = noteHasContent() ? "Your Journal" : "Journal";
   if (label) label.textContent = text;
   if (button) {
     button.setAttribute(
       "aria-label",
       noteHasContent()
-        ? `Your private note for ${activePerson?.name || "this official"}`
-        : `Private note for ${activePerson?.name || "this official"}`
+        ? `Your Journal for ${activePerson?.name || "this official"}`
+        : `Journal for ${activePerson?.name || "this official"}`
     );
   }
   if (preview) {
@@ -1527,12 +1527,12 @@ function refreshNoteUi() {
       preview.textContent = String(politicianNote.body);
       preview.classList.remove("is-empty");
     } else {
-      preview.textContent = "No note yet. Add a private note for this official.";
+      preview.textContent = "No Journal yet. Add a private Journal for this official.";
       preview.classList.add("is-empty");
     }
   }
   if (editBtn) {
-    editBtn.textContent = noteHasContent() ? "Edit note" : "Add note";
+    editBtn.textContent = noteHasContent() ? "Edit Journal" : "Add Journal";
   }
   if (noteBodyInput && notesModal && !notesModal.hidden) {
     noteBodyInput.value = String(politicianNote?.body || "");
@@ -1733,14 +1733,14 @@ async function savePoliticianNote(person, user) {
   const client = typeof getSupabase === "function" ? getSupabase() : null;
   if (!client || !user) {
     promptPoliticianAuth({
-      title: "Save notes with a free account",
+      title: "File a Journal with a free account",
       body: "Create a free account to keep private notes on meetings and follow-ups with your representatives.",
     });
     return;
   }
   const body = String(noteBodyInput?.value || "").trim();
   if (!body) {
-    setNotesStatus("Write something before saving.", "error");
+    setNotesStatus("Write something before filing.", "error");
     return;
   }
   const politicianId = await ensurePoliticianId(person);
@@ -1786,7 +1786,7 @@ async function savePoliticianNote(person, user) {
   }
 
   await loadPoliticianNote(person, user);
-  setNotesStatus("Note saved.", "success");
+  setNotesStatus("Journal filed.", "success");
 }
 
 async function clearPoliticianNote(person, user) {
@@ -1801,7 +1801,7 @@ async function clearPoliticianNote(person, user) {
   politicianNote = null;
   if (noteBodyInput) noteBodyInput.value = "";
   refreshNoteUi();
-  setNotesStatus("Note cleared.", "success");
+  setNotesStatus("Journal cleared.", "success");
 }
 
 async function setupNotes(person) {
@@ -1820,7 +1820,7 @@ async function setupNotes(person) {
     await loadPoliticianNote(person, user);
   } catch (error) {
     console.error(error);
-    setNotesStatus(error.message || "Could not load note.", "error");
+    setNotesStatus(error.message || "Could not load Journal.", "error");
   }
 }
 
@@ -1861,21 +1861,21 @@ document.addEventListener("pointerdown", (event) => {
 
 noteSaveBtn?.addEventListener("click", async () => {
   if (!activePerson) return;
-  setNotesStatus("Saving note…", "loading");
+  setNotesStatus("Filing Journal…", "loading");
   noteSaveBtn.disabled = true;
   noteSaveBtn.classList.add("is-loading");
   try {
     const user = typeof getUser === "function" ? await getUser() : null;
     await savePoliticianNote(activePerson, user);
     if (typeof showAppToast === "function") {
-      showAppToast("Private note saved.", "success");
+      showAppToast("Journal filed.", "success");
     }
     if (typeof flashSuccessBadge === "function") {
       flashSuccessBadge(noteSaveBtn, "Saved");
     }
   } catch (error) {
     console.error(error);
-    setNotesStatus(error.message || "Could not save note.", "error");
+    setNotesStatus(error.message || "Could not file Journal.", "error");
     if (typeof showAppToast === "function") {
       showAppToast(error.message || "Could not save note.", "error");
     }
@@ -1887,18 +1887,18 @@ noteSaveBtn?.addEventListener("click", async () => {
 
 noteClearBtn?.addEventListener("click", async () => {
   if (!activePerson || !politicianNote?.id) return;
-  setNotesStatus("Clearing note…", "loading");
+  setNotesStatus("Clearing Journal…", "loading");
   noteClearBtn.disabled = true;
   noteClearBtn.classList.add("is-loading");
   try {
     const user = typeof getUser === "function" ? await getUser() : null;
     await clearPoliticianNote(activePerson, user);
     if (typeof showAppToast === "function") {
-      showAppToast("Private note cleared.", "info");
+      showAppToast("Journal cleared.", "info");
     }
   } catch (error) {
     console.error(error);
-    setNotesStatus(error.message || "Could not clear note.", "error");
+    setNotesStatus(error.message || "Could not clear Journal.", "error");
     if (typeof showAppToast === "function") {
       showAppToast(error.message || "Could not clear note.", "error");
     }

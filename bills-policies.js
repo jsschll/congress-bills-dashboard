@@ -2100,14 +2100,14 @@ function ensureFeedBreakdownDrawer() {
       <div class="feed-breakdown-drawer__handle" aria-hidden="true"></div>
       <header class="feed-breakdown-drawer__header">
         <div>
-          <p class="feed-breakdown-drawer__eyebrow">Full breakdown</p>
-          <h2 id="feed-breakdown-title">Bill details</h2>
+          <p class="feed-breakdown-drawer__eyebrow">Audit</p>
+          <h2 id="feed-breakdown-title">Audit</h2>
         </div>
         <button
           type="button"
           class="feed-breakdown-drawer__close"
           data-close-breakdown="1"
-          aria-label="Close breakdown"
+          aria-label="Close Audit"
         >✕</button>
       </header>
       <div class="feed-breakdown-drawer__body" id="feed-breakdown-body"></div>
@@ -2154,13 +2154,17 @@ function openFeedBreakdownDrawer(card, item = {}) {
   const detail = template.content.cloneNode(true);
   body.replaceChildren(detail);
 
-  const headline =
-    item.short_title ||
-    item.shortTitle ||
-    item.title ||
-    card.querySelector(".a1-story-card__title")?.textContent ||
-    "Bill details";
-  if (titleEl) titleEl.textContent = String(headline).trim() || "Bill details";
+  if (titleEl) titleEl.textContent = "Audit";
+  const eyebrow = drawer.querySelector(".feed-breakdown-drawer__eyebrow");
+  if (eyebrow) {
+    const headline =
+      item.short_title ||
+      item.shortTitle ||
+      item.title ||
+      card.querySelector(".a1-story-card__title")?.textContent ||
+      "";
+    eyebrow.textContent = String(headline).trim() || "Audit";
+  }
 
   // Wire Ask AI inside the drawer to the same bill item.
   body.querySelectorAll(".details-toggle-btn, .a1-ask-ai-btn").forEach((btn) => {
@@ -2204,9 +2208,9 @@ function syncFeedBookmarkButton(button, item) {
   button.setAttribute("aria-pressed", String(following));
   button.setAttribute(
     "aria-label",
-    following ? "Remove bookmark" : "Bookmark this bill"
+    following ? "Remove from File" : "File this bill"
   );
-  button.title = following ? "Bookmarked" : "Bookmark";
+  button.title = following ? "Filed" : "File";
 }
 
 function wireFeedCardMicroActions(card, item) {
@@ -2223,7 +2227,7 @@ function wireFeedCardMicroActions(card, item) {
       await window.PolicyEngagement.toggleFollowBill(item);
       syncFeedBookmarkButton(bookmark, item);
     } catch (error) {
-      alert(error?.message || "Could not update bookmark.");
+      alert(error?.message || "Could not update File.");
     } finally {
       bookmark.disabled = false;
     }
@@ -2323,7 +2327,7 @@ function renderSocialFeedCardShell({
         </div>
       </div>
       <div class="feed-social-card__micro" aria-label="Card actions">
-        <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="Bookmark this bill" aria-pressed="false" title="Bookmark">🔖</button>
+        <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="File this bill" aria-pressed="false" title="File">📎</button>
         <button type="button" class="feed-card-icon-btn feed-card-share" aria-label="Share" title="Share">📤</button>
       </div>
     </div>

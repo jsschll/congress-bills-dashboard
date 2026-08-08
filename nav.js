@@ -9,9 +9,51 @@ const NAV_LOGO_SVG = `
   </span>
 `.trim();
 
+/** Primary chrome tabs — keep labels and routes in one place. */
+const PRIMARY_NAV = [
+  {
+    id: "docket",
+    href: "/docket",
+    label: "The Docket",
+    aliases: ["feed", "bills-policies"],
+  },
+  {
+    id: "archive",
+    href: "/archive",
+    label: "The Archive",
+    aliases: ["search"],
+  },
+  {
+    id: "representatives",
+    href: "/representatives",
+    label: "Public Servants",
+    aliases: ["politicians"],
+  },
+  {
+    id: "my-desk",
+    href: "/my-desk",
+    label: "My Desk",
+    aliases: ["profile"],
+  },
+];
+
+function normalizeNavPage(activePage = "") {
+  const page = String(activePage || "").trim();
+  if (!page) return "";
+  for (const item of PRIMARY_NAV) {
+    if (item.id === page || item.aliases.includes(page)) return item.id;
+  }
+  return page;
+}
+
+function isNavItemActive(item, activePage = "") {
+  const page = normalizeNavPage(activePage);
+  return page === item.id;
+}
+
 function buildLoggedOutActions(actions, activePage = "") {
   actions.replaceChildren();
-  if (activePage === "auth") return;
+  if (normalizeNavPage(activePage) === "auth" || activePage === "auth") return;
 
   const signIn = document.createElement("a");
   signIn.className = "app-nav__button app-nav__button--ghost";
@@ -24,36 +66,6 @@ function buildLoggedOutActions(actions, activePage = "") {
   signUp.textContent = "Sign up";
 
   actions.append(signIn, signUp);
-}
-
-function syncHeaderAuth(user, profile = null) {
-  const headerActions = document.querySelector(".header__actions");
-  if (!headerActions) return;
-
-  const refreshBtn = headerActions.querySelector("#refresh-btn");
-  headerActions.replaceChildren();
-
-  if (user) {
-    const menu = buildUserMenuControl(user, profile, {
-      compact: true,
-      onSignOut: () => signOut(),
-    });
-    headerActions.append(menu);
-  } else {
-    const signIn = document.createElement("a");
-    signIn.className = "app-nav__button app-nav__button--ghost";
-    signIn.href = "auth.html";
-    signIn.textContent = "Sign in";
-
-    const signUp = document.createElement("a");
-    signUp.className = "app-nav__button app-nav__button--primary";
-    signUp.href = "auth.html?mode=signup";
-    signUp.textContent = "Sign up";
-
-    headerActions.append(signIn, signUp);
-  }
-
-  if (refreshBtn) headerActions.append(refreshBtn);
 }
 
 function createNavShell(activePage = "home") {
@@ -86,29 +98,21 @@ function createNavShell(activePage = "home") {
   nav.className = "app-nav";
   nav.setAttribute("aria-label", "Main");
 
-  const link = (page, href, label) =>
-    `<a class="app-nav__link ${
-      activePage === page ? "is-active" : ""
-    }" href="${href}"${activePage === page ? ' aria-current="page"' : ""}>${label}</a>`;
-
-  const feedActive =
-    activePage === "feed" || activePage === "bills-policies" ? "is-active" : "";
+  const links = PRIMARY_NAV.map((item) => {
+    const active = isNavItemActive(item, activePage);
+    return `<a class="app-nav__link${active ? " is-active" : ""}" href="${
+      item.href
+    }"${active ? ' aria-current="page"' : ""}>${item.label}</a>`;
+  }).join("");
 
   nav.innerHTML = `
     <div class="app-nav__inner">
-      <a class="app-nav__brand" href="index.html">
+      <a class="app-nav__brand" href="index.html" aria-label="Article 1 home">
         ${NAV_LOGO_SVG}
         <span class="app-nav__brand-text">Article 1</span>
       </a>
       <div class="app-nav__links">
-        ${link("home", "index.html", "Home")}
-        ${link("search", "search.html", "Legislation")}
-        <a class="app-nav__link ${feedActive}" href="bills-policies.html"${
-          feedActive ? ' aria-current="page"' : ""
-        }>Feed</a>
-        ${link("topics", "topics.html", "Topics")}
-        ${link("politicians", "politicians.html", "Politicians")}
-        ${link("profile", "profile.html", "Profile")}
+        ${links}
       </div>
       <div class="app-nav__actions" id="app-nav-actions"></div>
     </div>
@@ -215,9 +219,9 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
   };
 
   panel.append(
-    mkItem("a", { href: "politicians.html?following=1", text: "Following" }),
-    mkItem("a", { href: "profile.html#account", text: "Settings" }),
-    mkItem("a", { href: "profile.html", text: "Profile" }),
+    mkItem("a", { href: "/representatives?following=1", text: "Following" }),
+    mkItem("a", { href: "/my-desk#account", text: "Settings" }),
+    mkItem("a", { href: "/my-desk", text: "My Desk" }),
     mkItem("button", {
       text: "Sign out",
       danger: true,
@@ -330,7 +334,7 @@ function buildNotificationBell(notifications, unreadCount) {
     notifications.forEach((item) => {
       const li = document.createElement("li");
       const link = document.createElement("a");
-      link.href = `bills-policies.html?tab=mine&n=${encodeURIComponent(item.id)}`;
+      link.href = `/docket?tab=mine&n=${encodeURIComponent(item.id)}`;
       link.className = `notif-bell__item ${item.read_at ? "" : "is-unread"}`;
       link.innerHTML = `
         <strong>${escapeHtml(item.bill_title || "Bill update")}</strong>
@@ -353,8 +357,8 @@ function buildNotificationBell(notifications, unreadCount) {
 
     const footer = document.createElement("a");
     footer.className = "notif-bell__footer";
-    footer.href = "bills-policies.html?tab=mine";
-    footer.textContent = "Open feed";
+    footer.href = "/docket?tab=mine";
+    footer.textContent = "Open The Docket";
     panel.append(footer);
   }
 
@@ -404,18 +408,17 @@ async function renderAppNav(activePage = "home") {
     if (typeof clearSharedLocationStorage === "function") {
       clearSharedLocationStorage();
     }
-    syncHeaderAuth(null);
     buildLoggedOutActions(actions, activePage);
-    // Profile stays gated — open contextual auth modal instead of dumping guests
+    // My Desk stays gated — open contextual auth modal instead of dumping guests
     // onto auth.html mid-browse.
-    nav.querySelectorAll('a[href="profile.html"]').forEach((link) => {
+    nav.querySelectorAll('a[href="/my-desk"]').forEach((link) => {
       link.addEventListener("click", (event) => {
         if (typeof promptAuthGate !== "function") return;
         event.preventDefault();
         promptAuthGate({
-          next: "profile.html",
-          title: "Your profile is one step away",
-          body: "Create a free account to save your location, follow representatives, and keep a personal Action Match.",
+          next: "/my-desk",
+          title: "Your desk is one step away",
+          body: "Create a free account to save your location, follow representatives, and keep a personal Journal.",
         });
       });
     });
@@ -429,7 +432,6 @@ async function renderAppNav(activePage = "home") {
   }
 
   const profile = await getNavProfile(user);
-  syncHeaderAuth(user, profile);
 
   let unreadCount = 0;
   let notifications = [];

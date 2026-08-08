@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Profile · Article 1</title>
+    <title>My Desk · Article 1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -18,11 +18,11 @@
     <main class="page page--profile">
       <header class="header profile-header">
         <div class="profile-header__intro">
-          <p class="eyebrow">Your civic profile</p>
-          <h1 id="profile-heading">Profile</h1>
+          <p class="eyebrow">Personal workspace</p>
+          <h1 id="profile-heading">My Desk</h1>
           <p class="subtitle">
             Set your location, see who represents you, and manage what you
-            follow.
+            follow — plus your Journal and filed items.
           </p>
         </div>
         <div class="profile-header__avatar-wrap" aria-hidden="true">
@@ -709,20 +709,20 @@
               >Civic action tracker</span
             >
             <span class="profile-accordion__summary"
-              >Private notes and contact logs</span
+              >Journal entries and contact logs</span
             >
           </span>
           <span class="profile-accordion__icon" aria-hidden="true"></span>
         </button>
         <div class="profile-accordion__body">
           <p class="profile-panel__lede">
-            Private notes on bills and a log of outreach to representatives.
+            Journal entries on bills and a log of outreach to representatives.
             Only you can see these.
           </p>
 
           <div class="profile-actions-forms">
             <form id="profile-note-form" class="profile-form profile-action-form">
-              <h3>Saved note</h3>
+              <h3>Journal</h3>
               <label class="profile-form__field">
                 <span>Related bill (optional)</span>
                 <select id="note-bill-select">
@@ -738,7 +738,7 @@
                 />
               </label>
               <label class="profile-form__field">
-                <span>Note title (optional)</span>
+                <span>Journal title (optional)</span>
                 <input
                   id="note-title"
                   type="text"
@@ -746,7 +746,7 @@
                 />
               </label>
               <label class="profile-form__field">
-                <span>Note</span>
+                <span>Journal</span>
                 <textarea
                   id="note-body"
                   rows="4"
@@ -758,7 +758,7 @@
                 <span>Date</span>
                 <input id="note-date" type="date" required />
               </label>
-              <button class="refresh-btn" type="submit">Save note</button>
+              <button class="refresh-btn" type="submit">File</button>
             </form>
 
             <form
@@ -832,7 +832,7 @@
                   class="profile-actions-filter"
                   data-filter="note"
                 >
-                  Notes
+                  Journal
                 </button>
                 <button
                   type="button"
@@ -973,7 +973,7 @@
 
     <script src="config.js"></script>
     <script src="shared.js?v=20260806guestux"></script>
-    <script src="nav.js?v=20260806guestux"></script>
+    <script src="nav.js?v=20260808civicnav"></script>
     <script src="politicians-shared.js?v=20260806guestux"></script>
     <script src="engagement.js?v=20260806guestux"></script>
     <script src="profile.js?v=20260806guestux" defer></script>

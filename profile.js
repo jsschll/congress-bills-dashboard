@@ -1934,7 +1934,7 @@ noteForm?.addEventListener("submit", async (event) => {
     noteForm.reset();
     setDefaultActionDates();
     fillBillSelects();
-    setProfileStatus("Note saved.", "success");
+    setProfileStatus("Journal filed.", "success");
   } catch (error) {
     console.error(error);
     setProfileStatus(error.message || "Could not save note.", "error");

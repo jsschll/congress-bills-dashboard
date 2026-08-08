@@ -195,7 +195,7 @@
     if (!includeChrome) return "";
     return `
       <div class="a1-micro-actions" aria-label="Card actions">
-        <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="Bookmark this bill" aria-pressed="false" title="Bookmark">🔖</button>
+        <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="File this bill" aria-pressed="false" title="File">📎</button>
         <button type="button" class="feed-card-icon-btn feed-card-share" aria-label="Share" title="Share">📤</button>
       </div>
     `;
@@ -321,7 +321,7 @@
         <div class="a1-story-card__footer">
           <button type="button" class="a1-story-card__breakdown" data-feed-breakdown="1">
             <span aria-hidden="true">↕</span>
-            Tap for Full Breakdown / AI Summary
+            Tap for Audit / AI Summary
           </button>
           ${reactionDockHtml()}
         </div>
@@ -897,7 +897,7 @@
           <template class="a1-story-detail-template">
             <div class="a1-story-detail" data-a1-theme="${escapeHtml(theme)}">
               <div class="a1-story-detail__intro">
-                <p class="a1-story-detail__eyebrow">${escapeHtml(label)} · Full breakdown</p>
+                <p class="a1-story-detail__eyebrow">Audit · ${escapeHtml(label)}</p>
                 <h3 class="a1-story-detail__title">${escapeHtml(title)}</h3>
                 <p class="a1-story-detail__bill">${escapeHtml(billId)} · ${escapeHtml(
                   categoryLabel
