@@ -4,6 +4,9 @@ const policyFeedList = document.getElementById("policy-feed-list");
 const policyFeedEmpty = document.getElementById("policy-feed-empty");
 const policyFeedPanel = document.getElementById("policy-feed-panel");
 const policyFeedFilters = document.getElementById("policy-feed-filters");
+const feedLocation = document.querySelector(".feed-location");
+const locationPill = document.getElementById("policy-location-pill");
+const locationPillLabel = document.getElementById("policy-location-pill-label");
 const forYouFeedPanel = document.getElementById("foryou-feed-panel");
 const forYouStatus = document.getElementById("foryou-status");
 const forYouList = document.getElementById("foryou-list");
@@ -386,11 +389,14 @@ function syncFilterControls() {
   if (locationForm) {
     locationForm.hidden = !filterState.locationOn;
   }
+  syncLocationPill();
+  setLocationPanelOpen(locationPanelOpen);
   updateFilterStatusLine();
   syncLocationFilterButton();
 }
 
 function updateFilterStatusLine() {
+  syncLocationPill();
   if (!filterStatus) return;
   const parts = [];
   if (filterState.stateCode) {
@@ -3247,6 +3253,7 @@ votesSubjectChips?.addEventListener("click", (event) => {
 
 stateFilterSelect?.addEventListener("change", async () => {
   filterState.stateCode = String(stateFilterSelect.value || "").toUpperCase();
+  syncLocationPill();
   await refreshWithFilters();
 });
 
@@ -3261,6 +3268,7 @@ locationToggle?.addEventListener("change", async () => {
     filterState.locationOn &&
     !String(locationInput?.value || filterState.addressQuery || "").trim()
   ) {
+    setLocationPanelOpen(true);
     locationInput?.focus();
     setPolicyFeedStatus("Enter an address or ZIP, then click Apply.", "error");
     recomputeVisibleItems();
@@ -3282,6 +3290,26 @@ locationForm?.addEventListener("submit", async (event) => {
   }
   await saveHomeAddress(filterState.addressQuery);
   await refreshWithFilters({ resolveLocation: true });
+  setLocationPanelOpen(false);
+});
+
+locationPill?.addEventListener("click", (event) => {
+  event.preventDefault();
+  if (activeTab !== "all" && activeTab !== "mine") return;
+  setLocationPanelOpen(!locationPanelOpen);
+});
+
+document.addEventListener("click", (event) => {
+  if (!locationPanelOpen || !feedLocation) return;
+  const target = event.target;
+  if (target instanceof Node && feedLocation.contains(target)) return;
+  setLocationPanelOpen(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && locationPanelOpen) {
+    setLocationPanelOpen(false);
+  }
 });
 
 locationFilterBtn?.addEventListener("click", (event) => {
