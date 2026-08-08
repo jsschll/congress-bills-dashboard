@@ -202,22 +202,17 @@ function friendlyCoverageLabel(level, status) {
 }
 
 function renderCoverageBadges(coverage = {}) {
+  // Compact feed chrome: keep coverage data for tooltips/debug, but do not
+  // render the badge strip — it competes with the card stream for vertical space.
+  if (!policyFeedCoverage) return;
   const entries = Object.entries(coverage || {});
-  if (!entries.length) {
-    policyFeedCoverage.replaceChildren();
-    policyFeedCoverage.hidden = true;
-    return;
+  policyFeedCoverage.replaceChildren();
+  policyFeedCoverage.hidden = true;
+  if (entries.length) {
+    policyFeedCoverage.title = coverageSummaryText(Object.fromEntries(entries));
+  } else {
+    policyFeedCoverage.removeAttribute("title");
   }
-  policyFeedCoverage.hidden = false;
-  policyFeedCoverage.replaceChildren(
-    ...entries.map(([level, status]) => {
-      const badge = document.createElement("span");
-      badge.className = `policy-feed-coverage__badge ${coverageTone(level, status)}`;
-      badge.textContent = `${level}: ${friendlyCoverageLabel(level, status)}`;
-      badge.title = coverageSummaryText({ [level]: status });
-      return badge;
-    })
-  );
 }
 
 function coverageSummaryText(coverage = {}) {
@@ -3289,7 +3284,9 @@ locationForm?.addEventListener("submit", async (event) => {
   await refreshWithFilters({ resolveLocation: true });
 });
 
-locationFilterBtn?.addEventListener("click", () => {
+locationFilterBtn?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
   setLocationPanelOpen(!locationPanelOpen);
   if (locationPanelOpen && filterState.locationOn) {
     locationInput?.focus();
