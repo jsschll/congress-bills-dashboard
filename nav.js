@@ -13,25 +13,25 @@ const NAV_LOGO_SVG = `
 const PRIMARY_NAV = [
   {
     id: "docket",
-    href: "/docket",
+    href: "bills-policies.html",
     label: "The Docket",
     aliases: ["feed", "bills-policies"],
   },
   {
     id: "archive",
-    href: "/archive",
+    href: "search.html",
     label: "The Archive",
     aliases: ["search"],
   },
   {
     id: "politicians",
-    href: "/politicians",
+    href: "politicians.html",
     label: "Public Servants",
     aliases: ["public-servants", "representatives"],
   },
   {
     id: "my-desk",
-    href: "/my-desk",
+    href: "profile.html",
     label: "My Desk",
     aliases: ["profile"],
   },
@@ -219,9 +219,9 @@ function buildUserMenuControl(user, profile, { onSignOut, compact = false } = {}
   };
 
   panel.append(
-    mkItem("a", { href: "/politicians?following=1", text: "Following" }),
-    mkItem("a", { href: "/my-desk#account", text: "Settings" }),
-    mkItem("a", { href: "/my-desk", text: "My Desk" }),
+    mkItem("a", { href: "politicians.html?following=1", text: "Following" }),
+    mkItem("a", { href: "profile.html#account", text: "Settings" }),
+    mkItem("a", { href: "profile.html", text: "My Desk" }),
     mkItem("button", {
       text: "Sign out",
       danger: true,
@@ -334,7 +334,7 @@ function buildNotificationBell(notifications, unreadCount) {
     notifications.forEach((item) => {
       const li = document.createElement("li");
       const link = document.createElement("a");
-      link.href = `/docket?tab=mine&n=${encodeURIComponent(item.id)}`;
+      link.href = `bills-policies.html?tab=mine&n=${encodeURIComponent(item.id)}`;
       link.className = `notif-bell__item ${item.read_at ? "" : "is-unread"}`;
       link.innerHTML = `
         <strong>${escapeHtml(item.bill_title || "Bill update")}</strong>
@@ -357,7 +357,7 @@ function buildNotificationBell(notifications, unreadCount) {
 
     const footer = document.createElement("a");
     footer.className = "notif-bell__footer";
-    footer.href = "/docket?tab=mine";
+    footer.href = "bills-policies.html?tab=mine";
     footer.textContent = "Open The Docket";
     panel.append(footer);
   }
@@ -411,12 +411,12 @@ async function renderAppNav(activePage = "home") {
     buildLoggedOutActions(actions, activePage);
     // My Desk stays gated — open contextual auth modal instead of dumping guests
     // onto auth.html mid-browse.
-    nav.querySelectorAll('a[href="/my-desk"]').forEach((link) => {
+    nav.querySelectorAll('a[href="profile.html"]').forEach((link) => {
       link.addEventListener("click", (event) => {
         if (typeof promptAuthGate !== "function") return;
         event.preventDefault();
         promptAuthGate({
-          next: "/my-desk",
+          next: "profile.html",
           title: "Your desk is one step away",
           body: "Create a free account to save your location, follow public servants, and keep a personal Action Match.",
         });
