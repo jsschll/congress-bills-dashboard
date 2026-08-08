@@ -3261,6 +3261,7 @@ locationToggle?.addEventListener("change", async () => {
     filterState.locationOn &&
     !String(locationInput?.value || filterState.addressQuery || "").trim()
   ) {
+    setLocationPanelOpen(true);
     locationInput?.focus();
     setPolicyFeedStatus("Enter an address or ZIP, then click Apply.", "error");
     recomputeVisibleItems();
@@ -3282,6 +3283,7 @@ locationForm?.addEventListener("submit", async (event) => {
   }
   await saveHomeAddress(filterState.addressQuery);
   await refreshWithFilters({ resolveLocation: true });
+  setLocationPanelOpen(false);
 });
 
 locationFilterBtn?.addEventListener("click", (event) => {
@@ -3290,6 +3292,12 @@ locationFilterBtn?.addEventListener("click", (event) => {
   setLocationPanelOpen(!locationPanelOpen);
   if (locationPanelOpen && filterState.locationOn) {
     locationInput?.focus();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && locationPanelOpen) {
+    setLocationPanelOpen(false);
   }
 });
 
