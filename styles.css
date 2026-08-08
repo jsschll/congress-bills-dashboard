@@ -92,7 +92,8 @@
   backdrop-filter: blur(12px);
 }
 
-.policy-feed-filters[hidden] {
+.policy-feed-filters[hidden],
+.policy-feed-filters__location[hidden] {
   display: none !important;
 }
 
@@ -4172,27 +4173,24 @@ body {
 
 @media (max-width: 640px) {
   .page-feed .feed-toolbar {
-    gap: 0.4rem;
+    gap: 0.35rem 0.45rem;
   }
 
   .page-feed .feed-toolbar__title {
-    width: 100%;
-    font-size: 1.15rem;
-  }
-
-  .page-feed .policy-feed-tabs {
-    order: 2;
-    flex: 1 1 auto;
+    font-size: 1.05rem;
   }
 
   .page-feed .feed-toolbar__actions {
-    order: 2;
-    margin-left: 0;
+    margin-left: auto;
   }
 
   .page-feed .policy-feed-tabs__button {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.78rem;
+  }
+
+  .page-feed .feed-location-btn {
     padding: 0.35rem 0.65rem;
-    font-size: 0.8rem;
   }
 }
 
