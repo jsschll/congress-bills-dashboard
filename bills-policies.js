@@ -1902,25 +1902,12 @@ function buildFeedSocialProof(item = {}, community = null) {
 }
 
 function renderFeedSocialProofHtml(proof = {}) {
-  const pct =
-    proof.hasData && proof.supportPct != null
-      ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
-      : 0;
   const tone = String(proof.tone || "first").replace(/[^a-z0-9_-]/gi, "");
   return `
     <div class="feed-social-proof__row">
       <span class="feed-social-proof__urgency is-${tone}">${escapePolicyHtml(
-        proof.urgency || "⚡ Be the 1st to Vote!"
+        proof.urgency || "Be the 1st to Vote!"
       )}</span>
-    </div>
-    <div
-      class="feed-story-meter"
-      role="img"
-      aria-label="${
-        proof.hasData ? `${pct}% leaning Pass` : "No community votes yet"
-      }"
-    >
-      <span class="feed-story-meter__fill" style="width:${pct}%"></span>
     </div>
   `;
 }
@@ -1928,26 +1915,31 @@ function renderFeedSocialProofHtml(proof = {}) {
 function applyFeedVoteRatioLabels(card, proof = {}) {
   const supportBtn = card?.querySelector?.('[data-stance="support"]');
   const opposeBtn = card?.querySelector?.('[data-stance="oppose"]');
-  if (!supportBtn || !opposeBtn) return;
-  const hasRatio =
-    proof.hasData &&
-    proof.supportPct != null &&
-    proof.opposePct != null;
-  const passLabel = hasRatio
-    ? `👍 PASS IT • ${proof.supportPct}%`
-    : "👍 PASS IT";
-  const killLabel = hasRatio
-    ? `👎 KILL IT • ${proof.opposePct}%`
-    : "👎 KILL IT";
-  supportBtn.dataset.liveLabel = passLabel;
-  opposeBtn.dataset.liveLabel = killLabel;
-  supportBtn.textContent = passLabel;
-  opposeBtn.textContent = killLabel;
+  // Keep Pass/Kill labels clean — Pass % lives on the side thermometer.
+  if (supportBtn && opposeBtn) {
+    const passLabel = "PASS IT";
+    const killLabel = "KILL IT";
+    supportBtn.dataset.liveLabel = passLabel;
+    opposeBtn.dataset.liveLabel = killLabel;
+    supportBtn.textContent = passLabel;
+    opposeBtn.textContent = killLabel;
+  }
+
+  const passPct =
+    proof.hasData && proof.supportPct != null
+      ? Math.max(0, Math.min(100, Number(proof.supportPct) || 0))
+      : null;
+  if (passPct != null && window.VoteFeedback?.mountOrUpdateThermoGauge) {
+    window.VoteFeedback.mountOrUpdateThermoGauge(card, passPct, {
+      animate: true,
+    });
+  }
 }
 
 async function hydrateFeedSocialProof(card, item) {
-  const el = card?.querySelector(".feed-social-proof");
-  if (!el || !item?.id) return;
+  // Story shells may omit .feed-social-proof; still hydrate the side thermometer.
+  if (!card || !item?.id) return;
+  const el = card.querySelector(".feed-social-proof");
   let proof = buildFeedSocialProof(item);
   let community = null;
   try {
@@ -1958,15 +1950,23 @@ async function hydrateFeedSocialProof(card, item) {
   } catch (_) {
     /* keep roll-call / empty fallback */
   }
-  el.innerHTML = renderFeedSocialProofHtml(proof);
+  if (el) {
+    el.innerHTML = renderFeedSocialProofHtml(proof);
+  }
   applyFeedVoteRatioLabels(card, proof);
 
-  // Keep post-vote ratio bar in sync with live community split.
   const local = window.VoteFeedback?.getLocalVote?.(item);
   const stance =
     local?.stance ||
     window.PolicyEngagement?.getStance?.(item.id) ||
     null;
+
+  if (proof.hasData && proof.supportPct != null) {
+    window.VoteFeedback?.mountOrUpdateThermoGauge?.(card, proof.supportPct, {
+      animate: !stance,
+    });
+  }
+
   if (stance && window.VoteFeedback && proof.hasData) {
     window.VoteFeedback.setLocalVote(item, {
       stance,
@@ -1974,34 +1974,32 @@ async function hydrateFeedSocialProof(card, item) {
       killPct: proof.opposePct,
       total: proof.total,
     });
-    const panel = card.querySelector(".policy-engage__logged-panel.vote-feedback-panel");
-    if (panel && !panel.hidden) {
-      window.VoteFeedback.mountPostVoteBar(panel, {
-        stance,
+    const panel = card.querySelector(
+      ".policy-engage__logged-panel.vote-feedback-panel"
+    );
+    if (panel) {
+      panel.hidden = true;
+      panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
+      panel.innerHTML = "";
+    }
+    window.VoteFeedback.applyPostVoteState?.(
+      {
+        root: card,
+        card,
+        stancesEl: card.querySelector(".policy-engage__stances"),
+        loggedPanel: panel,
+        supportBtn: card.querySelector('[data-stance="support"]'),
+        opposeBtn: card.querySelector('[data-stance="oppose"]'),
+      },
+      item,
+      stance,
+      {
         passPct: proof.supportPct,
         killPct: proof.opposePct,
-        animate: false,
-        showChange: true,
-      });
-      panel.querySelector(".policy-engage__change")?.addEventListener("click", () => {
-        const engage = card.querySelector(".policy-engage");
-        // Re-show buttons via a synthetic change: remount stance UI.
-        const supportBtn = card.querySelector('[data-stance="support"]');
-        const opposeBtn = card.querySelector('[data-stance="oppose"]');
-        const stances = card.querySelector(".policy-engage__stances");
-        if (stances) stances.hidden = false;
-        panel.hidden = false;
-        panel.classList.remove("vote-feedback-panel", "is-support", "is-oppose");
-        panel.innerHTML = `
-          <p class="policy-engage__logged-hint">
-            Choose Pass It or Kill It to update your vote.
-          </p>
-        `;
-        supportBtn?.classList.toggle("is-active", stance === "support");
-        opposeBtn?.classList.toggle("is-active", stance === "oppose");
-        engage?.classList.add("is-changing-vote");
-      });
-    }
+        total: proof.total,
+      },
+      { animate: false }
+    );
   }
 }
 
@@ -2025,8 +2023,8 @@ function mountFeedCardStanceButtons(card, item, options = {}) {
       };
 
   const mountOpts = {
-    supportLabel: "👍 PASS IT",
-    opposeLabel: "👎 KILL IT",
+    supportLabel: "PASS IT",
+    opposeLabel: "KILL IT",
     prompt: "",
     compact: true,
     showFollow: false,
@@ -2070,6 +2068,9 @@ function wireFeedCardAskAi(card, item) {
   card
     .querySelectorAll(".details-toggle-btn, .a1-ask-ai-btn")
     .forEach((btn) => {
+      // Audit / breakdown controls open the drawer, not Ask AI.
+      if (btn.hasAttribute("data-feed-breakdown")) return;
+      if (btn.classList.contains("a1-story-card__audit")) return;
       btn.addEventListener("click", (event) => {
         event.stopPropagation();
         if (window.PolicyEngagement?.openAskAi) {
@@ -2100,8 +2101,8 @@ function ensureFeedBreakdownDrawer() {
       <div class="feed-breakdown-drawer__handle" aria-hidden="true"></div>
       <header class="feed-breakdown-drawer__header">
         <div>
-          <p class="feed-breakdown-drawer__eyebrow">Full breakdown</p>
-          <h2 id="feed-breakdown-title">Bill details</h2>
+          <p class="feed-breakdown-drawer__eyebrow">Audit</p>
+          <h2 id="feed-breakdown-title">Bill audit</h2>
         </div>
         <button
           type="button"
@@ -2159,8 +2160,8 @@ function openFeedBreakdownDrawer(card, item = {}) {
     item.shortTitle ||
     item.title ||
     card.querySelector(".a1-story-card__title")?.textContent ||
-    "Bill details";
-  if (titleEl) titleEl.textContent = String(headline).trim() || "Bill details";
+    "Bill audit";
+  if (titleEl) titleEl.textContent = String(headline).trim() || "Bill audit";
 
   // Wire Ask AI inside the drawer to the same bill item.
   body.querySelectorAll(".details-toggle-btn, .a1-ask-ai-btn").forEach((btn) => {
@@ -2194,6 +2195,57 @@ function wireFeedCardBreakdown(card, item) {
     });
 }
 
+const BILL_JOURNAL_KEY = "a1.billJournal.v1";
+
+function readBillJournalStore() {
+  try {
+    const raw = localStorage.getItem(BILL_JOURNAL_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeBillJournalStore(store) {
+  try {
+    localStorage.setItem(BILL_JOURNAL_KEY, JSON.stringify(store));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function billJournalKey(item) {
+  return String(
+    item?.id ||
+      item?.billId ||
+      item?.bill_id ||
+      item?.billNumber ||
+      item?.bill_number ||
+      ""
+  ).trim();
+}
+
+function getBillJournalNote(item) {
+  const key = billJournalKey(item);
+  if (!key) return "";
+  return String(readBillJournalStore()[key]?.text || "").trim();
+}
+
+function setBillJournalNote(item, text) {
+  const key = billJournalKey(item);
+  if (!key) return;
+  const store = readBillJournalStore();
+  const cleaned = String(text || "").trim();
+  if (!cleaned) {
+    delete store[key];
+  } else {
+    store[key] = { text: cleaned, at: new Date().toISOString() };
+  }
+  writeBillJournalStore(store);
+}
+
 function syncFeedBookmarkButton(button, item) {
   if (!button) return;
   const following = Boolean(
@@ -2204,15 +2256,81 @@ function syncFeedBookmarkButton(button, item) {
   button.setAttribute("aria-pressed", String(following));
   button.setAttribute(
     "aria-label",
-    following ? "Remove bookmark" : "Bookmark this bill"
+    following ? "Remove from File" : "File this bill"
   );
-  button.title = following ? "Bookmarked" : "Bookmark";
+  button.title = following ? "Filed" : "File";
+  const label = button.querySelector(".feed-card-icon-btn__label");
+  if (label) label.textContent = "File";
+}
+
+function syncFeedJournalButton(button, item) {
+  if (!button) return;
+  const hasNote = Boolean(getBillJournalNote(item));
+  button.classList.toggle("is-active", hasNote);
+  button.setAttribute("aria-pressed", String(hasNote));
+  button.setAttribute(
+    "aria-label",
+    hasNote ? "Edit Journal note" : "Add Journal note"
+  );
+  button.title = "Journal";
+}
+
+function closeFeedJournalPopover(card) {
+  card?.querySelectorAll(".feed-journal-popover").forEach((node) => node.remove());
+}
+
+function openFeedJournalPopover(card, item, anchor) {
+  closeFeedJournalPopover(card);
+  const pop = document.createElement("div");
+  pop.className = "feed-journal-popover";
+  pop.innerHTML = `
+    <label class="feed-journal-popover__label" for="feed-journal-input">Journal</label>
+    <textarea
+      id="feed-journal-input"
+      class="feed-journal-popover__input"
+      rows="3"
+      maxlength="600"
+      placeholder="Private notes on this measure…"
+    ></textarea>
+    <div class="feed-journal-popover__actions">
+      <button type="button" class="feed-journal-popover__btn" data-journal-cancel>Cancel</button>
+      <button type="button" class="feed-journal-popover__btn is-primary" data-journal-save>Save</button>
+    </div>
+  `;
+  const host =
+    card.querySelector(".a1-story-card") ||
+    card.querySelector(".a1-card-shell") ||
+    card;
+  const prior = host.style.position;
+  if (!prior || prior === "static") host.style.position = "relative";
+  host.appendChild(pop);
+
+  const input = pop.querySelector(".feed-journal-popover__input");
+  if (input) {
+    input.value = getBillJournalNote(item);
+    input.focus();
+  }
+
+  pop.querySelector("[data-journal-cancel]")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    closeFeedJournalPopover(card);
+  });
+  pop.querySelector("[data-journal-save]")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setBillJournalNote(item, input?.value || "");
+    syncFeedJournalButton(anchor, item);
+    closeFeedJournalPopover(card);
+    if (typeof showAppToast === "function") {
+      showAppToast("Journal note saved.", "success");
+    }
+  });
 }
 
 function wireFeedCardMicroActions(card, item) {
-  const bookmark = card.querySelector(".feed-card-bookmark");
-  const share = card.querySelector(".feed-card-share");
+  const bookmark = card.querySelector(".feed-card-bookmark, .feed-card-file");
+  const journal = card.querySelector(".feed-card-journal");
   syncFeedBookmarkButton(bookmark, item);
+  syncFeedJournalButton(journal, item);
 
   bookmark?.addEventListener("click", async (event) => {
     event.stopPropagation();
@@ -2222,46 +2340,34 @@ function wireFeedCardMicroActions(card, item) {
       bookmark.disabled = true;
       await window.PolicyEngagement.toggleFollowBill(item);
       syncFeedBookmarkButton(bookmark, item);
+      if (typeof showAppToast === "function") {
+        const filed = bookmark.classList.contains("is-active");
+        showAppToast(
+          filed ? "Filed to your watchlist." : "Removed from File.",
+          filed ? "success" : "info"
+        );
+      }
     } catch (error) {
-      alert(error?.message || "Could not update bookmark.");
+      alert(error?.message || "Could not update File.");
     } finally {
       bookmark.disabled = false;
     }
   });
 
-  share?.addEventListener("click", async (event) => {
+  journal?.addEventListener("click", (event) => {
     event.stopPropagation();
     event.preventDefault();
-    const title =
-      item.title || item.short_title || item.billNumber || "Legislation";
-    const url =
-      item.official_url ||
-      item.clerk_url ||
-      item.url ||
-      item.source_url ||
-      window.location.href;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: String(title), url: String(url) });
-        return;
-      }
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(String(url));
-        share.classList.add("is-copied");
-        share.setAttribute("aria-label", "Link copied");
-        setTimeout(() => {
-          share.classList.remove("is-copied");
-          share.setAttribute("aria-label", "Share");
-        }, 1200);
-      }
-    } catch (_) {
-      /* user cancelled share */
+    const existing = card.querySelector(".feed-journal-popover");
+    if (existing) {
+      closeFeedJournalPopover(card);
+      return;
     }
+    openFeedJournalPopover(card, item, journal);
   });
 }
 
 /**
- * Instagram Story / sticker poll feed card.
+ * Fallback social / Bento feed card when theme engine is unavailable.
  */
 function renderSocialFeedCardShell({
   category,
@@ -2269,78 +2375,64 @@ function renderSocialFeedCardShell({
   billId,
   impacts,
   socialProof,
+  item = {},
 }) {
   const categoryLabel =
     typeof category === "string" ? category : category?.label || "";
-  const categoryIcon =
-    (typeof category === "object" && category?.icon) ||
-    feedCategoryIcon(categoryLabel);
   const what =
     impacts?.what || ensureActionVerbTldr("", { title: title || "" });
-  const chips = Array.isArray(impacts?.chips) && impacts.chips.length
-    ? impacts.chips
-    : [{ icon: "👤", label: "Public" }];
-  const costPill = impacts?.costPill || {
-    tone: "zero",
-    icon: "🟢",
-    label: "$0 Net Cost",
-  };
-  const costTone = String(costPill.tone || "zero").replace(/[^a-z0-9_-]/gi, "");
-  const proof = socialProof || buildFeedSocialProof({});
-  const chipHtml = chips
-    .map(
-      (chip) => `
-      <span class="feed-impact-chip">
-        <span class="feed-impact-chip__icon" aria-hidden="true">${
-          chip.icon || "👤"
-        }</span>
-        <span class="feed-impact-chip__label">${escapePolicyHtml(
-          chip.label || "Public"
-        )}</span>
-      </span>`
-    )
-    .join("");
+  const proof = socialProof || buildFeedSocialProof(item);
+  const status = formatFeedStatusTag(item);
+  const sponsor = item?.primarySponsor || item?.primary_sponsor || {};
+  const sponsorName = String(
+    sponsor.name ||
+      item.primary_sponsor_name ||
+      item.sponsor_name ||
+      "Sponsor pending"
+  ).trim();
+  const sponsorTitle = String(
+    sponsor.title || item.primary_sponsor_title || ""
+  ).trim();
+  const sponsorLine = sponsorTitle
+    ? `${sponsorName} · ${sponsorTitle}`
+    : sponsorName;
 
   return `
     <div class="feed-social-card__header">
       <div class="feed-social-card__meta" aria-label="Bill meta">
+        <span class="feed-status-pill is-${escapePolicyHtml(
+          status.tone || "pending"
+        )}">${escapePolicyHtml(status.label || "On the Docket")}</span>
+        <span class="feed-meta-dot" aria-hidden="true">•</span>
         <div class="category-pill" title="${escapePolicyHtml(
           categoryLabel || "Congress"
         )}">
-          <span class="category-pill__icon" aria-hidden="true">${categoryIcon}</span>
           <span class="category-pill__label">${escapePolicyHtml(
             categoryLabel || "Congress"
           )}</span>
         </div>
-        <span class="feed-meta-dot" aria-hidden="true">•</span>
-        <div class="feed-cost-pill is-${costTone}" aria-label="Fiscal impact">
-          <span class="feed-cost-pill__icon" aria-hidden="true">${
-            costPill.icon || "🟢"
-          }</span>
-          <span class="feed-cost-pill__label">${escapePolicyHtml(
-            costPill.label || "$0 Net Cost"
-          )}</span>
-        </div>
       </div>
       <div class="feed-social-card__micro" aria-label="Card actions">
-        <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="Bookmark this bill" aria-pressed="false" title="Bookmark">🔖</button>
-        <button type="button" class="feed-card-icon-btn feed-card-share" aria-label="Share" title="Share">📤</button>
+        <button type="button" class="feed-card-icon-btn feed-card-file feed-card-bookmark" aria-label="File this bill" aria-pressed="false" title="File">
+          <span class="feed-card-icon-btn__label">File</span>
+        </button>
+        <button type="button" class="feed-card-icon-btn feed-card-journal" aria-label="Journal note" aria-pressed="false" title="Journal">
+          <span class="feed-card-icon-btn__label">Journal</span>
+        </button>
       </div>
     </div>
     <div class="feed-social-card__body">
       <h3 class="feed-social-card__headline">${escapePolicyHtml(title)}</h3>
+      <p class="feed-social-card__sponsor">
+        <span class="feed-social-card__sponsor-label">Sponsor</span>
+        ${escapePolicyHtml(sponsorLine)}
+      </p>
       <p class="feed-social-card__bill-id">${escapePolicyHtml(
         billId || "Federal measure"
       )}</p>
-      <div class="feed-tldr" aria-label="The TL;DR">
-        <span class="feed-tldr__label" aria-hidden="true">⚡ THE TL;DR</span>
-        <p class="feed-tldr__text">${escapePolicyHtml(what)}</p>
-      </div>
-      <div class="feed-story-row feed-story-row--inline" aria-label="Who is affected">
-        <span class="feed-story-row__label">Who's affected:</span>
-        <div class="feed-impact-chips">
-          ${chipHtml}
-        </div>
+      <div class="feed-local-impact" aria-label="Local impact">
+        <span class="feed-local-impact__label">Local Impact</span>
+        <p class="feed-local-impact__text">${escapePolicyHtml(what)}</p>
       </div>
     </div>
     <div class="feed-social-card__actions">
@@ -2348,9 +2440,28 @@ function renderSocialFeedCardShell({
         ${renderFeedSocialProofHtml(proof)}
       </div>
       <div class="engagement-mount-point" aria-label="Your stance"></div>
-      <button type="button" class="details-toggle-btn">
-        ✨ Ask AI
+      <button type="button" class="feed-card-audit-btn" data-feed-breakdown="1">
+        Audit
       </button>
+    </div>
+    <div
+      class="vote-thermo-gauge"
+      role="img"
+      aria-label="0% Pass"
+      style="--thermo-pct:0%; --thermo-color:hsl(60 92% 50%);"
+      data-pass-pct="0"
+    >
+      <div class="vote-thermo-gauge__tube">
+        <div class="vote-thermo-gauge__ticks" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="vote-thermo-gauge__track">
+          <span class="vote-thermo-gauge__fill" style="height:0%"></span>
+        </div>
+      </div>
+      <div class="vote-thermo-gauge__bulb" aria-hidden="true">
+        <span class="vote-thermo-gauge__bulb-fill"></span>
+      </div>
     </div>
   `;
 }
@@ -2388,6 +2499,7 @@ function renderBillCard(item) {
       billId: formatFeedBillId(item),
       impacts: cardCopy.impacts,
       socialProof: buildFeedSocialProof(item),
+      item,
     });
   }
 
@@ -2562,6 +2674,7 @@ function renderVoteCard(item) {
       billId: formatFeedBillId(item),
       impacts: cardCopy.impacts,
       socialProof: buildFeedSocialProof(item),
+      item,
     });
   }
 

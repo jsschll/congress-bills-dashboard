@@ -72,6 +72,7 @@
 }
 
 .a1-article-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -107,4 +108,133 @@
   .a1-reaction-btn--pulse {
     animation: none;
   }
+
+  .vote-thermo-gauge__fill,
+  .vote-thermo-gauge__bulb-fill {
+    transition: none;
+  }
+}
+
+/* Vertical glass Pass% thermometer (React ArticleCard shell) */
+.a1-article-card {
+  position: relative;
+}
+
+.vote-thermo-gauge {
+  position: absolute;
+  top: 0.85rem;
+  bottom: 4.75rem;
+  right: 0.5rem;
+  z-index: 6;
+  width: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  --thermo-pct: 0%;
+  --thermo-color: hsl(60 92% 50%);
+}
+
+.vote-thermo-gauge__tube {
+  position: relative;
+  flex: 1 1 auto;
+  width: 0.72rem;
+  min-height: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.35),
+    0 4px 6px -4px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.vote-thermo-gauge__ticks {
+  position: absolute;
+  inset: 0.4rem 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.vote-thermo-gauge__ticks span {
+  display: block;
+  width: 58%;
+  height: 1.5px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.vote-thermo-gauge__track {
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.vote-thermo-gauge__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--thermo-pct, 0%);
+  border-radius: inherit;
+  background-color: var(--thermo-color, hsl(60 92% 50%));
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--thermo-color) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    height 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.75s ease,
+    box-shadow 0.75s ease;
+}
+
+.vote-thermo-gauge__bulb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: -0.22rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.35),
+    0 4px 6px -4px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2;
+}
+
+.vote-thermo-gauge__bulb-fill {
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  background-color: var(--thermo-color, hsl(60 92% 50%));
+  opacity: 0.35;
+  transition:
+    background-color 0.75s ease,
+    opacity 0.35s ease;
+}
+
+.vote-thermo-gauge.is-ready .vote-thermo-gauge__bulb-fill {
+  opacity: 1;
+}
+
+.vote-thermo-gauge:not(.is-ready) .vote-thermo-gauge__fill {
+  height: 0% !important;
+}
+
+.a1-article-card .vote-feedback-bar__track {
+  display: none !important;
 }

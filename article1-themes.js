@@ -195,8 +195,97 @@
     if (!includeChrome) return "";
     return `
       <div class="a1-micro-actions" aria-label="Card actions">
-        <button type="button" class="feed-card-icon-btn feed-card-bookmark" aria-label="Bookmark this bill" aria-pressed="false" title="Bookmark">🔖</button>
-        <button type="button" class="feed-card-icon-btn feed-card-share" aria-label="Share" title="Share">📤</button>
+        <button type="button" class="feed-card-icon-btn feed-card-file feed-card-bookmark" aria-label="File this bill" aria-pressed="false" title="File">
+          <span class="feed-card-icon-btn__label">File</span>
+        </button>
+        <button type="button" class="feed-card-icon-btn feed-card-journal" aria-label="Journal note" aria-pressed="false" title="Journal">
+          <span class="feed-card-icon-btn__label">Journal</span>
+        </button>
+      </div>
+    `;
+  }
+
+  function formatSponsorLine(item = {}) {
+    const sponsor = item.primarySponsor || item.primary_sponsor || {};
+    const name = String(
+      sponsor.name ||
+        sponsor.fullName ||
+        item.primary_sponsor_name ||
+        item.sponsor_name ||
+        item.sponsor ||
+        ""
+    ).trim();
+    const title = String(
+      sponsor.title ||
+        item.primary_sponsor_title ||
+        sponsor.party ||
+        ""
+    ).trim();
+    if (!name) return "Sponsor pending";
+    return title ? `${name} · ${title}` : name;
+  }
+
+  function formatStatusMeta(item = {}) {
+    const result = String(
+      item.result || item.statusLabel || item.status_label || item.status?.stepName || ""
+    ).trim();
+    const lower = result.toLowerCase();
+    const chamberRaw = String(item.chamber || item.jurisdiction || "").toLowerCase();
+    const chamber = chamberRaw.includes("senate")
+      ? "Senate"
+      : chamberRaw.includes("house")
+        ? "House"
+        : "";
+
+    if (/\b(passed|pass|agreed|confirmed|adopted|carried|enacted|became law|signed)\b/.test(lower)) {
+      return { label: chamber ? `Passed ${chamber}` : "Passed", tone: "passed" };
+    }
+    if (/\b(failed|fail|rejected|reject|defeated|defeat|not agree|tabled|vetoed|veto)\b/.test(lower)) {
+      return { label: chamber ? `Rejected ${chamber}` : "Rejected", tone: "failed" };
+    }
+    if (result && result.length <= 28 && !/calendar no\.?\s*$/i.test(result)) {
+      return { label: result, tone: "pending" };
+    }
+    return { label: "On the Docket", tone: "pending" };
+  }
+
+  function localImpactLine({ summary = "", impactsList = [], title = "", item = {} } = {}) {
+    const explicit = String(
+      item.communityImpact ||
+        item.community_impact ||
+        item.localImpact ||
+        item.local_impact ||
+        item.local_impact_summary ||
+        ""
+    ).trim();
+    const firstImpact = normalizeCopyLine(impactsList[0] || "");
+    const line = normalizeCopyLine(explicit || firstImpact || summary || title);
+    if (!line) return "Local impact details forthcoming.";
+    if (line.length <= 120) return line;
+    return `${line.slice(0, 117).replace(/\s+\S*$/, "").trim()}…`;
+  }
+
+  function thermoGaugeHtml(passPct = 0) {
+    const pct = Math.max(0, Math.min(100, Math.round(Number(passPct) || 0)));
+    return `
+      <div
+        class="vote-thermo-gauge"
+        role="img"
+        aria-label="${pct}% Pass"
+        style="--thermo-pct:${pct}%; --thermo-color:hsl(60 92% 50%);"
+        data-pass-pct="${pct}"
+      >
+        <div class="vote-thermo-gauge__tube">
+          <div class="vote-thermo-gauge__ticks" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="vote-thermo-gauge__track">
+            <span class="vote-thermo-gauge__fill" style="height:${pct}%"></span>
+          </div>
+        </div>
+        <div class="vote-thermo-gauge__bulb" aria-hidden="true">
+          <span class="vote-thermo-gauge__bulb-fill"></span>
+        </div>
       </div>
     `;
   }
@@ -262,10 +351,10 @@
   }
 
   /**
-   * Instagram/TikTok-style story peek: fixed-height hero + overlay type + vote dock.
-   * Dense theme layouts live in the breakdown drawer template.
+   * Social / Bento peek: scannable hierarchy + side thermometer + civic actions.
+   * Dense theme layouts live in the Audit drawer template.
    */
-  function renderStoryPeek(payload, theme, label) {
+  function renderStoryPeek(payload, theme) {
     const { billId, title, category, impactsList, summary, item } = payload;
     const { imageSrc, imageAlt, defaultStockUrl } = resolveHeroImage(item, {
       title,
@@ -273,14 +362,14 @@
       summary,
       impactsList,
     });
-    const punch = punchLine({ summary, impactsList, title });
-    const second =
-      impactsList[1] && normalizeCopyLine(impactsList[1]) !== punch
-        ? normalizeCopyLine(impactsList[1])
-        : "";
+    const status = formatStatusMeta(item || {});
+    const sponsor = formatSponsorLine(item || {});
+    const impact = localImpactLine({ summary, impactsList, title, item });
 
     return `
-      <div class="a1-story-card" data-theme="${escapeHtml(theme)}">
+      <div class="a1-story-card a1-story-card--bento" data-theme="${escapeHtml(
+        theme
+      )}">
         <div class="a1-story-card__media a1-story-card__frame">
           <img
             class="a1-story-card__photo"
@@ -294,37 +383,37 @@
           <div class="a1-story-card__scrim" aria-hidden="true"></div>
           <div class="a1-story-card__top">
             <div class="a1-story-card__pills">
-              <span class="a1-story-card__pill a1-story-card__pill--theme">${escapeHtml(
-                label
-              )}</span>
+              <span class="a1-story-card__pill a1-story-card__pill--status is-${escapeHtml(
+                status.tone
+              )}">${escapeHtml(status.label)}</span>
               <span class="a1-story-card__pill a1-story-card__pill--cat">${escapeHtml(
                 category || "Congress"
-              )}</span>
-              <span class="a1-story-card__pill a1-story-card__pill--id">${escapeHtml(
-                billId
               )}</span>
             </div>
             ${microActionsHtml()}
           </div>
           <div class="a1-story-card__copy">
             <h3 class="a1-story-card__title">${escapeHtml(title)}</h3>
-            <p class="a1-story-card__punch">${escapeHtml(punch)}</p>
-            ${
-              second
-                ? `<p class="a1-story-card__punch a1-story-card__punch--secondary">${escapeHtml(
-                    second
-                  )}</p>`
-                : ""
-            }
+            <p class="a1-story-card__sponsor">
+              <span class="a1-story-card__sponsor-label">Sponsor</span>
+              <span class="a1-story-card__sponsor-name">${escapeHtml(sponsor)}</span>
+              <span class="a1-story-card__bill-id">${escapeHtml(billId)}</span>
+            </p>
+            <div class="a1-story-card__impact" aria-label="Local impact">
+              <span class="a1-story-card__impact-label">Local Impact</span>
+              <p class="a1-story-card__impact-text">${escapeHtml(impact)}</p>
+            </div>
           </div>
         </div>
         <div class="a1-story-card__footer">
-          <button type="button" class="a1-story-card__breakdown" data-feed-breakdown="1">
-            <span aria-hidden="true">↕</span>
-            Tap for Full Breakdown / AI Summary
+          <div class="a1-story-card__poll" aria-label="Citizen poll">
+            ${reactionDockHtml()}
+          </div>
+          <button type="button" class="a1-story-card__breakdown a1-story-card__audit" data-feed-breakdown="1">
+            Audit
           </button>
-          ${reactionDockHtml()}
         </div>
+        ${thermoGaugeHtml(0)}
       </div>
     `;
   }
@@ -883,8 +972,9 @@
       item,
     };
 
-    const peek = withChrome(true, () => renderStoryPeek(payload, theme, label));
+    const peek = withChrome(true, () => renderStoryPeek(payload, theme));
     const detail = renderThemeDetail(theme, payload);
+    const sponsor = formatSponsorLine(item || {});
 
     return {
       theme,
@@ -897,16 +987,17 @@
           <template class="a1-story-detail-template">
             <div class="a1-story-detail" data-a1-theme="${escapeHtml(theme)}">
               <div class="a1-story-detail__intro">
-                <p class="a1-story-detail__eyebrow">${escapeHtml(label)} · Full breakdown</p>
+                <p class="a1-story-detail__eyebrow">Audit · Full breakdown</p>
                 <h3 class="a1-story-detail__title">${escapeHtml(title)}</h3>
                 <p class="a1-story-detail__bill">${escapeHtml(billId)} · ${escapeHtml(
                   categoryLabel
                 )}</p>
+                <p class="a1-story-detail__sponsor">${escapeHtml(sponsor)}</p>
               </div>
               ${detail}
               <div class="a1-story-detail__ai">
                 <button type="button" class="details-toggle-btn a1-ask-ai-btn a1-story-detail__ask">
-                  ✨ Ask AI about this bill
+                  Ask AI about this bill
                 </button>
               </div>
             </div>
